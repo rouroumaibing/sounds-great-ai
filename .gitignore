@@ -1,0 +1,6 @@
+.env
+.superpowers/
+docs/superpowers
+
+tmp/
+readonly-docs

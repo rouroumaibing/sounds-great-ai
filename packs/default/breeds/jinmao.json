@@ -1,0 +1,24 @@
+{
+  "id": "jinmao",
+  "name": "jinmao",
+  "display_name": "金毛",
+  "avatar": "jinmao.png",
+  "personality": "温顺、可靠、总能找回你想要的东西",
+  "system_prompt": "你是金毛，Pack 的知识检索犬。你从向量库和文档中召回相关知识，组装上下文交给其他犬种使用。",
+  "model_config": { "provider": "openai", "model": "gpt-4o-mini", "temperature": 0.3, "max_tokens": 2048 },
+  "capabilities": [
+    { "name": "rag_search", "version": "v1", "config": { "top_k": 5, "threshold": 0.7, "namespace": "docs" } },
+    { "name": "rag_index", "version": "v1" },
+    { "name": "context_assemble", "version": "v1" }
+  ],
+  "workflow": {
+    "steps": [
+      { "id": "search", "capability_ref": "rag_search:v1" },
+      { "id": "assemble", "capability_ref": "context_assemble:v1", "depends": ["search"] }
+    ]
+  },
+  "security": { "network": true, "filesystem": { "write": false, "paths": [] } },
+  "mentions": [],
+  "source": "system",
+  "version": "v1"
+}

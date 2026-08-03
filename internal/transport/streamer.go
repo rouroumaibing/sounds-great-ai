@@ -33,6 +33,11 @@ func (s *Streamer) SendEvent(ctx context.Context, event *protocol.Event) error {
 	return s.conn.WriteMessage(websocket.TextMessage, data)
 }
 
+// Send satisfies pack.EventSink. Delegates to SendEvent.
+func (s *Streamer) Send(ctx context.Context, ev *protocol.Event) error {
+	return s.SendEvent(ctx, ev)
+}
+
 func (s *Streamer) SendPing() error {
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()

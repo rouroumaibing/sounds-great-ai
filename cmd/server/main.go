@@ -68,6 +68,50 @@ func setupPack() *pack.Pack {
 	if err := p.RegisterCapability(capability.NewCodeSearch(workspaceDir)); err != nil {
 		log.Printf("Warning: CodeSearch registration failed: %v", err)
 	}
+	if err := p.RegisterCapability(capability.NewTaskDecompose()); err != nil {
+		log.Printf("Warning: TaskDecompose registration failed: %v", err)
+	}
+	if err := p.RegisterCapability(capability.NewAgentDispatch()); err != nil {
+		log.Printf("Warning: AgentDispatch registration failed: %v", err)
+	}
+	if err := p.RegisterCapability(capability.NewResultMerge()); err != nil {
+		log.Printf("Warning: ResultMerge registration failed: %v", err)
+	}
+	// Dispatch executor (framework capability)
+	if err := p.RegisterCapability(capability.NewDispatchExecute(p)); err != nil {
+		log.Printf("Warning: DispatchExecute registration failed: %v", err)
+	}
+	// xigou chain
+	if err := p.RegisterCapability(capability.NewCodeAnalyze()); err != nil {
+		log.Printf("Warning: CodeAnalyze registration failed: %v", err)
+	}
+	if err := p.RegisterCapability(capability.NewRefactorSuggest()); err != nil {
+		log.Printf("Warning: RefactorSuggest registration failed: %v", err)
+	}
+	// zangao chain
+	if err := p.RegisterCapability(capability.NewFormatOutput()); err != nil {
+		log.Printf("Warning: FormatOutput registration failed: %v", err)
+	}
+	if err := p.RegisterCapability(capability.NewRenderMarkdown()); err != nil {
+		log.Printf("Warning: RenderMarkdown registration failed: %v", err)
+	}
+	if err := p.RegisterCapability(capability.NewStreamResponse()); err != nil {
+		log.Printf("Warning: StreamResponse registration failed: %v", err)
+	}
+	// demu chain
+	if err := p.RegisterCapability(capability.NewLogTrace()); err != nil {
+		log.Printf("Warning: LogTrace registration failed: %v", err)
+	}
+	if err := p.RegisterCapability(capability.NewErrorDiagnose()); err != nil {
+		log.Printf("Warning: ErrorDiagnose registration failed: %v", err)
+	}
+	// zhonghuatianyuanquan
+	sf, err := capability.NewSensitiveFilter()
+	if err == nil {
+		_ = p.RegisterCapability(sf)
+	} else {
+		log.Printf("Warning: SensitiveFilter construction failed: %v", err)
+	}
 	// Load breed configs from JSON files
 	breedsDir := os.Getenv("BREEDS_DIR")
 	if breedsDir == "" {

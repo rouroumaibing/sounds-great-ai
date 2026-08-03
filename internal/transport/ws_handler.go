@@ -121,6 +121,7 @@ func (h *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 					Context: &pack.ExecutionContext{
 						SessionID: sessionID,
 					},
+					Sink: streamer,
 				}
 
 				out, err := h.pack.Bark(barkCtx, breedID, input)

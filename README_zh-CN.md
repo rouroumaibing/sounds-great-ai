@@ -198,9 +198,9 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 | command_check | Shipped | internal/aspect/command_guard.go |
 | path_validate | Shipped | internal/aspect/command_guard.go |
 | sensitive_filter | Planned | internal/aspect/ |
-| task_decompose | Planned | internal/a2a/orchestrator/ |
-| agent_dispatch | Planned | internal/a2a/ |
-| result_merge | Planned | internal/a2a/ |
+| task_decompose | Shipped | internal/capability/task_decompose.go |
+| agent_dispatch | Shipped | internal/capability/agent_dispatch.go |
+| result_merge | Shipped | internal/capability/result_merge.go |
 | code_search | Planned | internal/tool/ (grep/glob) |
 | code_analyze | Planned | internal/agent/coder.go |
 | refactor_suggest | Planned | internal/agent/coder.go |

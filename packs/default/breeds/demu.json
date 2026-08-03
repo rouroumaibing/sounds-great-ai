@@ -8,14 +8,12 @@
   "model_config": { "provider": "openai", "model": "gpt-4o-mini", "temperature": 0.2, "max_tokens": 2048 },
   "capabilities": [
     { "name": "log_trace", "version": "v1" },
-    { "name": "error_diagnose", "version": "v1" },
-    { "name": "performance_profile", "version": "v1" }
+    { "name": "error_diagnose", "version": "v1" }
   ],
   "workflow": {
     "steps": [
       { "id": "trace", "capability_ref": "log_trace:v1" },
-      { "id": "diagnose", "capability_ref": "error_diagnose:v1", "depends": ["trace"] },
-      { "id": "profile", "capability_ref": "performance_profile:v1", "depends": ["trace"] }
+      { "id": "diagnose", "capability_ref": "error_diagnose:v1", "depends": ["trace"] }
     ]
   },
   "security": { "network": false, "filesystem": { "write": false, "paths": ["/workspace/logs"] } },

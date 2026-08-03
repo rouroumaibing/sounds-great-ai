@@ -9,13 +9,15 @@
   "capabilities": [
     { "name": "task_decompose", "version": "v1" },
     { "name": "agent_dispatch", "version": "v1" },
+    { "name": "dispatch_execute", "version": "v1" },
     { "name": "result_merge", "version": "v1" }
   ],
   "workflow": {
     "steps": [
       { "id": "decompose", "capability_ref": "task_decompose:v1" },
       { "id": "dispatch", "capability_ref": "agent_dispatch:v1", "depends": ["decompose"] },
-      { "id": "merge", "capability_ref": "result_merge:v1", "depends": ["dispatch"] }
+      { "id": "execute", "capability_ref": "dispatch_execute:v1", "depends": ["dispatch", "decompose"] },
+      { "id": "merge", "capability_ref": "result_merge:v1", "depends": ["execute"] }
     ]
   },
   "security": { "network": true, "filesystem": { "write": false, "paths": [] } },

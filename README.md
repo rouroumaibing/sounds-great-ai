@@ -197,21 +197,22 @@ We build in the open. Here's where we are.
 |---------|--------|-------|
 | command_check | Shipped | internal/aspect/command_guard.go |
 | path_validate | Shipped | internal/aspect/command_guard.go |
-| sensitive_filter | Planned | internal/aspect/ |
-| task_decompose | Planned | internal/a2a/orchestrator/ |
-| agent_dispatch | Planned | internal/a2a/ |
-| result_merge | Planned | internal/a2a/ |
+| sensitive_filter | Shipped | internal/capability/sensitive_filter.go |
+| task_decompose | Shipped | internal/capability/task_decompose.go |
+| agent_dispatch | Shipped | internal/capability/agent_dispatch.go |
+| result_merge | Shipped | internal/capability/result_merge.go |
+| dispatch_execute | Shipped | internal/capability/dispatch_execute.go |
 | code_search | Planned | internal/tool/ (grep/glob) |
-| code_analyze | Planned | internal/agent/coder.go |
-| refactor_suggest | Planned | internal/agent/coder.go |
+| code_analyze | Shipped | internal/capability/code_analyze.go |
+| refactor_suggest | Shipped | internal/capability/refactor_suggest.go |
 | rag_search | Planned | Vector DB integration |
 | rag_index | Planned | Vector DB integration |
 | context_assemble | Planned | — |
-| format_output | Planned | internal/transport/ |
-| render_markdown | Planned | internal/transport/ |
-| stream_response | Planned | internal/transport/ws_handler.go |
-| log_trace | Planned | internal/aspect/tracing.go |
-| error_diagnose | Planned | — |
+| format_output | Shipped | internal/capability/format_output.go |
+| render_markdown | Shipped | internal/capability/render_markdown.go |
+| stream_response | Shipped | internal/capability/stream_response.go |
+| log_trace | Shipped | internal/capability/log_trace.go |
+| error_diagnose | Shipped | internal/capability/error_diagnose.go |
 | performance_profile | Planned | — |
 
 ### Server Integration
@@ -222,6 +223,7 @@ We build in the open. Here's where we are.
 | setupPack() init + LoadFromDir | Shipped |
 | /api/breeds route mounting | Shipped |
 | WebSocket → Bark end-to-end pipeline | Shipped |
+| WebSocket → Bark → multi-breed dispatch end-to-end pipeline | Shipped |
 
 ### v2: Pack Runtime Execution Model
 

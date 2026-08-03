@@ -58,12 +58,20 @@ func (p *Pack) executeWorkflow(ctx context.Context, wf *WorkflowConfig, bindings
 				}
 
 				stepInput := *input
-				stepInput.Previous = make(map[string]*TaskOutput)
+				// Merge dispatch-level Previous (from ExecuteDispatch, keyed by
+				// SubTaskID) with step-level Previous (from workflow step deps,
+				// keyed by step ID). executeWorkflow must not discard the
+				// upstream outputs that ExecuteDispatch wired up.
+				merged := make(map[string]*TaskOutput)
+				for k, v := range input.Previous {
+					merged[k] = v
+				}
 				mu.Lock()
 				for _, dep := range s.Depends {
-					stepInput.Previous[dep] = stepResults[dep]
+					merged[dep] = stepResults[dep]
 				}
 				mu.Unlock()
+				stepInput.Previous = merged
 				stepInput.CapabilityConfig = configMap[s.CapabilityRef]
 
 				out, err := cap.Run(ctx, &stepInput)

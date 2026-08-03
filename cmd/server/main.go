@@ -2,14 +2,19 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"time"
 
+	"github.com/cloudwego/eino/components/embedding"
 	"sounds-great-ai/internal/agent"
 	"sounds-great-ai/internal/capability"
 	"sounds-great-ai/internal/component"
 	"sounds-great-ai/internal/packapi"
+	"sounds-great-ai/internal/ragstore"
 	"sounds-great-ai/internal/transport"
 	"sounds-great-ai/pkg/pack"
 )
@@ -31,11 +36,14 @@ func main() {
 	}
 
 	// Initialize Pack system
-	p := setupPack()
+	p, registry, embedder, cleaner, workspaceDir := setupPack()
 	defer p.Close()
+	if cleaner != nil {
+		defer cleaner.Stop()
+	}
 
 	wsHandler := transport.NewWSHandler(p)
-	mux := buildMuxWithHandler(wsHandler, p)
+	mux := buildMuxWithHandler(wsHandler, p, registry, embedder, workspaceDir)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -47,7 +55,7 @@ func main() {
 	}
 }
 
-func setupPack() *pack.Pack {
+func setupPack() (*pack.Pack, *ragstore.StoreRegistry, embedding.Embedder, *ragstore.RetiredCleaner, string) {
 	p := pack.New("default")
 	// Register capabilities (fixed Go code, once at startup)
 	if err := p.RegisterCapability(capability.NewCommandCheck()); err != nil {
@@ -112,6 +120,22 @@ func setupPack() *pack.Pack {
 	} else {
 		log.Printf("Warning: SensitiveFilter construction failed: %v", err)
 	}
+	// RAG capabilities (jinmao)
+	ctx := context.Background()
+	registry, _, cleaner, embedder, err := setupRAG(ctx, workspaceDir)
+	if err != nil {
+		log.Printf("Warning: RAG init failed, rag_* capabilities unavailable: %v", err)
+	} else {
+		if err := p.RegisterCapability(capability.NewRagSearch(registry)); err != nil {
+			log.Printf("Warning: RagSearch registration failed: %v", err)
+		}
+		if err := p.RegisterCapability(capability.NewRagIndex(registry)); err != nil {
+			log.Printf("Warning: RagIndex registration failed: %v", err)
+		}
+		if err := p.RegisterCapability(capability.NewContextAssemble()); err != nil {
+			log.Printf("Warning: ContextAssemble registration failed: %v", err)
+		}
+	}
 	// Load breed configs from JSON files
 	breedsDir := os.Getenv("BREEDS_DIR")
 	if breedsDir == "" {
@@ -120,7 +144,7 @@ func setupPack() *pack.Pack {
 	if err := p.LoadFromDir(breedsDir, pack.LoadPolicyFailFast); err != nil {
 		log.Printf("Warning: breed load failed: %v", err)
 	}
-	return p
+	return p, registry, embedder, cleaner, workspaceDir
 }
 
 func loadConfig() *component.ModelConfig {
@@ -134,11 +158,79 @@ func loadConfig() *component.ModelConfig {
 	}
 }
 
-func buildMux() *http.ServeMux {
-	return buildMuxWithHandler(transport.NewWSHandler(pack.New("default")), pack.New("default"))
+func getenvDefault(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return defaultVal
 }
 
-func buildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack) *http.ServeMux {
+func getenvDefaultInt(key string, defaultVal int) int {
+	if v := os.Getenv(key); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil {
+			return n
+		}
+	}
+	return defaultVal
+}
+
+func setupRAG(ctx context.Context, workspaceDir string) (*ragstore.StoreRegistry, *ragstore.Migrator, *ragstore.RetiredCleaner, embedding.Embedder, error) {
+	embedder, err := component.NewOpenAIEmbedder(ctx, component.EmbedConfig{
+		APIKey:  os.Getenv("MODEL_API_KEY"),
+		BaseURL: os.Getenv("MODEL_BASE_URL"),
+		Model:   getenvDefault("EMBEDDING_MODEL", "text-embedding-3-small"),
+		Dim:     getenvDefaultInt("EMBEDDING_DIM", 1536),
+	})
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("embedder init: %w", err)
+	}
+
+	backend := ragstore.BackendType(os.Getenv("RAG_STORE_BACKEND"))
+	if backend == "" {
+		backend = ragstore.BackendMemory
+	}
+
+	cfg := ragstore.StoreConfig{
+		Backend:     backend,
+		Embedder:    embedder,
+		PersistPath: filepath.Join(workspaceDir, "rag_index.json"),
+		SQLitePath:  filepath.Join(workspaceDir, "rag_index.db"),
+	}
+	initialStore, err := ragstore.NewStore(cfg)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("initial store: %w", err)
+	}
+
+	registry := ragstore.NewStoreRegistry(initialStore, backend)
+	registry.SetActiveConfig(cfg)
+
+	// Migrator: persists migration log + retired_stores metadata to migration.db.
+	migrationDB := filepath.Join(workspaceDir, "migration.db")
+	migrator, err := ragstore.NewMigrator(registry, migrationDB)
+	if err != nil {
+		log.Printf("Warning: migrator init failed: %v", err)
+	} else {
+		registry.SetMigrator(migrator)
+		registry.SetDB(migrator.DB())
+		registry.SetEmbedder(embedder)
+		if err := registry.LoadRetirees(ctx, migrator.DB()); err != nil {
+			log.Printf("Warning: load retirees failed: %v", err)
+		}
+	}
+
+	// RetiredCleaner: drops retired backends after their 30-day retain window.
+	cleaner := ragstore.NewRetiredCleaner(registry, 24*time.Hour)
+	cleaner.Start()
+
+	return registry, migrator, cleaner, embedder, nil
+}
+
+func buildMux() *http.ServeMux {
+	return buildMuxWithHandler(transport.NewWSHandler(pack.New("default")), pack.New("default"), nil, nil, "")
+}
+
+func buildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, registry *ragstore.StoreRegistry, embedder embedding.Embedder, workspaceDir string) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -149,6 +241,12 @@ func buildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack) *http.Ser
 	// Mount Pack API routes
 	packAPI := packapi.NewHandler(p, "packs/default/breeds")
 	mux.Handle("/api/breeds/", packAPI.Routes())
+
+	// Mount RAG API routes (backend inspect/switch/sync) when registry is available.
+	if registry != nil && embedder != nil {
+		ragHandler := transport.NewRAGHandler(registry, embedder, workspaceDir)
+		mux.Handle("/api/rag/", ragHandler.Routes())
+	}
 
 	return mux
 }

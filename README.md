@@ -205,9 +205,9 @@ We build in the open. Here's where we are.
 | code_search | Planned | internal/tool/ (grep/glob) |
 | code_analyze | Shipped | internal/capability/code_analyze.go |
 | refactor_suggest | Shipped | internal/capability/refactor_suggest.go |
-| rag_search | Planned | Vector DB integration |
-| rag_index | Planned | Vector DB integration |
-| context_assemble | Planned | — |
+| rag_search | Shipped | internal/capability/rag_search.go |
+| rag_index | Shipped | internal/capability/rag_index.go |
+| context_assemble | Shipped | internal/capability/context_assemble.go |
 | format_output | Shipped | internal/capability/format_output.go |
 | render_markdown | Shipped | internal/capability/render_markdown.go |
 | stream_response | Shipped | internal/capability/stream_response.go |
@@ -224,6 +224,7 @@ We build in the open. Here's where we are.
 | /api/breeds route mounting | Shipped |
 | WebSocket → Bark end-to-end pipeline | Shipped |
 | WebSocket → Bark → multi-breed dispatch end-to-end pipeline | Shipped |
+| RAG pipeline (embedding + vector store + retrieval) | Shipped — pluggable backends (Memory/SQLite/Eino) with runtime switching |
 
 ### v2: Pack Runtime Execution Model
 

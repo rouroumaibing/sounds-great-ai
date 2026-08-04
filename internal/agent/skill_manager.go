@@ -22,6 +22,12 @@ func (s *SkillManager) Load(skillDir string) error {
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
+			skillPath := filepath.Join(skillDir, entry.Name(), "SKILL.md")
+			content, err := os.ReadFile(skillPath)
+			if err != nil {
+				continue
+			}
+			s.skills[entry.Name()] = string(content)
 			continue
 		}
 		name := entry.Name()

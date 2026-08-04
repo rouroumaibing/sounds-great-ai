@@ -178,60 +178,66 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 
 我们公开构建。以下是当前进展。
 
-### Core Platform
+### v0: 已上线（旧架构，保留运行）
 
 | Feature | Status |
 |---------|--------|
 | Pack 协调器 (Register / Bark / Validate) | Shipped |
 | BreedConfig 配置驱动 (JSON 热加载) | Shipped |
-| DAG 工作流引擎 (拓扑排序 + 并行执行) | Shipped |
-| Capability 生命周期 (Init / Health / Close) | Shipped |
 | REST API (CRUD + Source 保护) | Shipped |
-| A2A 多 Agent 协议 (SSE + Polling) | Shipped |
-| 安全护栏 (CommandCheck / PathValidate) | Shipped |
-| 文件监听热加载 (fsnotify) | Planned |
-
-### Capability Adapters
-
-| Adapter | Status | Wraps |
-|---------|--------|-------|
-| command_check | Shipped | internal/aspect/command_guard.go |
-| path_validate | Shipped | internal/aspect/command_guard.go |
-| sensitive_filter | Planned | internal/aspect/ |
-| task_decompose | Shipped | internal/capability/task_decompose.go |
-| agent_dispatch | Shipped | internal/capability/agent_dispatch.go |
-| result_merge | Shipped | internal/capability/result_merge.go |
-| code_search | Planned | internal/tool/ (grep/glob) |
-| code_analyze | Planned | internal/agent/coder.go |
-| refactor_suggest | Planned | internal/agent/coder.go |
-| rag_search | Planned | Vector DB integration |
-| rag_index | Planned | Vector DB integration |
-| context_assemble | Planned | — |
-| format_output | Planned | internal/transport/ |
-| render_markdown | Planned | internal/transport/ |
-| stream_response | Planned | internal/transport/ws_handler.go |
-| log_trace | Planned | internal/aspect/tracing.go |
-| error_diagnose | Planned | — |
-| performance_profile | Planned | — |
-
-### Server Integration
-
-| Feature | Status |
-|---------|--------|
-| cmd/server 集成 Pack 系统 | Shipped |
-| setupPack() 初始化 + LoadFromDir | Shipped |
-| /api/breeds 路由挂载 | Shipped |
 | WebSocket → Bark 端到端链路 | Shipped |
+| 安全护栏 (CommandCheck / PathValidate) | Shipped |
 
-### v2: Pack Runtime Execution Model
+### v1: Clowder-AI 对齐重构（进行中）
+
+> 分支：`restructuring/clowder-ai-alignment` | Spec：[设计文档](docs/superpowers/specs/2026-08-03-clowder-ai-alignment-restructuring-design.md)
+
+**新平台层（已 shipped）：**
+
+| 包 | 说明 | 状态 |
+|---|------|------|
+| `internal/adapter/unified/` | 统一 AgentExecutor 接口 + ProcessManager + NDJSON 解析 | Shipped |
+| `internal/adapter/{claude,codex,gemini,opencode}/` | 4 个 CLI 适配器 | Shipped |
+| `internal/config/` | 新版品种配置（variants[] 替代 capabilities[]+workflow[]） | Shipped |
+| `internal/skills/` | 技能框架（.md 提示词包加载 + 注入） | Shipped |
+| `internal/router/` | 动态路由引擎（规则 + LLM fallback） | Shipped |
+| `internal/a2a/` | A2A Hub + 上下文压缩（替代旧 client/server/orchestrator） | Shipped |
+| `internal/sop/` | SOP 门控 + 跨模型審查 + max_a2a_depth=3 | Shipped |
+| `internal/mcp/` | MCP 注册表 | Shipped |
+| `internal/memory/` | 共享内存（证据/决策/教训） | Shipped |
+| `internal/platform/` | 平台总装（wires all components） | Shipped |
+
+**待验证清理的旧代码：**
+
+| 旧代码 | 被谁引用 | 清理条件 | 状态 |
+|--------|---------|---------|------|
+| `internal/capability/` (20+ Go 适配器) | `cmd/server/main.go` | 新平台层接入 server 后移除 | Pending |
+| `internal/agent/skill_manager.go` | `cmd/server/main.go` | 被 `internal/skills/` 替代后移除 | Pending |
+| `pkg/pack/workflow.go` (固定 DAG) | server + transport + packapi + capability | 被 `internal/router/` 替代后移除 | Pending |
+| `pkg/pack/capability.go` | server + capability | 新 CLI adapter 替代后移除 | Pending |
+
+**已清理：**
+- `cmd/a2a-test/` — 已删除（已备份）
+- `internal/a2a/{client,server,orchestrator}/` — 已删除（被 `internal/a2a/hub.go` 替代，已备份）
+- `backup/v0-capability-based/` — 已删除（capability 已转为 8 个 skill .md，其余已被新平台层替代）
+- 8 个 skill .md 已创建到 `packs/default/skills/`
+
+**验证清单：**
+- [ ] 新平台层接入 `cmd/server/main.go`（替换 `internal/capability` + `pkg/pack` 调用）
+- [ ] `internal/transport/` 的 `pkg/pack` 引用迁移到新路由
+- [ ] `internal/packapi/` 的 `pkg/pack` 引用迁移到新配置
+- [ ] 旧 `internal/capability/` 逐个转换为 skill .md 或 MCP 工具
+- [ ] `pkg/pack/workflow.go` DAG 引用全部替换为 `internal/router/` 动态路由
+- [ ] 全量 `go build ./...` 通过（不含 backup/）
+- [ ] 全量 `go test ./...` 通过（不含 backup/）
+
+### v2: 后续规划
 
 | Feature | Target |
 |---------|--------|
-| Workflow Engine (retry/timeout/cancellation/checkpoint) | v2 |
-| Error Model (ErrorCode enum) | v2 |
-| Observability (ExecutionRecord / trace) | v2 |
-| Permission Middleware (Safety 强制层) | v2 |
-| Plugin/WASM Capability 扩展 | v2 |
+| 文件监听热加载 (fsnotify) | v2 |
+| Eino Context Compression（handoff 时自动压缩） | v2 |
+| MCP 工具市场（动态安装 MCP server） | v2 |
 | Prompt 版本管理 / A/B test | v2 |
 | DB 存储替代 JSON 文件 | v2 |
 | Contract Test (config 兼容性) | v2 |

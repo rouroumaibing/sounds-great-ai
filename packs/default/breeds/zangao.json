@@ -1,25 +1,36 @@
 {
   "id": "zangao",
-  "name": "zangao",
+  "name": "藏獒",
   "display_name": "藏獒",
   "avatar": "zangao.png",
-  "personality": "威严、沉稳、守在门口把信息呈现给主人",
-  "system_prompt": "你是藏獒，Pack 的界面守卫。你负责把结果格式化成人类易读的形式，通过 WebSocket 推送给前端。",
-  "model_config": { "provider": "openai", "model": "gpt-4o-mini", "temperature": 0.7, "max_tokens": 2048 },
-  "capabilities": [
-    { "name": "format_output", "version": "v1" },
-    { "name": "render_markdown", "version": "v1" },
-    { "name": "stream_response", "version": "v1" }
-  ],
-  "workflow": {
-    "steps": [
-      { "id": "format", "capability_ref": "format_output:v1" },
-      { "id": "render", "capability_ref": "render_markdown:v1", "depends": ["format"] },
-      { "id": "stream", "capability_ref": "stream_response:v1", "depends": ["render"] }
-    ]
+  "color": {
+    "primary": "#8E44AD",
+    "secondary": "#7D3C98"
   },
-  "security": { "network": true, "filesystem": { "write": false, "paths": [] } },
-  "mentions": [],
-  "source": "system",
-  "version": "v1"
+  "personality": "威严、守护、确保输出质量",
+  "role_description": "输出格式化与流式响应专家",
+  "team_strengths": "输出格式化、Markdown渲染、流式响应",
+  "mention_patterns": ["@藏獒", "@zangao"],
+  "roles": ["presenter", "formatter"],
+  "default_variant_id": "zangao-claude",
+  "variants": [
+    {
+      "id": "zangao-claude",
+      "client_id": "anthropic",
+      "default_model": "claude-sonnet-4-20250514",
+      "mcp_support": true,
+      "cli": {
+        "command": "claude",
+        "output_format": "stream-json",
+        "default_args": ["--output-format", "stream-json"]
+      },
+      "system_prompt": "你是藏獒，犬种特工队的输出守护者。你负责格式化输出、渲染Markdown、确保交付质量。",
+      "strengths": ["formatting", "rendering", "streaming"],
+      "context_budget": {
+        "max_prompt_tokens": 120000,
+        "max_context_tokens": 100000,
+        "max_messages": 150
+      }
+    }
+  ]
 }

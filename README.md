@@ -178,63 +178,66 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 
 We build in the open. Here's where we are.
 
-### Core Platform
+### v0: Live (legacy architecture, still running)
 
 | Feature | Status |
 |---------|--------|
 | Pack Coordinator (Register / Bark / Validate) | Shipped |
 | BreedConfig Config-Driven (JSON hot-reload) | Shipped |
-| DAG Workflow Engine (topological sort + parallel execution) | Shipped |
-| Capability Lifecycle (Init / Health / Close) | Shipped |
 | REST API (CRUD + Source Protection) | Shipped |
-| A2A Multi-Agent Protocol (SSE + Polling) | Shipped |
-| Safety Guardrails (CommandCheck / PathValidate) | Shipped |
-| File Watcher Hot Reload (fsnotify) | Planned |
-
-### Capability Adapters
-
-| Adapter | Status | Wraps |
-|---------|--------|-------|
-| command_check | Shipped | internal/aspect/command_guard.go |
-| path_validate | Shipped | internal/aspect/command_guard.go |
-| sensitive_filter | Shipped | internal/capability/sensitive_filter.go |
-| task_decompose | Shipped | internal/capability/task_decompose.go |
-| agent_dispatch | Shipped | internal/capability/agent_dispatch.go |
-| result_merge | Shipped | internal/capability/result_merge.go |
-| dispatch_execute | Shipped | internal/capability/dispatch_execute.go |
-| code_search | Planned | internal/tool/ (grep/glob) |
-| code_analyze | Shipped | internal/capability/code_analyze.go |
-| refactor_suggest | Shipped | internal/capability/refactor_suggest.go |
-| rag_search | Shipped | internal/capability/rag_search.go |
-| rag_index | Shipped | internal/capability/rag_index.go |
-| context_assemble | Shipped | internal/capability/context_assemble.go |
-| format_output | Shipped | internal/capability/format_output.go |
-| render_markdown | Shipped | internal/capability/render_markdown.go |
-| stream_response | Shipped | internal/capability/stream_response.go |
-| log_trace | Shipped | internal/capability/log_trace.go |
-| error_diagnose | Shipped | internal/capability/error_diagnose.go |
-| performance_profile | Planned | — |
-
-### Server Integration
-
-| Feature | Status |
-|---------|--------|
-| cmd/server Pack system integration | Shipped |
-| setupPack() init + LoadFromDir | Shipped |
-| /api/breeds route mounting | Shipped |
 | WebSocket → Bark end-to-end pipeline | Shipped |
-| WebSocket → Bark → multi-breed dispatch end-to-end pipeline | Shipped |
-| RAG pipeline (embedding + vector store + retrieval) | Shipped — pluggable backends (Memory/SQLite/Eino) with runtime switching |
+| Safety Guardrails (CommandCheck / PathValidate) | Shipped |
 
-### v2: Pack Runtime Execution Model
+### v1: Clowder-AI Alignment Restructuring (In Progress)
+
+> Branch: `restructuring/clowder-ai-alignment` | Spec: [design doc](docs/superpowers/specs/2026-08-03-clowder-ai-alignment-restructuring-design.md)
+
+**New platform layer (shipped):**
+
+| Package | Description | Status |
+|---------|-------------|--------|
+| `internal/adapter/unified/` | Unified AgentExecutor interface + ProcessManager + NDJSON parser | Shipped |
+| `internal/adapter/{claude,codex,gemini,opencode}/` | 4 CLI adapters | Shipped |
+| `internal/config/` | New breed config (variants[] replaces capabilities[]+workflow[]) | Shipped |
+| `internal/skills/` | Skills framework (.md prompt pack loading + injection) | Shipped |
+| `internal/router/` | Dynamic routing engine (rule-based + LLM fallback) | Shipped |
+| `internal/a2a/` | A2A Hub + context compression (replaces old client/server/orchestrator) | Shipped |
+| `internal/sop/` | SOP guardian + cross-model review + max_a2a_depth=3 | Shipped |
+| `internal/mcp/` | MCP registry | Shipped |
+| `internal/memory/` | Shared memory (evidence/decisions/lessons) | Shipped |
+| `internal/platform/` | Platform integration (wires all components) | Shipped |
+
+**Pending cleanup (old code still referenced by server):**
+
+| Old code | Referenced by | Cleanup condition | Status |
+|----------|--------------|-------------------|--------|
+| `internal/capability/` (20+ Go adapters) | `cmd/server/main.go` | Remove after new platform wired into server | Pending |
+| `internal/agent/skill_manager.go` | `cmd/server/main.go` | Remove after replaced by `internal/skills/` | Pending |
+| `pkg/pack/workflow.go` (fixed DAG) | server + transport + packapi + capability | Remove after replaced by `internal/router/` | Pending |
+| `pkg/pack/capability.go` | server + capability | Remove after replaced by CLI adapters | Pending |
+
+**Already cleaned:**
+- `cmd/a2a-test/` — deleted (backed up)
+- `internal/a2a/{client,server,orchestrator}/` — deleted (replaced by `internal/a2a/hub.go`, backed up)
+- `backup/v0-capability-based/` — deleted (capabilities converted to 8 skill .md files, rest replaced by new platform layer)
+- 8 skill .md files created in `packs/default/skills/`
+
+**Verification checklist:**
+- [ ] Wire new platform layer into `cmd/server/main.go` (replace `internal/capability` + `pkg/pack` calls)
+- [ ] Migrate `internal/transport/` `pkg/pack` references to new router
+- [ ] Migrate `internal/packapi/` `pkg/pack` references to new config
+- [ ] Convert old `internal/capability/` adapters to skill .md files or MCP tools
+- [ ] Replace all `pkg/pack/workflow.go` DAG references with `internal/router/` dynamic routing
+- [ ] Full `go build ./...` passes (excluding backup/)
+- [ ] Full `go test ./...` passes (excluding backup/)
+
+### v2: Future Plans
 
 | Feature | Target |
 |---------|--------|
-| Workflow Engine (retry/timeout/cancellation/checkpoint) | v2 |
-| Error Model (ErrorCode enum) | v2 |
-| Observability (ExecutionRecord / trace) | v2 |
-| Permission Middleware (Safety enforcement layer) | v2 |
-| Plugin/WASM Capability extension | v2 |
+| File Watcher Hot Reload (fsnotify) | v2 |
+| Eino Context Compression (auto-compress on handoff) | v2 |
+| MCP Tool Marketplace (dynamic MCP server install) | v2 |
 | Prompt version management / A/B test | v2 |
 | DB storage replacing JSON files | v2 |
 | Contract Test (config compatibility) | v2 |

@@ -432,12 +432,24 @@ func buildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	// Mount Pack API routes
 	packAPI := packapi.NewHandler(p, breedsDir)
 	packAPI.SetEventBus(eventBus)
+	mux.Handle("/api/breeds", packAPI.Routes())
 	mux.Handle("/api/breeds/", packAPI.Routes())
 
-	// Mount RAG API routes (backend inspect/switch/sync) when registry is available.
+	// Mount RAG API routes (backend inspect/switch/sync).
+	// When RAG init failed (no API key, no registry), mount a stub so the
+	// frontend gets a structured response instead of 404.
 	if registry != nil && embedder != nil {
 		ragHandler := transport.NewRAGHandler(registry, embedder, workspaceDir)
 		mux.Handle("/api/rag/", ragHandler.Routes())
+	} else {
+		mux.HandleFunc("/api/rag/backend", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"active":   "none",
+				"retirees": []map[string]any{},
+				"error":    "RAG not initialized (embedding API key required)",
+			})
+		})
 	}
 
 	// Mount Thread + Session API routes (use platform stores if available, else create standalone)
@@ -453,6 +465,7 @@ func buildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	} else {
 		threadHandler = transport.NewThreadHandler(threadStore)
 	}
+	mux.Handle("/api/threads", threadHandler.Routes())
 	mux.Handle("/api/threads/", threadHandler.Routes())
 	mux.Handle("/api/sessions/", threadHandler.Routes())
 

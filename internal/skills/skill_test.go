@@ -84,3 +84,74 @@ func TestSkillAllTriggersSingularFallback(t *testing.T) {
 		t.Errorf("AllTriggers = %v", all)
 	}
 }
+
+func TestSkillParseNoFrontmatter(t *testing.T) {
+	raw := "# Plain Markdown\n\nNo frontmatter here."
+	s, err := ParseSkill("plain.md", []byte(raw))
+	if err != nil {
+		t.Fatalf("ParseSkill: %v", err)
+	}
+	if s.Body != raw {
+		t.Errorf("Body = %q, want %q", s.Body, raw)
+	}
+	if s.ID != "" {
+		t.Errorf("ID = %s, want empty", s.ID)
+	}
+}
+
+func TestSkillParseEmptyData(t *testing.T) {
+	s, err := ParseSkill("empty.md", []byte(""))
+	if err != nil {
+		t.Fatalf("ParseSkill: %v", err)
+	}
+	if s.Body != "" {
+		t.Errorf("Body = %q, want empty", s.Body)
+	}
+	if s.ID != "" {
+		t.Errorf("ID = %s, want empty", s.ID)
+	}
+}
+
+func TestSkillParseMalformedFrontmatter(t *testing.T) {
+	raw := "---\nid: test\nname: Test\nThis has no closing delimiter"
+	s, err := ParseSkill("malformed.md", []byte(raw))
+	if err != nil {
+		t.Fatalf("ParseSkill: %v", err)
+	}
+	if s.Body != raw {
+		t.Errorf("Body = %q, want %q", s.Body, raw)
+	}
+}
+
+func TestSkillParseEmptyFrontmatter(t *testing.T) {
+	raw := "---\n\n---\n\nbody content"
+	s, err := ParseSkill("empty-fm.md", []byte(raw))
+	if err != nil {
+		t.Fatalf("ParseSkill: %v", err)
+	}
+	if s.Body != "body content" {
+		t.Errorf("Body = %q, want 'body content'", s.Body)
+	}
+	if s.ID != "empty-fm" {
+		t.Errorf("ID = %s, want 'empty-fm'", s.ID)
+	}
+}
+
+func TestSkillAllTriggersEmpty(t *testing.T) {
+	s := &Skill{}
+	all := s.AllTriggers()
+	if all != nil {
+		t.Errorf("AllTriggers = %v, want nil", all)
+	}
+}
+
+func TestSkillAllTriggersArrayPriority(t *testing.T) {
+	s := &Skill{
+		Trigger:  "single",
+		Triggers: []string{"multi1", "multi2"},
+	}
+	all := s.AllTriggers()
+	if len(all) != 2 || all[0] != "multi1" || all[1] != "multi2" {
+		t.Errorf("AllTriggers = %v, want [multi1 multi2]", all)
+	}
+}

@@ -58,3 +58,50 @@ func TestIsPathAllowed(t *testing.T) {
 		t.Error("path outside root should not be allowed")
 	}
 }
+
+func TestResolvePathEmptyString(t *testing.T) {
+	root := t.TempDir()
+	wm := NewWorkspaceManager(root)
+	resolved, err := wm.ResolvePath("")
+	if err != nil {
+		t.Errorf("ResolvePath(\"\") failed: %v", err)
+	}
+	expected, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		expected = root
+	}
+	if resolved != expected {
+		t.Errorf("ResolvePath(\"\") = %q, want %q", resolved, expected)
+	}
+}
+
+func TestIsPathAllowedRootItself(t *testing.T) {
+	root := t.TempDir()
+	wm := NewWorkspaceManager(root)
+	if !wm.IsPathAllowed(root) {
+		t.Error("root itself should be allowed")
+	}
+}
+
+func TestRootDir(t *testing.T) {
+	root := t.TempDir()
+	wm := NewWorkspaceManager(root)
+	if wm.RootDir() != root {
+		t.Errorf("RootDir() = %q, want %q", wm.RootDir(), root)
+	}
+}
+
+func TestNewWorkspaceManagerRelativePath(t *testing.T) {
+	wm := NewWorkspaceManager(".")
+	if !filepath.IsAbs(wm.RootDir()) {
+		t.Errorf("RootDir() should be absolute, got %q", wm.RootDir())
+	}
+}
+
+func TestIsPathAllowedEmptyString(t *testing.T) {
+	root := t.TempDir()
+	wm := NewWorkspaceManager(root)
+	if wm.IsPathAllowed("") {
+		t.Error("empty string should not be allowed (resolves to CWD, not root)")
+	}
+}

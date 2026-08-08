@@ -1,6 +1,9 @@
 package telemetry
 
 import (
+	"bufio"
+	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -17,6 +20,16 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+// Hijack implements http.Hijacker, delegating to the underlying ResponseWriter.
+// Required for WebSocket upgrade to work through TraceMiddleware.
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("underlying ResponseWriter does not implement http.Hijacker")
+	}
+	return hj.Hijack()
 }
 
 func statusStr(code int) string {

@@ -83,3 +83,9 @@ func (lb *LogBuffer) Len() int {
 	defer lb.mu.Unlock()
 	return lb.count
 }
+
+// All returns all entries currently in the buffer in chronological order
+// (oldest first, newest last).
+func (lb *LogBuffer) All() []LogEntry {
+	return lb.Recent(lb.Len())
+}

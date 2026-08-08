@@ -58,3 +58,62 @@ func TestSkillManagerInjectSkills(t *testing.T) {
 		t.Error("expected second skill injected")
 	}
 }
+
+func TestSkillManagerLoadFromNonexistentDir(t *testing.T) {
+	m := NewManager("/nonexistent/path/xyz_abc")
+	err := m.LoadFromDir()
+	if err == nil {
+		t.Error("expected error for nonexistent dir")
+	}
+}
+
+func TestSkillManagerLoadFromEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	m := NewManager(dir)
+	if err := m.LoadFromDir(); err != nil {
+		t.Fatalf("LoadFromDir on empty dir failed: %v", err)
+	}
+	if len(m.All()) != 0 {
+		t.Errorf("expected 0 skills, got %d", len(m.All()))
+	}
+}
+
+func TestSkillManagerLoadFromDirSkipsNonMarkdown(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "not_a_skill.txt"), []byte("text content"), 0644)
+	os.WriteFile(filepath.Join(dir, "valid.md"), []byte("---\nname: Valid\ndescription: valid\n---\nBody"), 0644)
+	m := NewManager(dir)
+	if err := m.LoadFromDir(); err != nil {
+		t.Fatalf("LoadFromDir failed: %v", err)
+	}
+	if m.Get("valid") == nil {
+		t.Error("expected 'valid' skill to be loaded")
+	}
+}
+
+func TestSkillManagerGetNonexistent(t *testing.T) {
+	m := NewManager("")
+	if m.Get("nonexistent") != nil {
+		t.Error("expected nil for nonexistent skill")
+	}
+}
+
+func TestSkillManagerInjectSkillsEmpty(t *testing.T) {
+	m := NewManager("")
+	result := m.InjectSkills("original prompt", nil)
+	if result != "original prompt" {
+		t.Errorf("expected original prompt, got %q", result)
+	}
+	result = m.InjectSkills("original prompt", []*Skill{})
+	if result != "original prompt" {
+		t.Errorf("expected original prompt, got %q", result)
+	}
+}
+
+func TestSkillManagerAllEmpty(t *testing.T) {
+	m := NewManager("")
+	all := m.All()
+	if len(all) != 0 {
+		t.Errorf("expected 0 skills, got %d", len(all))
+	}
+}

@@ -58,3 +58,50 @@ func TestSandboxManagerGCTicker(t *testing.T) {
 		t.Error("new sandbox should still exist")
 	}
 }
+
+func TestSandboxManagerCleanSandboxNonexistentTask(t *testing.T) {
+	workDir := t.TempDir()
+	baseRepo := t.TempDir()
+	mgr := NewSandboxManager(baseRepo, workDir)
+	ctx := context.Background()
+	if err := mgr.CleanSandbox(ctx, "nonexistent-task", false); err != nil {
+		t.Errorf("CleanSandbox on nonexistent task failed: %v", err)
+	}
+}
+
+func TestSandboxManagerCleanSandboxWithBranchDelete(t *testing.T) {
+	workDir := t.TempDir()
+	baseRepo := t.TempDir()
+	mgr := NewSandboxManager(baseRepo, workDir)
+	sandboxPath := filepath.Join(workDir, "task-branch")
+	os.MkdirAll(sandboxPath, 0755)
+	os.WriteFile(filepath.Join(sandboxPath, "file.txt"), []byte("test"), 0644)
+	ctx := context.Background()
+	if err := mgr.CleanSandbox(ctx, "task-branch", true); err != nil {
+		t.Fatalf("CleanSandbox with branch delete failed: %v", err)
+	}
+	if _, err := os.Stat(sandboxPath); !os.IsNotExist(err) {
+		t.Error("sandbox directory should have been removed")
+	}
+}
+
+func TestSandboxManagerNewWithEmptyPaths(t *testing.T) {
+	mgr := NewSandboxManager("", "")
+	if mgr.BaseRepo != "" {
+		t.Errorf("expected empty BaseRepo, got %q", mgr.BaseRepo)
+	}
+	if mgr.WorkDir != "" {
+		t.Errorf("expected empty WorkDir, got %q", mgr.WorkDir)
+	}
+}
+
+func TestSandboxManagerRunGCWithNonexistentWorkDir(t *testing.T) {
+	mgr := NewSandboxManager("", "/nonexistent/path/xyz_abc")
+	mgr.runGCOnce(24)
+}
+
+func TestSandboxManagerRunGCWithEmptyWorkDir(t *testing.T) {
+	workDir := t.TempDir()
+	mgr := NewSandboxManager("", workDir)
+	mgr.runGCOnce(24)
+}

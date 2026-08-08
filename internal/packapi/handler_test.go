@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -336,5 +337,341 @@ func TestGetBreedStatus(t *testing.T) {
 	json.NewDecoder(rec.Body).Decode(&result)
 	if result["status"] != "idle" {
 		t.Fatalf("status = %v, want idle", result["status"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Edge case tests
+// ---------------------------------------------------------------------------
+
+func TestCreateBreedInvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader([]byte("not json")))
+	w := httptest.NewRecorder()
+	h.CreateBreed(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestCreateBreedEmptyBody(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(nil))
+	w := httptest.NewRecorder()
+	h.CreateBreed(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestCreateBreedOverwriteSystemBreed(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+
+	// Register a system breed first
+	p.Register(&pack.BreedConfig{
+		ID:               "sys-breed",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           pack.BreedSourceSystem,
+	})
+
+	h := NewHandler(p, dir)
+
+	// Try to overwrite as user source
+	cfg := pack.BreedConfig{
+		ID:               "sys-breed",
+		Name:             "overwritten",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           pack.BreedSourceUser,
+	}
+	body, _ := json.Marshal(cfg)
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateBreed(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (Validate should reject)", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestListBreedsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/breeds", nil)
+	w := httptest.NewRecorder()
+	h.ListBreeds(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	var breeds []*pack.BreedConfig
+	json.Unmarshal(w.Body.Bytes(), &breeds)
+	if len(breeds) != 0 {
+		t.Errorf("breeds len = %d, want 0", len(breeds))
+	}
+}
+
+func TestListBreedsMultiple(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+
+	for i := 0; i < 3; i++ {
+		p.Register(&pack.BreedConfig{
+			ID:               fmt.Sprintf("breed-%d", i),
+			DefaultVariantID: "v1",
+			Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+			Source:           pack.BreedSourceUser,
+		})
+	}
+
+	h := NewHandler(p, dir)
+	req := httptest.NewRequest(http.MethodGet, "/api/breeds", nil)
+	w := httptest.NewRecorder()
+	h.ListBreeds(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	var breeds []*pack.BreedConfig
+	json.Unmarshal(w.Body.Bytes(), &breeds)
+	if len(breeds) != 3 {
+		t.Errorf("breeds len = %d, want 3", len(breeds))
+	}
+}
+
+func TestDeleteBreedNotFound(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/breeds/nonexistent", nil)
+	req.SetPathValue("id", "nonexistent")
+	w := httptest.NewRecorder()
+	h.DeleteBreed(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusForbidden)
+	}
+}
+
+func TestDeleteBreedRemovesFile(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+
+	cfg := pack.BreedConfig{
+		ID:               "file-breed",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           pack.BreedSourceUser,
+	}
+	p.Register(&cfg)
+	saveBreedFile(dir, &cfg)
+
+	// Verify file exists
+	filePath := filepath.Join(dir, "file-breed.json")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		t.Fatalf("breed file should exist before delete")
+	}
+
+	h := NewHandler(p, dir)
+	req := httptest.NewRequest(http.MethodDelete, "/api/breeds/file-breed", nil)
+	req.SetPathValue("id", "file-breed")
+	w := httptest.NewRecorder()
+	h.DeleteBreed(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+		t.Errorf("breed file should be deleted, stat err = %v", err)
+	}
+}
+
+func TestBarkBreedInvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds/some/bark", bytes.NewReader([]byte("not json")))
+	req.SetPathValue("id", "some")
+	w := httptest.NewRecorder()
+	h.BarkBreed(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestBarkBreedEmptyBody(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds/some/bark", bytes.NewReader(nil))
+	req.SetPathValue("id", "some")
+	w := httptest.NewRecorder()
+	h.BarkBreed(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateBreedNotFound(t *testing.T) {
+	h, _ := setupTestPackHandler(t)
+
+	body, _ := json.Marshal(map[string]any{"display_name": "Updated"})
+	req := httptest.NewRequest("PATCH", "/api/breeds/nonexistent", bytes.NewReader(body))
+	req.SetPathValue("id", "nonexistent")
+	rec := httptest.NewRecorder()
+	h.UpdateBreed(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestUpdateBreedSystemBreedForbidden(t *testing.T) {
+	h, _ := setupTestPackHandler(t)
+
+	cfg := pack.BreedConfig{
+		ID:          "sys-breed",
+		Name:        "System",
+		DisplayName: "System Breed",
+		Source:      pack.BreedSourceSystem,
+		Variants:    []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
+	}
+	h.pack.Register(&cfg)
+
+	body, _ := json.Marshal(map[string]any{"display_name": "Hacked"})
+	req := httptest.NewRequest("PATCH", "/api/breeds/sys-breed", bytes.NewReader(body))
+	req.SetPathValue("id", "sys-breed")
+	rec := httptest.NewRecorder()
+	h.UpdateBreed(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestUpdateBreedInvalidJSON(t *testing.T) {
+	h, _ := setupTestPackHandler(t)
+
+	cfg := pack.BreedConfig{
+		ID:          "test-breed",
+		Name:        "Test",
+		DisplayName: "Test Breed",
+		Source:      pack.BreedSourceUser,
+		Variants:    []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
+	}
+	h.pack.Register(&cfg)
+
+	req := httptest.NewRequest("PATCH", "/api/breeds/test-breed", bytes.NewReader([]byte("not json")))
+	req.SetPathValue("id", "test-breed")
+	rec := httptest.NewRecorder()
+	h.UpdateBreed(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateBreedMultipleFields(t *testing.T) {
+	h, dir := setupTestPackHandler(t)
+
+	cfg := pack.BreedConfig{
+		ID:              "test-breed",
+		Name:            "Test",
+		DisplayName:     "Test Breed",
+		Personality:     "calm",
+		RoleDescription: "analyzer",
+		Source:          pack.BreedSourceUser,
+		Variants:        []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
+	}
+	h.pack.Register(&cfg)
+	saveBreedFile(dir, &cfg)
+
+	body, _ := json.Marshal(map[string]any{
+		"display_name":     "Updated Name",
+		"personality":      "energetic",
+		"role_description": "reviewer",
+	})
+	req := httptest.NewRequest("PATCH", "/api/breeds/test-breed", bytes.NewReader(body))
+	req.SetPathValue("id", "test-breed")
+	rec := httptest.NewRecorder()
+	h.UpdateBreed(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+	var result pack.BreedConfig
+	json.NewDecoder(rec.Body).Decode(&result)
+	if result.DisplayName != "Updated Name" {
+		t.Errorf("DisplayName = %q, want %q", result.DisplayName, "Updated Name")
+	}
+	if result.Personality != "energetic" {
+		t.Errorf("Personality = %q, want %q", result.Personality, "energetic")
+	}
+	if result.RoleDescription != "reviewer" {
+		t.Errorf("RoleDescription = %q, want %q", result.RoleDescription, "reviewer")
+	}
+}
+
+func TestGetBreedStatusNotFound(t *testing.T) {
+	h, _ := setupTestPackHandler(t)
+
+	req := httptest.NewRequest("GET", "/api/breeds/nonexistent/status", nil)
+	req.SetPathValue("id", "nonexistent")
+	rec := httptest.NewRecorder()
+	h.GetBreedStatus(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestErrorResponseFormat(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader([]byte("bad")))
+	w := httptest.NewRecorder()
+	h.CreateBreed(w, req)
+
+	var errResp map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("unmarshal error response: %v", err)
+	}
+	if errResp["error"] == "" {
+		t.Error("expected non-empty error message in response")
+	}
+}
+
+func TestCreateBreedContentTypeJSON(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir)
+
+	cfg := newValidBreed()
+	body, _ := json.Marshal(cfg)
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateBreed(w, req)
+
+	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want %q", ct, "application/json")
 	}
 }

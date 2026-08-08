@@ -33,15 +33,30 @@
 > *当 Agent 们完美完成一次协同，终端亮起绿色的爪印：*
 > **`Sounds Great!`**
 
+## 截图
+
+<div align="center">
+
+**主页**
+
+![主页](docs/images/homepage.png)
+
+**设置 — 成员管理**
+
+![设置 — 成员管理](docs/images/settings-members.png)
+
+</div>
+
 ## What It Does
 
-| Capability | What It Means |
-|------------|---------------|
-| **Config-Driven 角色系统** | 犬种角色是纯 JSON 数据，用户可在页面上创建/修改/删除狗狗，热加载立即生效，无需重启 |
-| **A2A 多 Agent 协作** | 异步 Agent 间通信，支持 @mention 路由、线程隔离、SSE 流式传输、结构化交接 |
-| **DAG 工作流引擎** | 每个犬种定义自己的工作流（拓扑排序 + 并行执行 + 依赖传递），非简单线性调用 |
-| **安全护栏（Hard Rails）** | 命令黑名单、路径校验、沙盒隔离 —— 安全不依赖 prompt，由代码强制执行 |
-| **Capability 适配器** | 薄适配器层包装现有代码，新增能力只需实现接口 + 注册，不改现有代码 |
+| 能力 | 说明 |
+|------|------|
+| **CLI 适配器架构** | 4 个 CLI agent（Claude/Codex/Gemini/opencode）作为子进程启动，stdin/stdout pipe 通信，NDJSON 流解析 |
+| **配置驱动角色系统** | 犬种角色是纯 JSON 数据，用户可在页面上创建/修改/删除狗狗，热加载立即生效 |
+| **平台层协调** | Go + Eino 平台处理身份、路由、安全、记忆、技能 —— 平台层不做 LLM 推理 |
+| **安全护栏（Hard Rails）** | 命令黑名单、路径校验、敏感数据过滤 —— 安全由代码强制执行，不依赖 prompt |
+| **RAG 存储** | 3 后端（Memory/SQLite/Eino）动态切换，向量检索，30 天退役池 |
+| **技能系统** | SKILL.md 提示词包从磁盘加载，注入 CLI adapter 系统提示 |
 | **热加载** | 运行时注册新犬种 → 立即生效；文件监听 + HTTP API 双路径 |
 | **Eino 框架集成** | 基于 CloudWeGo Eino 的 ChatModel 接口，支持 OpenAI / Azure / 本地模型 |
 
@@ -51,12 +66,12 @@
 
 | 角色 | 犬种 | 性格特征 | 核心职责 | Capabilities |
 |------|------|----------|----------|-------------|
-| **Orchestrator** | 边牧 *(bianmu)* | 极高智商、控场大师、眼神敏锐 | 任务拆解、DAG 工作流调度、状态机控制 | task_decompose, agent_dispatch, result_merge |
-| **Safety Guardrail** | 中华田园犬 *(zhonghuatianyuanquan)* | 忠诚可靠、警惕性高、熟悉家园环境 | 安全边界、命令黑名单、权限代码审计 | command_check, path_validate, sensitive_filter |
-| **UI / CLI Presentation** | 藏獒 *(zangao)* | 体型雄浑、威严沉稳、一夫当关 | TUI 状态框渲染、日志大盘展示、人类确认 | format_output, render_markdown, stream_response |
-| **Code Hunter** | 细狗 *(xigou)* | 身形流线、极速迅猛、目标明确 | 自动化 Refactor、高难度 Bug 修复代码生成 | code_search, code_analyze, refactor_suggest |
-| **RAG / Retriever** | 金毛 *(jinmao)* | 寻回本能强、温和靠谱 | 向量检索、上下文叼取、文档关联 | rag_search, rag_index, context_assemble |
-| **Log & Bug Tracer** | 德牧 *(demu)* | 警觉敏锐、黑背立耳、执行力强 | Panic 追查、StackTrace 分析、Log 溯源 | log_trace, error_diagnose, performance_profile |
+| **Orchestrator** | 边牧 *(bianmu)* | 极高智商、控场大师、眼神敏锐 | 任务拆解、路由调度、状态机控制 | `agent_dispatch`（路由） |
+| **Safety Guardrail** | 中华田园犬 *(zhonghuatianyuanquan)* | 忠诚可靠、警惕性高、熟悉家园环境 | 安全边界、命令黑名单、权限代码审计 | `command_check, path_validate, sensitive_filter` |
+| **UI / CLI Presentation** | 藏獒 *(zangao)* | 体型雄浑、威严沉稳、一夫当关 | TUI 状态框渲染、日志大盘展示、人类确认 | CLI adapter 处理输出 |
+| **Code Hunter** | 细狗 *(xigou)* | 身形流线、极速迅猛、目标明确 | 自动化 Refactor、高难度 Bug 修复代码生成 | CLI adapter 处理代码搜索/分析 |
+| **RAG / Retriever** | 金毛 *(jinmao)* | 寻回本能强、温和靠谱 | 向量检索、上下文叼取、文档关联 | `context_assemble` + RAG via ragstore |
+| **Log & Bug Tracer** | 德牧 *(demu)* | 警觉敏锐、黑背立耳、执行力强 | Panic 追查、StackTrace 分析、Log 溯源 | CLI adapter 处理日志追踪 |
 
 > 用户可以创建自己的狗狗 —— 只需一个 JSON 文件，选择已注册的 capability，定义工作流，热加载立即生效。
 
@@ -72,39 +87,34 @@
                        │ LoadFromDir / POST API
                        ▼
 ┌───────────────────────────────────────────────────┐
-│                 Pack (协调者)                        │
-│   registry: map[string]*BreedConfig                 │
-│   capabilities: map[string]Capability               │
-│   mu: sync.RWMutex                                  │
-│                                                     │
-│   Bark(breedID, input) → DAG 拓扑排序 → 并行执行     │
+│              internal/platform/ (组合根)             │
+│   config + router + adapters + skills + mcp + a2a   │
+│   + sop + memory + ragstore + threadstore + settings│
 └──────────────────────┬────────────────────────────┘
-                       │ Capability.Run()
+                       │ CLI Adapter Execute()
                        ▼
 ┌───────────────────────────────────────────────────┐
-│            internal/capability/ (适配器)             │
-│   CommandCheck  PathValidate  StreamResponse        │
-│   CodeSearch    TaskDecompose  ...                  │
-│   (薄适配器，包装 internal/ 现有代码)                 │
+│            internal/adapter/ (CLI 适配器)           │
+│   claude/    codex/    gemini/    opencode/         │
+│   unified/ (ProcessManager + NDJSON 解析)           │
 └──────────────────────┬────────────────────────────┘
-                       │ 调用
+                       │ stdin/stdout pipe
                        ▼
 ┌───────────────────────────────────────────────────┐
-│            internal/ (现有代码，不改)                │
-│   aspect/  transport/  agent/  tool/  workspace/    │
-│   a2a/  component/                                  │
+│            外部 CLI 进程                             │
+│   claude CLI  |  codex CLI  |  gemini CLI  |  ...   │
 └───────────────────────────────────────────────────┘
 ```
 
 **三层分离原则：**
 
-| Layer | Responsible For | Not Responsible For |
-|-------|----------------|---------------------|
-| **Breed JSON (数据)** | 角色身份、性格、模型配置、能力声明、工作流定义 | 代码逻辑 |
-| **Capability (Go 代码)** | 具体能力实现，包装现有 internal/ 代码 | 角色定义、任务调度 |
-| **Pack (协调者)** | 注册管理、DAG 调度、热加载、安全校验 | 具体能力实现 |
+| 层 | 负责 | 不负责 |
+|----|------|--------|
+| **Breed JSON（数据）** | 角色身份、性格、variant 配置、模型选择 | 代码逻辑 |
+| **Platform（Go + Eino）** | 身份、路由、安全、记忆、技能、协调 | LLM 推理（那是 CLI 的事） |
+| **CLI Adapter** | 启动 CLI、注入 prompt、解析流、管理生命周期 | 角色定义、协调 |
 
-> *角色是数据，能力是代码。用户定义"谁"，系统决定"怎么做"。*
+> *角色是数据，平台协调，CLI 推理。*
 
 ## Quick Start
 
@@ -128,17 +138,33 @@ go mod download
 cp .env.example .env
 # 编辑 .env，填入 MODEL_API_KEY 等
 
-# 4. Run server
-go run cmd/server/main.go
+# 4. Run both backend and frontend
+make dev
+# Backend on :8080, Frontend on :5173
 
-# 5. Or run A2A multi-agent test
-go run cmd/a2a-test/main.go
+# Or run individually
+make backend   # Go server only
+make frontend  # Vite dev server only
 ```
 
 Server 启动后：
 - `http://localhost:8080/health` — 健康检查
 - `http://localhost:8080/ws` — WebSocket 通信
 - `http://localhost:8080/api/breeds` — 犬种 CRUD API
+
+### 升级
+
+#### 通过 UI
+
+点击右上角 Header 中的升级按钮（↑ 图标），选择是否拉取最新代码。
+
+#### 通过 CLI
+
+```bash
+make upgrade
+```
+
+会提示"是否需要拉取最新的代码？(y/n)"，然后安装依赖、重新构建前端和后端。
 
 ### Create Your Own Dog
 
@@ -152,18 +178,15 @@ curl -X POST http://localhost:8080/api/breeds \
     "display_name": "我的狗狗",
     "avatar": "mydog.png",
     "personality": "活泼、好奇、什么都想试试",
-    "system_prompt": "你是我的狗狗，负责探索新事物。",
-    "model_config": { "provider": "openai", "model": "gpt-4o-mini", "temperature": 0.5 },
-    "capabilities": [
-      { "name": "command_check", "version": "v1" },
-      { "name": "path_validate", "version": "v1" }
+    "default_variant_id": "v1",
+    "variants": [
+      {
+        "id": "v1",
+        "client_id": "claude",
+        "default_model": "claude-sonnet-4-20250514",
+        "system_prompt": "你是我的狗狗，负责探索新事物。"
+      }
     ],
-    "workflow": {
-      "steps": [
-        { "id": "check", "capability_ref": "command_check:v1" },
-        { "id": "validate", "capability_ref": "path_validate:v1", "depends": ["check"] }
-      ]
-    },
     "source": "user",
     "version": "v1"
   }'
@@ -188,59 +211,125 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 | WebSocket → Bark 端到端链路 | Shipped |
 | 安全护栏 (CommandCheck / PathValidate) | Shipped |
 
-### v1: Clowder-AI 对齐重构（进行中）
+### v1: 平台层（进行中）
 
-> 分支：`restructuring/clowder-ai-alignment` | Spec：[设计文档](docs/superpowers/specs/2026-08-03-clowder-ai-alignment-restructuring-design.md)
+> Spec：[开发路线图](docs/superpowers/specs/2026-08-06-development-roadmap-design.md)
 
-**新平台层（已 shipped）：**
+**已完成：**
 
 | 包 | 说明 | 状态 |
 |---|------|------|
-| `internal/adapter/unified/` | 统一 AgentExecutor 接口 + ProcessManager + NDJSON 解析 | Shipped |
-| `internal/adapter/{claude,codex,gemini,opencode}/` | 4 个 CLI 适配器 | Shipped |
-| `internal/config/` | 新版品种配置（variants[] 替代 capabilities[]+workflow[]） | Shipped |
-| `internal/skills/` | 技能框架（.md 提示词包加载 + 注入） | Shipped |
-| `internal/router/` | 动态路由引擎（规则 + LLM fallback） | Shipped |
-| `internal/a2a/` | A2A Hub + 上下文压缩（替代旧 client/server/orchestrator） | Shipped |
-| `internal/sop/` | SOP 门控 + 跨模型審查 + max_a2a_depth=3 | Shipped |
-| `internal/mcp/` | MCP 注册表 | Shipped |
-| `internal/memory/` | 共享内存（证据/决策/教训） | Shipped |
-| `internal/platform/` | 平台总装（wires all components） | Shipped |
+| `internal/adapter/` | 4 个 CLI 适配器 + ProcessManager | ✅ Shipped |
+| `internal/config/` | 新版品种配置（variants[] 格式） | ✅ Shipped |
+| `internal/skills/` | 技能框架（.md 加载 + 注入） | ✅ Shipped |
+| `internal/ragstore/` | RAG 存储（3 后端：Memory/SQLite/Eino） | ✅ Shipped |
+| `internal/transport/` | WebSocket + HTTP API + SPA | ✅ Shipped |
+| `internal/platform/` | 平台组合根 | ✅ Shipped |
+| `internal/capability/` | 6 个纯逻辑能力（安全护栏 + 路由 + 上下文） | ✅ Shipped |
+| `internal/prompt/` | System Prompt Builder + Context Assembler（5 段提示，token 预算） | ✅ Shipped |
+| `internal/threadstore/` | 线程 + 消息存储（SQLite WAL + 内存，工厂模式） | ✅ Shipped |
+| `internal/router/` | 动态路由引擎 + @mention 多犬种路由 | ✅ Shipped |
+| `internal/a2a/` | A2A Hub + 上下文压缩 | ✅ 最小实现 |
+| `internal/sop/` | SOP 门控 + 跨模型審查 | ✅ 最小实现 |
+| `internal/mcp/` | MCP 注册表 | ✅ 最小实现 |
+| `internal/memory/` | 共享内存 | ✅ 最小实现 |
+| `internal/settings/` | 设置存储（内存） | ✅ 最小实现 |
 
-**待验证清理的旧代码：**
+**多犬种协作 — 已完成：**
 
-| 旧代码 | 被谁引用 | 清理条件 | 状态 |
-|--------|---------|---------|------|
-| `internal/capability/` (20+ Go 适配器) | `cmd/server/main.go` | 新平台层接入 server 后移除 | Pending |
-| `internal/agent/skill_manager.go` | `cmd/server/main.go` | 被 `internal/skills/` 替代后移除 | Pending |
-| `pkg/pack/workflow.go` (固定 DAG) | server + transport + packapi + capability | 被 `internal/router/` 替代后移除 | Pending |
-| `pkg/pack/capability.go` | server + capability | 新 CLI adapter 替代后移除 | Pending |
+| 功能 | 说明 | clowder-ai 参考 |
+|------|------|----------------|
+| System Prompt Builder | 5 段提示：身份 + 限制 + 队友名册 + 角色 + 技能 | SystemPromptBuilder |
+| Context Assembler | 历史转 schema 消息，token 预算，截断 | ContextAssembler |
+| @mention 路由 | 解析 @mention（中文+英文），按 breed config 模式路由 | AgentRouter |
+| 串行执行 | 多犬种链式：每个输出作为下一个的上下文 | route-serial |
+| 并行执行 | goroutine 并发 + 共享 streamer + WaitGroup | route-parallel |
+| SQLite 持久化 | WAL 模式，工厂模式，close/reopen 持久性 | ThreadStore + MessageStore |
 
-**已清理：**
-- `cmd/a2a-test/` — 已删除（已备份）
-- `internal/a2a/{client,server,orchestrator}/` — 已删除（被 `internal/a2a/hub.go` 替代，已备份）
-- `backup/v0-capability-based/` — 已删除（capability 已转为 8 个 skill .md，其余已被新平台层替代）
-- 8 个 skill .md 已创建到 `packs/default/skills/`
+### v2: 剩余工作
 
-**验证清单：**
-- [ ] 新平台层接入 `cmd/server/main.go`（替换 `internal/capability` + `pkg/pack` 调用）
-- [ ] `internal/transport/` 的 `pkg/pack` 引用迁移到新路由
-- [ ] `internal/packapi/` 的 `pkg/pack` 引用迁移到新配置
-- [ ] 旧 `internal/capability/` 逐个转换为 skill .md 或 MCP 工具
-- [ ] `pkg/pack/workflow.go` DAG 引用全部替换为 `internal/router/` 动态路由
-- [ ] 全量 `go build ./...` 通过（不含 backup/）
-- [ ] 全量 `go test ./...` 通过（不含 backup/）
+> 基于 clowder-ai 架构调研评估。不需要的项已移除（见下方设计决策）。
 
-### v2: 后续规划
+| 工作项 | 说明 | clowder-ai 参考 | 状态 |
+|--------|------|----------------|------|
+| Hooks 接入执行流 | 将 session-init hooks（S1-S4）接入 adapter.Execute() | SystemPromptBuilder spawn 时注入 | 下一个 |
+| RAG 按需检索 | MCP `search_knowledge` tool → RAG store → agent 按需查询 | domains/memory/（按需，非默认前置） | 规划中 |
+| SOP 基础门禁 | SOPGuardian 接入执行流（review 触发、安全检查） | 五轴风险路由（简化版） | 规划中 |
 
-| Feature | Target |
-|---------|--------|
-| 文件监听热加载 (fsnotify) | v2 |
-| Eino Context Compression（handoff 时自动压缩） | v2 |
-| MCP 工具市场（动态安装 MCP server） | v2 |
-| Prompt 版本管理 / A/B test | v2 |
-| DB 存储替代 JSON 文件 | v2 |
-| Contract Test (config 兼容性) | v2 |
+### 设计决策 — 评估为不需要
+
+基于 clowder-ai 架构调研：
+
+| 项 | clowder-ai 有做？ | 为什么不需要 |
+|----|-------------------|-------------|
+| 调用队列/跟踪/调和 | 复杂的调用系统 | ProcessManager + ProcessRegistry 已覆盖 spawn/跟踪/僵尸防御 |
+| 多 mention 状态机 | 否 — 仅 @mention 路由 | 我们的 @mention + 串行/并行已对齐 |
+| 上下文评估路由 | 否 | clowder-ai 不做基于上下文的路由 |
+| 路由护栏 | 否 | clowder-ai 没有路由护栏 |
+| A2A 交接/压缩 | 否 — @mention 在共享 thread 通信 | A2A Hub 是空壳；@mention 才是模式 |
+| 知识图谱 | 否 | 过度工程 |
+| 语义重排 | 否 | 过度工程 |
+| 反思/蒸馏 | 否 | 过度工程 |
+| 富消息（音频/卡片/画廊） | 否 | 纯文本足够 |
+| MCP server 桥接（50+ 工具） | 仅注册表 | 注册表暂时够用 |
+| 调度器 | 否 | 过度工程 |
+| 连接器网关 | 否 | 过度工程 |
+| 遥测 | 否 | 暂不需要 |
+
+## Security Audit（安全扫描）
+
+v1 开发完成（验证清单全部通过）后，项目在发布前进行全量安全扫描。
+
+### 工具
+
+[codex-security](https://github.com/openai/codex-security) — OpenAI 的安全扫描 CLI 和 TypeScript SDK，用于发现、验证和修复代码安全漏洞。
+
+### 前置条件
+
+- v1 验证清单：全部 ✅
+- `go build ./...` 通过
+- `go test ./...` 通过
+- `npx tsc --noEmit` 通过（前端）
+- Node.js 22.13+ 已安装
+
+### 扫描流程
+
+```bash
+# 1. 安装 codex-security
+npm install @openai/codex-security
+
+# 2. 认证登录
+npx @openai/codex-security login
+
+# 3. 基础扫描（快速，覆盖 Go 后端和 TypeScript 前端）
+npx @openai/codex-security scan .
+
+# 4. 深度扫描（全面，多 Agent，用于发布前检查）
+npx @openai/codex-security scan . --mode deep --workers 2 --subagents 0 --stop-after-no-new 3 --max-discovery-runs 10
+```
+
+### 扫描范围
+
+| 范围 | 路径 | 语言 |
+|------|------|------|
+| 后端 | `cmd/`, `internal/`, `pkg/` | Go |
+| 前端 | `web/src/` | TypeScript/React |
+| 配置 | `packs/`, `.env.example` | JSON / env |
+
+### 修复流程
+
+1. **分类** — 按严重程度分类每个发现（critical / high / medium / low）
+2. **修复** — 发布前解决所有 critical 和 high 发现
+3. **复扫** — 运行基础扫描验证修复
+4. **记录** — 记录 medium/low 发现的已接受风险
+
+### 通过标准
+
+- 0 个 critical 发现
+- 0 个 high 发现
+- 所有 medium/low 发现已记录或已修复
+
+---
 
 ## Philosophy
 
@@ -260,7 +349,7 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 | P1 | 角色是数据，能力是代码 | Breed 是 JSON，Capability 是 Go，互不耦合 |
 | P2 | 不改现有代码 | 适配器包装 internal/，新增能力只加不改 |
 | P3 | 热加载优先 | 用户创建角色 → 立即生效，无需重启 |
-| P4 | DAG 不是线性 | 工作流支持依赖、并行、传递，非简单 for 循环 |
+| P4 | CLI adapter，不是 DAG | 犬种通过 CLI adapter 执行，不是固定工作流 DAG |
 | P5 | 安全由代码强制 | Hard Rails 在 Pack 层，不在 prompt 里 |
 
 ## Project Structure
@@ -268,31 +357,38 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 ```
 sounds-great-ai/
 ├── cmd/
-│   ├── server/              # HTTP 服务器入口
-│   └── a2a-test/            # A2A 多 Agent 测试入口
+│   └── server/              # HTTP 服务器入口
 ├── pkg/
-│   ├── a2a/                 # A2A 协议类型 (AgentCard, Task, Message)
+│   ├── a2a/                 # A2A 协议类型
 │   └── pack/                # Pack/Breed 核心系统
-│       ├── breed.go         # BreedConfig 数据模型
-│       ├── capability.go    # Capability 接口 + TaskInput/Output
-│       ├── pack.go          # Pack 协调器 (Register/Bark/Validate)
-│       ├── workflow.go      # DAG 工作流执行器
-│       └── loader.go        # JSON 文件加载器
 ├── internal/
-│   ├── a2a/                 # A2A 实现 (server/client/orchestrator)
-│   ├── aspect/              # 安全护栏 (command_guard, approval, tracing)
-│   ├── capability/          # Capability 适配器 (command_check, path_validate)
+│   ├── adapter/             # CLI 适配器 (claude/codex/gemini/opencode)
+│   ├── a2a/                 # A2A Hub + 上下文压缩
+│   ├── aspect/              # 安全护栏
+│   ├── capability/          # 6 个纯逻辑能力
 │   ├── component/           # Eino 模型工厂
+│   ├── config/              # 犬种配置加载器 (variants[] 格式)
+│   ├── mcp/                 # MCP 注册表
+│   ├── memory/              # 共享内存
 │   ├── packapi/             # REST API handler
-│   ├── transport/           # WebSocket 传输层
-│   ├── agent/               # Agent 实现 (coder, skill_manager)
-│   ├── tool/                # 工具 (fs_tools, terminal_tools)
-│   └── workspace/           # 工作区管理 (manager, sandbox, pty)
+│   ├── platform/            # 平台组合根
+│   ├── ragstore/            # RAG 存储 (Memory/SQLite/Eino)
+│   ├── router/              # 动态路由引擎
+│   ├── skills/              # 技能框架
+│   ├── sop/                 # SOP 门控
+│   ├── settings/            # 设置存储
+│   ├── threadstore/         # 线程存储
+│   ├── transport/           # WebSocket + HTTP 传输层
+│   ├── agent/               # Agent 实现
+│   ├── tool/                # 工具
+│   └── workspace/           # 工作区管理
 ├── packs/
 │   └── default/
-│       └── breeds/          # 6 个犬种 JSON 配置
+│       ├── breeds/          # 6 个犬种 JSON 配置
+│       └── skills/          # SKILL.md 提示词包
+├── web/                     # 前端 (React + Vite)
 └── docs/
-    ├── design/              # 设计文档 (character-setting, story)
+    ├── design/              # 设计文档
     └── superpowers/
         ├── specs/           # 技术规格文档
         └── plans/           # 实现计划文档

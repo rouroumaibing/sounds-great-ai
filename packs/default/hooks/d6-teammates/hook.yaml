@@ -1,0 +1,12 @@
+id: D6
+name: 队友上下文
+stage: per-turn
+order: 600
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

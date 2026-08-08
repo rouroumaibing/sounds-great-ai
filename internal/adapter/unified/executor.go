@@ -20,13 +20,14 @@ type AgentExecutor interface {
 
 // ExecuteRequest carries all information needed to invoke a CLI agent.
 type ExecuteRequest struct {
-	Messages     []*schema.Message // Eino message format (conversation history)
-	SystemPrompt string            // Breed persona prompt + injected skills
-	Model        string            // Model variant (e.g., "claude-opus-4-6")
-	Skills       []string          // Skill prompt IDs to inject
-	MCPConfig    *MCPConfig        // MCP server configs to pass to CLI
-	WorkDir      string            // Working directory for file ops
-	MaxTokens    int               // Response budget (0 = CLI default)
+	Messages       []*schema.Message // Eino message format (conversation history)
+	SystemPrompt   string            // Breed persona prompt + injected skills
+	SystemPromptL0 string            // Native L0 system prompt (compression-immune, via CLI flag)
+	Model          string            // Model variant (e.g., "claude-opus-4-6")
+	Skills         []string          // Skill prompt IDs to inject
+	MCPConfig      *MCPConfig        // MCP server configs to pass to CLI
+	WorkDir        string            // Working directory for file ops
+	MaxTokens      int               // Response budget (0 = CLI default)
 }
 
 // AgentCapabilities describes what a CLI backend supports.

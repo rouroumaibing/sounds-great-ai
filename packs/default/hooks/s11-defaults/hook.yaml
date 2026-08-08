@@ -1,0 +1,12 @@
+id: S11
+name: 默认行为
+stage: session-init
+order: 1800
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

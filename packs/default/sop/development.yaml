@@ -1,0 +1,154 @@
+id: development
+domain: engineering
+label: Development SOP
+description: >
+  Risk-routed development lane catalog. Stage ids are bulletin-board lanes,
+  not a mandatory serial pipeline; dogs select only the lanes justified by
+  behavior, data, security, contract, or irreversibility risk.
+stages:
+  - id: kickoff
+    label: 立项（按需）
+    suggested_skill: feat-lifecycle
+    hard_rules:
+      - id: kickoff-ac-checklist
+        text: Feature spec 必须有 AC + 需求点 checklist
+        severity: blocker
+        predicate:
+          type: manual_only
+          reason: Feature spec completeness is reviewed from docs and operator context.
+    pitfalls:
+      - id: kickoff-no-unconfirmed-implementation
+        text: 没有 leader 确认就直接开始实现
+        severity: warn
+        predicate:
+          type: manual_only
+          reason: operator confirmation is conversational intent.
+
+  - id: impl
+    label: 实现隔离（按需）
+    suggested_skill: worktree
+    hard_rules:
+      - id: impl-main-sync-before-worktree
+        text: worktree 开之前必须 main 双向同步 (ahead=0 behind=0)
+        severity: blocker
+        predicate:
+          type: git_state
+          branch: main
+          checks: [ahead_zero, behind_zero]
+          before_command: git worktree add
+      - id: impl-redis-port-only
+        text: Redis 只用指定端口，禁碰其他
+        severity: blocker
+        predicate:
+          type: env_check
+          key: REDIS_URL
+          must_include: ":6379"
+      - id: impl-risk-route-before-action
+        text: 实现前未按五轴判断风险，就机械套用或机械跳过流程
+        severity: blocker
+        predicate:
+          type: manual_only
+          reason: Risk classification is semantic; machine guards enforce concrete safety.
+    pitfalls:
+      - id: impl-post-compact-recall-loss
+        text: 压缩后忘了当前在做什么
+        severity: warn
+        predicate:
+          type: manual_only
+          reason: Current runtime has no stable post-compact recall-failure telemetry.
+
+  - id: quality_gate
+    label: 自检（按风险）
+    suggested_skill: quality-gate
+    hard_rules:
+      - id: quality-gate-vision-coverage
+        text: 自检报告必须包含愿景覆盖度
+        severity: blocker
+        predicate:
+          type: manual_only
+          reason: Vision coverage has no machine-checkable report artifact yet.
+    pitfalls:
+      - id: quality-gate-risk-matched-evidence
+        text: 声称完成但没有与风险面匹配的验证证据
+        severity: blocker
+        predicate:
+          type: command_pattern
+          must_match: go test|go build|go vet
+
+  - id: review
+    label: 独立验证（按风险择源）
+    suggested_skill: request-review
+    hard_rules:
+      - id: review-no-self-review
+        text: 同一个体不能 review 自己的代码
+        severity: blocker
+        predicate:
+          type: handle_check
+          constraint: reviewer_not_author
+      - id: review-cross-breed
+        text: 跨犬种 review 优先
+        severity: warn
+        predicate:
+          type: handle_check
+          constraint: cross_breed_preferred
+    pitfalls:
+      - id: review-retrigger-after-p1
+        text: P1/P2 修复后的实质内容未被对应 review source 覆盖
+        severity: blocker
+        predicate:
+          type: manual_only
+          reason: Final-SHA review coverage is the boundary.
+
+  - id: merge
+    label: 合入（载体触发）
+    suggested_skill: merge-gate
+    hard_rules:
+      - id: merge-squash-only
+        text: 必须用 squash merge
+        severity: blocker
+        predicate:
+          type: command_pattern
+          must_match: git merge.*--squash|gh pr merge.*--squash
+      - id: merge-review-sha-dedup
+        text: 同一 SHA 不重复触发 review
+        severity: warn
+        predicate:
+          type: sha_dedup
+          scope: review
+    pitfalls:
+      - id: merge-local-squash-close
+        text: 本地 squash + push + close（显示 closed 不是 merged）
+        severity: blocker
+        predicate:
+          type: command_sequence
+          anti_pattern:
+            - git push
+            - gh pr close
+          absent:
+            - gh pr merge
+
+  - id: completion
+    label: 愿景守护（终态触发）
+    suggested_skill: feat-lifecycle
+    hard_rules:
+      - id: completion-vision-guardian
+        text: 用户可见或愿景变化的 feat close 前必须有独立愿景守护
+        severity: blocker
+        predicate:
+          type: manual_only
+          reason: Guardian identity and signoff are still conversational artifacts.
+      - id: completion-merged-and-tested
+        text: PR merged + tests pass
+        severity: blocker
+        predicate:
+          type: command_sequence
+          must_include:
+            - git log
+            - go test
+    pitfalls:
+      - id: completion-missing-guardian-handoff
+        text: 用户可见或愿景变化的 feat 没有独立守护就直接 close
+        severity: blocker
+        predicate:
+          type: handle_check
+          constraint: guardian_handoff_present

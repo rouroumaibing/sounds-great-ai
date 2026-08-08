@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver
 
@@ -16,11 +17,12 @@ import (
 )
 
 type SQLiteStore struct {
-	embedder embedding.Embedder
-	db       *sql.DB
-	mu       sync.Mutex // single-writer lock (SQLite WAL)
-	vecCache map[string][]float64
-	cacheMu  sync.RWMutex
+	embedder     embedding.Embedder
+	db           *sql.DB
+	mu           sync.Mutex // single-writer lock (SQLite WAL)
+	vecCache     map[string][]float64
+	cacheMu      sync.RWMutex
+	ftsAvailable bool // FTS5 extension available for hybrid search
 }
 
 const sqliteSchemaSQL = `
@@ -36,12 +38,20 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE INDEX IF NOT EXISTS idx_namespace ON documents(namespace);
 `
 
+const sqliteFTSSchemaSQL = `
+CREATE VIRTUAL TABLE IF NOT EXISTS docs_fts USING fts5(doc_id UNINDEXED, title, content);
+`
+
 func NewSQLiteStore(embedder embedding.Embedder, dbPath string) (*SQLiteStore, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 	_, _ = db.Exec("PRAGMA journal_mode=WAL")
+	_, _ = db.Exec("PRAGMA busy_timeout=5000")
 	_, err = db.Exec(sqliteSchemaSQL)
 	if err != nil {
 		db.Close()
@@ -51,6 +61,10 @@ func NewSQLiteStore(embedder embedding.Embedder, dbPath string) (*SQLiteStore, e
 		embedder: embedder,
 		db:       db,
 		vecCache: make(map[string][]float64),
+	}
+	// Try to create FTS5 virtual table; gracefully degrade if unavailable.
+	if _, ftsErr := db.Exec(sqliteFTSSchemaSQL); ftsErr == nil {
+		s.ftsAvailable = true
 	}
 	if err := s.loadVecCache(context.Background()); err != nil {
 		db.Close()
@@ -114,6 +128,14 @@ func (s *SQLiteStore) Upsert(ctx context.Context, docs []*schema.Document) error
 		if err != nil {
 			return err
 		}
+		// Sync to FTS5 table if available
+		if s.ftsAvailable {
+			title, _ := d.MetaData["title"].(string)
+			_, _ = tx.ExecContext(ctx, "DELETE FROM docs_fts WHERE doc_id = ?", d.ID)
+			_, _ = tx.ExecContext(ctx,
+				"INSERT INTO docs_fts (doc_id, title, content) VALUES (?, ?, ?)",
+				d.ID, title, d.Content)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return err
@@ -133,11 +155,31 @@ func (s *SQLiteStore) Search(ctx context.Context, query string, opts SearchOpts)
 		return nil, err
 	}
 
+	// 1. Vector NN search (existing cosine scan)
+	vecResults := s.vectorSearch(ctx, qVec[0], opts)
+
+	// 2. BM25 recall via FTS5 (if available)
+	var bm25Results []string // ranked doc_ids
+	if s.ftsAvailable {
+		bm25Results = s.bm25Search(ctx, query, opts)
+	}
+
+	// 3. RRF fusion or vector-only
+	if len(bm25Results) == 0 {
+		// No BM25 results (FTS5 unavailable or query error) → vector-only
+		return vecResults, nil
+	}
+
+	return s.rrrFusion(vecResults, bm25Results, opts), nil
+}
+
+// vectorSearch performs the existing cosine similarity scan against the vecCache.
+func (s *SQLiteStore) vectorSearch(ctx context.Context, qVec []float64, opts SearchOpts) []*schema.Document {
 	rows, err := s.db.QueryContext(ctx,
 		"SELECT id, content, meta_data FROM documents WHERE namespace = ? OR ? = ''",
 		opts.Namespace, opts.Namespace)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	defer rows.Close()
 
@@ -149,7 +191,7 @@ func (s *SQLiteStore) Search(ctx context.Context, query string, opts SearchOpts)
 	for rows.Next() {
 		var id, content, metaDataJSON string
 		if err := rows.Scan(&id, &content, &metaDataJSON); err != nil {
-			return nil, err
+			return nil
 		}
 		s.cacheMu.RLock()
 		vec, ok := s.vecCache[id]
@@ -157,7 +199,7 @@ func (s *SQLiteStore) Search(ctx context.Context, query string, opts SearchOpts)
 		if !ok {
 			continue
 		}
-		sim := cosineSimilarity(qVec[0], vec)
+		sim := cosineSimilarity(qVec, vec)
 		if sim < opts.Threshold {
 			continue
 		}
@@ -172,14 +214,11 @@ func (s *SQLiteStore) Search(ctx context.Context, query string, opts SearchOpts)
 		results = append(results, scored{doc: doc, sim: sim})
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].sim > results[j].sim })
-	if opts.TopK > 0 && len(results) > opts.TopK {
-		results = results[:opts.TopK]
-	}
 	docs := make([]*schema.Document, len(results))
 	for i, r := range results {
 		docs[i] = r.doc
 	}
-	return docs, nil
+	return docs
 }
 
 func (s *SQLiteStore) Delete(ctx context.Context, ids []string) error {
@@ -198,6 +237,9 @@ func (s *SQLiteStore) Delete(ctx context.Context, ids []string) error {
 		_, err := tx.ExecContext(ctx, "DELETE FROM documents WHERE id = ?", id)
 		if err != nil {
 			return err
+		}
+		if s.ftsAvailable {
+			_, _ = tx.ExecContext(ctx, "DELETE FROM docs_fts WHERE doc_id = ?", id)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -254,6 +296,9 @@ func (s *SQLiteStore) DropAll(ctx context.Context) error {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
 	_, err := s.db.ExecContext(ctx, "DELETE FROM documents")
+	if s.ftsAvailable {
+		_, _ = s.db.ExecContext(ctx, "DELETE FROM docs_fts")
+	}
 	s.vecCache = make(map[string][]float64)
 	return err
 }

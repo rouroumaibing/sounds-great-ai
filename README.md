@@ -33,15 +33,30 @@ This isn't just another Agent invocation framework. It's a **Pack** — a squad 
 > *When the Agents perfectly complete a collaboration, the terminal lights up with green paw prints:*
 > **`Sounds Great!`**
 
+## Screenshots
+
+<div align="center">
+
+**Homepage**
+
+![Homepage](docs/images/homepage.png)
+
+**Settings — Member Management**
+
+![Settings — Members](docs/images/settings-members.png)
+
+</div>
+
 ## What It Does
 
 | Capability | What It Means |
 |------------|---------------|
-| **Config-Driven Role System** | Breed roles are pure JSON data — create/modify/delete dogs on the page, hot-reload takes effect instantly, no restart needed |
-| **A2A Multi-Agent Collaboration** | Async inter-Agent communication with @mention routing, thread isolation, SSE streaming, structured handoffs |
-| **DAG Workflow Engine** | Each breed defines its own workflow (topological sort + parallel execution + dependency passing) — not simple linear calls |
-| **Hard Rails Safety** | Command blocklist, path validation, sandbox isolation — safety enforced by code, not prompts |
-| **Capability Adapters** | Thin adapter layer wrapping existing code — add new capabilities by implementing an interface + registering, no existing code changes |
+| **CLI Adapter Architecture** | 4 CLI agents (Claude/Codex/Gemini/opencode) spawned as subprocesses with stdin/stdout pipe communication, NDJSON stream parsing |
+| **Config-Driven Role System** | Breed roles are pure JSON data — create/modify/delete dogs on the page, hot-reload takes effect instantly |
+| **Platform Layer Coordination** | Go + Eino platform handles identity, routing, safety, memory, skills — no LLM reasoning in platform layer |
+| **Hard Rails Safety** | Command blocklist, path validation, sensitive data filtering — safety enforced by code, not prompts |
+| **RAG Store** | 3 backends (Memory/SQLite/Eino) with dynamic switching, vector search, 30-day retirement pool |
+| **Skills System** | SKILL.md prompt packs loaded from disk, injected into CLI adapter system prompts |
 | **Hot Reload** | Register new breeds at runtime → instant effect; file watcher + HTTP API dual path |
 | **Eino Framework Integration** | Based on CloudWeGo Eino's ChatModel interface, supports OpenAI / Azure / local models |
 
@@ -51,12 +66,12 @@ Six dogs, six roles, each with its own specialty:
 
 | Role | Breed | Personality | Core Responsibilities | Capabilities |
 |------|-------|-------------|----------------------|-------------|
-| **Orchestrator** | Border Collie *(bianmu)* | Extremely intelligent, field-control master, sharp-eyed | Task decomposition, DAG workflow scheduling, state machine control | task_decompose, agent_dispatch, result_merge |
-| **Safety Guardrail** | Chinese Rural Dog *(zhonghuatianyuanquan)* | Loyal, reliable, highly alert, knows home terrain | Safety boundaries, command blocklist, permission auditing | command_check, path_validate, sensitive_filter |
-| **UI / CLI Presentation** | Tibetan Mastiff *(zangao)* | Majestic, imposing, steadfast, gatekeeper | TUI status rendering, log dashboard, human confirmation | format_output, render_markdown, stream_response |
-| **Code Hunter** | Xigou *(xigou)* | Streamlined, lightning-fast, laser-focused | Automated Refactor, high-difficulty Bug fix code generation | code_search, code_analyze, refactor_suggest |
-| **RAG / Retriever** | Golden Retriever *(jinmao)* | Strong retrieval instinct, gentle, dependable | Vector search, context fetching, document association | rag_search, rag_index, context_assemble |
-| **Log & Bug Tracer** | German Shepherd *(demu)* | Alert, black-backed, upright ears, strong execution | Panic tracking, StackTrace analysis, Log tracing | log_trace, error_diagnose, performance_profile |
+| **Orchestrator** | Border Collie *(bianmu)* | Extremely intelligent, field-control master, sharp-eyed | Task decomposition, DAG workflow scheduling, state machine control | `agent_dispatch` (routing) |
+| **Safety Guardrail** | Chinese Rural Dog *(zhonghuatianyuanquan)* | Loyal, reliable, highly alert, knows home terrain | Safety boundaries, command blocklist, permission auditing | `command_check, path_validate, sensitive_filter` |
+| **UI / CLI Presentation** | Tibetan Mastiff *(zangao)* | Majestic, imposing, steadfast, gatekeeper | TUI status rendering, log dashboard, human confirmation | CLI adapter handles output |
+| **Code Hunter** | Xigou *(xigou)* | Streamlined, lightning-fast, laser-focused | Automated Refactor, high-difficulty Bug fix code generation | CLI adapter handles code search/analysis |
+| **RAG / Retriever** | Golden Retriever *(jinmao)* | Strong retrieval instinct, gentle, dependable | Vector search, context fetching, document association | `context_assemble` + RAG via ragstore |
+| **Log & Bug Tracer** | German Shepherd *(demu)* | Alert, black-backed, upright ears, strong execution | Panic tracking, StackTrace analysis, Log tracing | CLI adapter handles log tracing |
 
 > Users can create their own dogs — just one JSON file, select registered capabilities, define a workflow, and hot-reload takes effect instantly.
 
@@ -72,27 +87,22 @@ Six dogs, six roles, each with its own specialty:
                        │ LoadFromDir / POST API
                        ▼
 ┌───────────────────────────────────────────────────┐
-│                 Pack (Coordinator)                  │
-│   registry: map[string]*BreedConfig                 │
-│   capabilities: map[string]Capability               │
-│   mu: sync.RWMutex                                  │
-│                                                     │
-│   Bark(breedID, input) → DAG topological sort → parallel execution  │
+│              internal/platform/ (composition root)  │
+│   config + router + adapters + skills + mcp + a2a   │
+│   + sop + memory + ragstore + threadstore + settings│
 └──────────────────────┬────────────────────────────┘
-                       │ Capability.Run()
+                       │ CLI Adapter Execute()
                        ▼
 ┌───────────────────────────────────────────────────┐
-│            internal/capability/ (adapters)          │
-│   CommandCheck  PathValidate  StreamResponse        │
-│   CodeSearch    TaskDecompose  ...                  │
-│   (thin adapters, wrapping internal/ existing code) │
+│            internal/adapter/ (CLI adapters)         │
+│   claude/    codex/    gemini/    opencode/         │
+│   unified/ (ProcessManager + NDJSON parser)         │
 └──────────────────────┬────────────────────────────┘
-                       │ calls
+                       │ stdin/stdout pipe
                        ▼
 ┌───────────────────────────────────────────────────┐
-│            internal/ (existing code, unchanged)     │
-│   aspect/  transport/  agent/  tool/  workspace/    │
-│   a2a/  component/                                  │
+│            External CLI Processes                   │
+│   claude CLI  |  codex CLI  |  gemini CLI  |  ...   │
 └───────────────────────────────────────────────────┘
 ```
 
@@ -100,11 +110,11 @@ Six dogs, six roles, each with its own specialty:
 
 | Layer | Responsible For | Not Responsible For |
 |-------|----------------|---------------------|
-| **Breed JSON (Data)** | Role identity, personality, model config, capability declarations, workflow definitions | Code logic |
-| **Capability (Go Code)** | Specific capability implementation, wrapping existing internal/ code | Role definition, task scheduling |
-| **Pack (Coordinator)** | Registry management, DAG scheduling, hot reload, safety validation | Specific capability implementation |
+| **Breed JSON (Data)** | Role identity, personality, variant config, model selection | Code logic |
+| **Platform (Go + Eino)** | Identity, routing, safety, memory, skills, coordination | LLM reasoning (that's CLI's job) |
+| **CLI Adapter** | Spawn CLI, inject prompt, parse stream, manage lifecycle | Role definition, coordination |
 
-> *Roles are data, capabilities are code. Users define "who", the system decides "how".*
+> *Roles are data, platform coordinates, CLI reasons.*
 
 ## Quick Start
 
@@ -123,22 +133,39 @@ cd sounds-great-ai
 
 # 2. Install dependencies
 go mod download
+cd web && npm install && cd ..
 
-# 3. Configure
+# 3. Configure (optional — server starts with defaults)
 cp .env.example .env
 # Edit .env, fill in MODEL_API_KEY etc.
 
-# 4. Run server
-go run cmd/server/main.go
+# 4. Run both backend and frontend
+make dev
+# Backend on :8080, Frontend on :5173
 
-# 5. Or run A2A multi-agent test
-go run cmd/a2a-test/main.go
+# Or run individually
+make backend   # Go server only
+make frontend  # Vite dev server only
 ```
 
 After server starts:
 - `http://localhost:8080/health` — Health check
 - `http://localhost:8080/ws` — WebSocket communication
 - `http://localhost:8080/api/breeds` — Breed CRUD API
+
+### Upgrade
+
+#### Via UI
+
+Click the upgrade button (↑ icon) in the top-right header. Choose whether to pull latest code.
+
+#### Via CLI
+
+```bash
+make upgrade
+```
+
+This will prompt "是否需要拉取最新的代码？(y/n)", then install dependencies, rebuild frontend and backend.
 
 ### Create Your Own Dog
 
@@ -152,18 +179,15 @@ curl -X POST http://localhost:8080/api/breeds \
     "display_name": "My Dog",
     "avatar": "mydog.png",
     "personality": "Lively, curious, eager to try everything",
-    "system_prompt": "You are my dog, responsible for exploring new things.",
-    "model_config": { "provider": "openai", "model": "gpt-4o-mini", "temperature": 0.5 },
-    "capabilities": [
-      { "name": "command_check", "version": "v1" },
-      { "name": "path_validate", "version": "v1" }
+    "default_variant_id": "v1",
+    "variants": [
+      {
+        "id": "v1",
+        "client_id": "claude",
+        "default_model": "claude-sonnet-4-20250514",
+        "system_prompt": "You are my dog, responsible for exploring new things."
+      }
     ],
-    "workflow": {
-      "steps": [
-        { "id": "check", "capability_ref": "command_check:v1" },
-        { "id": "validate", "capability_ref": "path_validate:v1", "depends": ["check"] }
-      ]
-    },
     "source": "user",
     "version": "v1"
   }'
@@ -188,59 +212,125 @@ We build in the open. Here's where we are.
 | WebSocket → Bark end-to-end pipeline | Shipped |
 | Safety Guardrails (CommandCheck / PathValidate) | Shipped |
 
-### v1: Clowder-AI Alignment Restructuring (In Progress)
+### v1: Platform Layer (In Progress)
 
-> Branch: `restructuring/clowder-ai-alignment` | Spec: [design doc](docs/superpowers/specs/2026-08-03-clowder-ai-alignment-restructuring-design.md)
+> Spec: [development roadmap](docs/superpowers/specs/2026-08-06-development-roadmap-design.md)
 
-**New platform layer (shipped):**
+**Completed:**
 
 | Package | Description | Status |
 |---------|-------------|--------|
-| `internal/adapter/unified/` | Unified AgentExecutor interface + ProcessManager + NDJSON parser | Shipped |
-| `internal/adapter/{claude,codex,gemini,opencode}/` | 4 CLI adapters | Shipped |
-| `internal/config/` | New breed config (variants[] replaces capabilities[]+workflow[]) | Shipped |
-| `internal/skills/` | Skills framework (.md prompt pack loading + injection) | Shipped |
-| `internal/router/` | Dynamic routing engine (rule-based + LLM fallback) | Shipped |
-| `internal/a2a/` | A2A Hub + context compression (replaces old client/server/orchestrator) | Shipped |
-| `internal/sop/` | SOP guardian + cross-model review + max_a2a_depth=3 | Shipped |
-| `internal/mcp/` | MCP registry | Shipped |
-| `internal/memory/` | Shared memory (evidence/decisions/lessons) | Shipped |
-| `internal/platform/` | Platform integration (wires all components) | Shipped |
+| `internal/adapter/` | 4 CLI adapters (claude/codex/gemini/opencode) + ProcessManager | ✅ Shipped |
+| `internal/config/` | New breed config (variants[] replaces capabilities[]+workflow[]) | ✅ Shipped |
+| `internal/skills/` | Skills framework (.md prompt pack loading + injection) | ✅ Shipped |
+| `internal/ragstore/` | RAG store (3 backends: Memory/SQLite/Eino) | ✅ Shipped |
+| `internal/transport/` | WebSocket + HTTP API + SPA serving | ✅ Shipped |
+| `internal/platform/` | Platform composition root (wires all components) | ✅ Shipped |
+| `internal/capability/` | 6 pure-logic capabilities (safety guards + routing + context) | ✅ Shipped |
+| `internal/prompt/` | System Prompt Builder + Context Assembler (5-segment prompt, token budget) | ✅ Shipped |
+| `internal/threadstore/` | Thread + Message store (SQLite WAL + in-memory, factory pattern) | ✅ Shipped |
+| `internal/router/` | Dynamic routing engine + @mention multi-breed router | ✅ Shipped |
+| `internal/a2a/` | A2A Hub + context compression | ✅ Minimal |
+| `internal/sop/` | SOP guardian + cross-model review | ✅ Minimal |
+| `internal/mcp/` | MCP registry | ✅ Minimal |
+| `internal/memory/` | Shared memory (evidence/decisions/lessons) | ✅ Minimal |
+| `internal/settings/` | Settings store (in-memory) | ✅ Minimal |
 
-**Pending cleanup (old code still referenced by server):**
+**Multi-breed coordination — shipped:**
 
-| Old code | Referenced by | Cleanup condition | Status |
-|----------|--------------|-------------------|--------|
-| `internal/capability/` (20+ Go adapters) | `cmd/server/main.go` | Remove after new platform wired into server | Pending |
-| `internal/agent/skill_manager.go` | `cmd/server/main.go` | Remove after replaced by `internal/skills/` | Pending |
-| `pkg/pack/workflow.go` (fixed DAG) | server + transport + packapi + capability | Remove after replaced by `internal/router/` | Pending |
-| `pkg/pack/capability.go` | server + capability | Remove after replaced by CLI adapters | Pending |
+| Feature | Description | clowder-ai ref |
+|---------|-------------|---------------|
+| System Prompt Builder | 5-segment prompt: identity + restrictions + roster + role + skills | SystemPromptBuilder |
+| Context Assembler | History to schema messages, token budget, truncation | ContextAssembler |
+| @mention Routing | Parse @mentions (Chinese + English), route by breed config patterns | AgentRouter |
+| Serial Execution | Multi-breed chain: each output feeds next breed's context | route-serial |
+| Parallel Execution | Goroutine concurrent + shared streamer + WaitGroup | route-parallel |
+| SQLite Persistence | WAL mode, factory pattern, close/reopen durability | ThreadStore + MessageStore |
 
-**Already cleaned:**
-- `cmd/a2a-test/` — deleted (backed up)
-- `internal/a2a/{client,server,orchestrator}/` — deleted (replaced by `internal/a2a/hub.go`, backed up)
-- `backup/v0-capability-based/` — deleted (capabilities converted to 8 skill .md files, rest replaced by new platform layer)
-- 8 skill .md files created in `packs/default/skills/`
+### v2: Remaining Work
 
-**Verification checklist:**
-- [ ] Wire new platform layer into `cmd/server/main.go` (replace `internal/capability` + `pkg/pack` calls)
-- [ ] Migrate `internal/transport/` `pkg/pack` references to new router
-- [ ] Migrate `internal/packapi/` `pkg/pack` references to new config
-- [ ] Convert old `internal/capability/` adapters to skill .md files or MCP tools
-- [ ] Replace all `pkg/pack/workflow.go` DAG references with `internal/router/` dynamic routing
-- [ ] Full `go build ./...` passes (excluding backup/)
-- [ ] Full `go test ./...` passes (excluding backup/)
+> Evaluated against clowder-ai architecture. Items not needed were removed (see Design Decisions below).
 
-### v2: Future Plans
+| Work Item | Description | clowder-ai ref | Status |
+|-----------|-------------|---------------|--------|
+| Hooks wiring | Wire session-init hooks (S1-S4) into adapter.Execute() | SystemPromptBuilder spawn-time injection | Next |
+| RAG on-demand retrieval | MCP `search_knowledge` tool → RAG store → agent on-demand query | domains/memory/ (on-demand, not default pre-step) | Planned |
+| SOP basic gates | SOPGuardian wired into execution flow (review trigger, safety check) | 5-axis risk routing (simplified) | Planned |
 
-| Feature | Target |
-|---------|--------|
-| File Watcher Hot Reload (fsnotify) | v2 |
-| Eino Context Compression (auto-compress on handoff) | v2 |
-| MCP Tool Marketplace (dynamic MCP server install) | v2 |
-| Prompt version management / A/B test | v2 |
-| DB storage replacing JSON files | v2 |
-| Contract Test (config compatibility) | v2 |
+### Design Decisions — Evaluated as Not Needed
+
+Based on clowder-ai architecture research:
+
+| Item | clowder-ai does it? | Why we don't need it |
+|------|---------------------|---------------------|
+| Invocation Queue/Tracker/Reconciler | Complex invocation system | ProcessManager + ProcessRegistry already covers spawn/tracking/zombie defense |
+| Multi-mention state machine | No — just @mention routing | Our @mention + serial/parallel already aligns |
+| Context-eval routing | No | clowder-ai doesn't do context-based routing |
+| Route guards | No | clowder-ai doesn't have route guardrails |
+| A2A handoff/compression | No — @mention in shared thread | A2A Hub is an empty shell; @mention is the pattern |
+| Knowledge graph | No | Over-engineering |
+| Semantic reranker | No | Over-engineering |
+| Reflection/distillation | No | Over-engineering |
+| Rich messages (audio/card/gallery) | No | Plain text sufficient |
+| MCP server bridge (50+ tools) | Registry only | Registry is sufficient for now |
+| Scheduler | No | Over-engineering |
+| Connector gateway | No | Over-engineering |
+| Telemetry | No | Not now |
+
+## Security Audit
+
+After v1 development is complete (all verification checklist items pass), the project undergoes a full security scan before release.
+
+### Tool
+
+[codex-security](https://github.com/openai/codex-security) — OpenAI's CLI and TypeScript SDK for finding, validating, and fixing security vulnerabilities in code.
+
+### Prerequisites
+
+- v1 verification checklist: all items ✅
+- `go build ./...` passes
+- `go test ./...` passes
+- `npx tsc --noEmit` passes (frontend)
+- Node.js 22.13+ installed
+
+### Scan Procedure
+
+```bash
+# 1. Install codex-security
+npm install @openai/codex-security
+
+# 2. Authenticate
+npx @openai/codex-security login
+
+# 3. Basic scan (quick, covers both Go backend and TypeScript frontend)
+npx @openai/codex-security scan .
+
+# 4. Deep scan (thorough, multi-agent, for pre-release)
+npx @openai/codex-security scan . --mode deep --workers 2 --subagents 0 --stop-after-no-new 3 --max-discovery-runs 10
+```
+
+### Scan Scope
+
+| Scope | Path | Language |
+|-------|------|----------|
+| Backend | `cmd/`, `internal/`, `pkg/` | Go |
+| Frontend | `web/src/` | TypeScript/React |
+| Config | `packs/`, `.env.example` | JSON / env |
+
+### Fix Workflow
+
+1. **Triage** — classify each finding by severity (critical / high / medium / low)
+2. **Fix** — address all critical and high findings before release
+3. **Re-scan** — run basic scan to verify fixes
+4. **Document** — record accepted risks for medium/low findings
+
+### Pass Criteria
+
+- 0 critical findings
+- 0 high findings
+- All medium/low findings documented or fixed
+
+---
 
 ## Philosophy
 
@@ -260,7 +350,7 @@ Traditional frameworks focus on **control** — what Agents cannot do. Sounds Gr
 | P1 | Roles are data, capabilities are code | Breed is JSON, Capability is Go, decoupled |
 | P2 | Don't modify existing code | Adapters wrap internal/, new capabilities only add |
 | P3 | Hot reload first | User creates role → instant effect, no restart |
-| P4 | DAG not linear | Workflows support dependencies, parallelism, passing — not simple for loops |
+| P4 | CLI adapter, not DAG | Breeds use CLI adapters for execution, not fixed workflow DAGs |
 | P5 | Safety enforced by code | Hard Rails at Pack layer, not in prompts |
 
 ## Project Structure
@@ -268,31 +358,38 @@ Traditional frameworks focus on **control** — what Agents cannot do. Sounds Gr
 ```
 sounds-great-ai/
 ├── cmd/
-│   ├── server/              # HTTP server entry point
-│   └── a2a-test/            # A2A multi-agent test entry point
+│   └── server/              # HTTP server entry point
 ├── pkg/
-│   ├── a2a/                 # A2A protocol types (AgentCard, Task, Message)
+│   ├── a2a/                 # A2A protocol types
 │   └── pack/                # Pack/Breed core system
-│       ├── breed.go         # BreedConfig data model
-│       ├── capability.go    # Capability interface + TaskInput/Output
-│       ├── pack.go          # Pack coordinator (Register/Bark/Validate)
-│       ├── workflow.go      # DAG workflow executor
-│       └── loader.go        # JSON file loader
 ├── internal/
-│   ├── a2a/                 # A2A implementation (server/client/orchestrator)
+│   ├── adapter/             # CLI adapters (claude/codex/gemini/opencode)
+│   ├── a2a/                 # A2A Hub + context compression
 │   ├── aspect/              # Safety guardrails (command_guard, approval, tracing)
-│   ├── capability/          # Capability adapters (command_check, path_validate)
+│   ├── capability/          # 6 pure-logic capabilities
 │   ├── component/           # Eino model factory
+│   ├── config/              # Breed config loader (variants[] format)
+│   ├── mcp/                 # MCP registry
+│   ├── memory/              # Shared memory (evidence/decisions/lessons)
 │   ├── packapi/             # REST API handler
-│   ├── transport/           # WebSocket transport layer
+│   ├── platform/            # Platform composition root
+│   ├── ragstore/            # RAG store (Memory/SQLite/Eino backends)
+│   ├── router/              # Dynamic routing engine
+│   ├── skills/              # Skills framework (.md loading + injection)
+│   ├── sop/                 # SOP guardian
+│   ├── settings/            # Settings store
+│   ├── threadstore/         # Thread store
+│   ├── transport/           # WebSocket + HTTP transport layer
 │   ├── agent/               # Agent implementation (coder, skill_manager)
 │   ├── tool/                # Tools (fs_tools, terminal_tools)
-│   └── workspace/           # Workspace management (manager, sandbox, pty)
+│   └── workspace/           # Workspace management
 ├── packs/
 │   └── default/
-│       └── breeds/          # 6 breed JSON configs
+│       ├── breeds/          # 6 breed JSON configs
+│       └── skills/          # SKILL.md prompt packs
+├── web/                     # Frontend (React + Vite)
 └── docs/
-    ├── design/              # Design docs (character-setting, story)
+    ├── design/              # Design docs
     └── superpowers/
         ├── specs/           # Technical spec docs
         └── plans/           # Implementation plan docs

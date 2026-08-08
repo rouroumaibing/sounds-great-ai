@@ -1,0 +1,12 @@
+id: D14
+name: SOP阶段提示
+stage: per-turn
+order: 1400
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

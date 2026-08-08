@@ -1,0 +1,12 @@
+id: S5
+name: 队友名册
+stage: session-init
+order: 500
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

@@ -4,3 +4,21 @@ docs/superpowers
 
 tmp/
 readonly-docs
+
+.logs/
+.pids/
+bin/
+
+# Stray Go binaries in root (use bin/ instead)
+main
+server
+
+# SQLite databases
+*.db
+*.db-wal
+*.db-shm
+
+# Frontend env
+web/.env.development
+web/.env.local
+web/.env.production

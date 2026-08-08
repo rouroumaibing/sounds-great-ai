@@ -1,0 +1,11 @@
+domainId: eval:freshness
+displayName: "副作用新鲜度评估"
+descriptionForHuman: "评估副作用新鲜度 — 数据存储保护区、持久化状态、TTL 合规"
+evalBreed: demu
+frequency: daily
+sourceAdapter: telemetry
+threadId: thread_eval_freshness
+sla:
+  acknowledgeHours: 24
+  reevalWithinHours: 72
+enabled: true

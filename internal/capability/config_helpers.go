@@ -1,5 +1,12 @@
 package capability
 
+import "strings"
+
+// contains is a simple substring check helper used by tests.
+func contains(s, substr string) bool {
+	return strings.Contains(s, substr)
+}
+
 // getFloatConfig extracts a float64 value from a config map with a default fallback.
 // Handles float64, float32, int, int64 (Go's encoding/json defaults to float64
 // for numbers, but some paths may produce int).

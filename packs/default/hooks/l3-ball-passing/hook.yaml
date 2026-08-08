@@ -1,0 +1,12 @@
+id: L3
+name: 传球三选一与路由规则
+stage: session-init
+order: 350
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

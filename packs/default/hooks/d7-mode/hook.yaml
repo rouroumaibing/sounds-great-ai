@@ -1,0 +1,12 @@
+id: D7
+name: 模式声明
+stage: per-turn
+order: 700
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

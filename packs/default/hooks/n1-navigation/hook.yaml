@@ -1,0 +1,12 @@
+id: N1
+name: 导航上下文
+stage: per-turn
+order: 2400
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

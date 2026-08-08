@@ -1,0 +1,12 @@
+id: D12
+name: 活跃参与者
+stage: per-turn
+order: 1200
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

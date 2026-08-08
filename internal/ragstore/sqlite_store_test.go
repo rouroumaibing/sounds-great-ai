@@ -106,3 +106,120 @@ func TestSQLiteStore_ConcurrentAccess_NoRace(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestSQLiteStore_FTS5Available(t *testing.T) {
+	emb := &stubEmbedder{vec: []float64{1.0}}
+	store, _ := NewSQLiteStore(emb, filepath.Join(t.TempDir(), "test.db"))
+	defer store.Close()
+	if !store.ftsAvailable {
+		t.Fatal("FTS5 should be available with modernc.org/sqlite")
+	}
+}
+
+func TestSQLiteStore_HybridSearch_BM25Vector(t *testing.T) {
+	emb := &stubEmbedder{vec: []float64{1.0, 0.0}}
+	store, _ := NewSQLiteStore(emb, filepath.Join(t.TempDir(), "test.db"))
+	defer store.Close()
+
+	docs := []*schema.Document{
+		{ID: "d1", Content: "the quick brown fox jumps", MetaData: map[string]any{"title": "fox story"}},
+		{ID: "d2", Content: "lazy dog sleeps all day", MetaData: map[string]any{"title": "dog story"}},
+		{ID: "d3", Content: "fox and dog are friends", MetaData: map[string]any{"title": "friends"}},
+	}
+	if err := store.Upsert(context.Background(), docs); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	// Search for "fox" — should match d1 and d3 via BM25, all via vector
+	results, err := store.Search(context.Background(), "fox", SearchOpts{TopK: 5, Threshold: 0.0})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("hybrid search returned no results")
+	}
+
+	// Verify RRF fusion: docs matching both BM25 and vector should rank higher
+	ids := make(map[string]bool)
+	for _, r := range results {
+		ids[r.ID] = true
+	}
+	// d1 and d3 contain "fox" → should be in results
+	if !ids["d1"] {
+		t.Fatal("d1 (contains 'fox') missing from hybrid results")
+	}
+	if !ids["d3"] {
+		t.Fatal("d3 (contains 'fox') missing from hybrid results")
+	}
+}
+
+func TestSQLiteStore_HybridSearch_FTS5ErrorFallback(t *testing.T) {
+	emb := &stubEmbedder{vec: []float64{1.0}}
+	store, _ := NewSQLiteStore(emb, filepath.Join(t.TempDir(), "test.db"))
+	defer store.Close()
+
+	store.Upsert(context.Background(), []*schema.Document{
+		{ID: "d1", Content: "hello world"},
+	})
+
+	// Invalid FTS5 query syntax (unmatched quote) → should fall back to vector-only
+	results, err := store.Search(context.Background(), `hello "`, SearchOpts{TopK: 5, Threshold: 0.0})
+	if err != nil {
+		t.Fatalf("search with bad FTS5 query: %v", err)
+	}
+	// Should still get vector results
+	if len(results) == 0 {
+		t.Fatal("fallback to vector-only returned no results")
+	}
+}
+
+func TestSQLiteStore_HybridSearch_RRFOrdering(t *testing.T) {
+	emb := &stubEmbedder{vec: []float64{1.0}}
+	store, _ := NewSQLiteStore(emb, filepath.Join(t.TempDir(), "test.db"))
+	defer store.Close()
+
+	// d1 matches BM25 query exactly; d2 does not
+	store.Upsert(context.Background(), []*schema.Document{
+		{ID: "d1", Content: "golang testing best practices", MetaData: map[string]any{"title": "go"}},
+		{ID: "d2", Content: "python recipes cookbook", MetaData: map[string]any{"title": "py"}},
+	})
+
+	results, err := store.Search(context.Background(), "golang", SearchOpts{TopK: 2, Threshold: 0.0})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("no results")
+	}
+	// d1 should rank first (matches BM25 + vector)
+	if results[0].ID != "d1" {
+		t.Fatalf("RRF: want d1 first, got %s", results[0].ID)
+	}
+}
+
+func TestSQLiteStore_FTS5SyncOnUpsert(t *testing.T) {
+	emb := &stubEmbedder{vec: []float64{1.0}}
+	store, _ := NewSQLiteStore(emb, filepath.Join(t.TempDir(), "test.db"))
+	defer store.Close()
+
+	// Upsert
+	store.Upsert(context.Background(), []*schema.Document{
+		{ID: "d1", Content: "original content", MetaData: map[string]any{"title": "orig"}},
+	})
+	// Re-upsert with new content
+	store.Upsert(context.Background(), []*schema.Document{
+		{ID: "d1", Content: "updated content", MetaData: map[string]any{"title": "updated"}},
+	})
+
+	// Search for "updated" — should find the re-upserted content
+	results, _ := store.Search(context.Background(), "updated", SearchOpts{TopK: 5, Threshold: 0.0})
+	found := false
+	for _, r := range results {
+		if r.ID == "d1" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("FTS5 sync on re-upsert failed: d1 not found for 'updated'")
+	}
+}

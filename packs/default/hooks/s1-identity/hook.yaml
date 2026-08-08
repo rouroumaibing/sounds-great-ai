@@ -1,0 +1,12 @@
+id: S1
+name: 身份声明
+stage: session-init
+order: 100
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: IdentityResolver
+inputs: [breedId, breedName, roleDescription]
+safetyTier: readonly
+governanceTier: immutable

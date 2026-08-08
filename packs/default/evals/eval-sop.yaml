@@ -1,0 +1,11 @@
+domainId: eval:sop
+displayName: "SOP 规则合规评估"
+descriptionForHuman: "评估 SOP 规则合规 — 红旗模式命中率、Phase 边界越界、VISION 兼容性"
+evalBreed: bianmu
+frequency: weekly
+sourceAdapter: telemetry
+threadId: thread_eval_sop
+sla:
+  acknowledgeHours: 48
+  reevalWithinHours: 168
+enabled: true

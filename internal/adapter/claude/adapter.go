@@ -39,7 +39,7 @@ func (a *Adapter) Execute(ctx context.Context, req unified.ExecuteRequest) (<-ch
 	if a.pm == nil {
 		return nil, fmt.Errorf("process manager not configured")
 	}
-	args := a.buildArgs(req.Model, req.WorkDir, req.MCPConfig)
+	args := a.buildArgs(req.Model, req.WorkDir, req.MCPConfig, req.SystemPromptL0)
 	stdinInput := a.buildStdin(req)
 	reader, err := a.pm.Spawn(ctx, a.BinaryPath, args, stdinInput)
 	if err != nil {
@@ -48,7 +48,7 @@ func (a *Adapter) Execute(ctx context.Context, req unified.ExecuteRequest) (<-ch
 	return a.streamEvents(reader), nil
 }
 
-func (a *Adapter) buildArgs(model, workDir string, mcp *unified.MCPConfig) []string {
+func (a *Adapter) buildArgs(model, workDir string, mcp *unified.MCPConfig, systemPromptL0 string) []string {
 	args := []string{"--output-format", "stream-json"}
 	if model != "" {
 		args = append(args, "--model", model)
@@ -56,11 +56,23 @@ func (a *Adapter) buildArgs(model, workDir string, mcp *unified.MCPConfig) []str
 	if workDir != "" {
 		args = append(args, "--cwd", workDir)
 	}
+	if systemPromptL0 != "" {
+		args = append(args, "--append-system-prompt", systemPromptL0)
+	}
+	if mcp != nil && len(mcp.Servers) > 0 && workDir != "" {
+		if configPath, err := unified.WriteMCPConfigFile(mcp, workDir); err == nil && configPath != "" {
+			args = append(args, "--mcp-config", configPath)
+		}
+	}
 	return args
 }
 
 func (a *Adapter) buildStdin(req unified.ExecuteRequest) string {
 	var sb strings.Builder
+	if req.SystemPrompt != "" {
+		sb.WriteString(req.SystemPrompt)
+		sb.WriteString("\n\n")
+	}
 	for _, msg := range req.Messages {
 		sb.WriteString(msg.Content)
 		sb.WriteString("\n")

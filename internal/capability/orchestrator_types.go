@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
+	"sounds-great-ai/pkg/pack"
 	"sounds-great-ai/pkg/pack/orchestrator"
 )
 
@@ -15,19 +17,6 @@ import (
 type SubTask = orchestrator.SubTask
 type DispatchEntry = orchestrator.DispatchEntry
 type DispatchPlan = orchestrator.DispatchPlan
-
-// MergeResult — result_merge output
-type MergeResult struct {
-	Summary  string         `json:"summary"`
-	Sections []MergeSection `json:"sections"`
-}
-
-// MergeSection — a single breed's merged result section
-type MergeSection struct {
-	BreedID string `json:"breed_id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-}
 
 // decodeData converts an any (from TaskOutput.Data) into a target typed slice/struct
 // via json.Marshal → json.Unmarshal round-trip.
@@ -39,60 +28,16 @@ func decodeData(src any, dst any) error {
 	return json.Unmarshal(b, dst)
 }
 
-// sanitizeJSONResponse strips Markdown wrappers or extraneous text to extract pure JSON.
-func sanitizeJSONResponse(s string) string {
-	s = strings.TrimSpace(s)
-	// If wrapped in markdown codeblocks
-	if start := strings.Index(s, "```"); start >= 0 {
-		if nl := strings.Index(s[start:], "\n"); nl >= 0 {
-			content := s[start+nl+1:]
-			if end := strings.LastIndex(content, "```"); end >= 0 {
-				s = content[:end]
-			}
-		}
+// truncateRunes returns s truncated to at most max runes, UTF-8 safe.
+func truncateRunes(s string, max int) string {
+	if max <= 0 {
+		return ""
 	}
-	s = strings.TrimSpace(s)
-	// Fallback: extract substring between first '['/'{' and last ']'/'}'
-	firstArray := strings.Index(s, "[")
-	firstObject := strings.Index(s, "{")
-	first := -1
-	if firstArray >= 0 && (firstObject < 0 || firstArray < firstObject) {
-		first = firstArray
-	} else if firstObject >= 0 {
-		first = firstObject
+	r := []rune(s)
+	if len(r) <= max {
+		return s
 	}
-	lastArray := strings.LastIndex(s, "]")
-	lastObject := strings.LastIndex(s, "}")
-	last := -1
-	if lastArray >= 0 && lastArray > lastObject {
-		last = lastArray
-	} else if lastObject >= 0 {
-		last = lastObject
-	}
-	if first >= 0 && last > first {
-		return s[first : last+1]
-	}
-	return s
-}
-
-// balancedTruncate truncates each breed's output to an equal share of the total budget.
-// Uses []rune for UTF-8 safe character level truncation.
-func balancedTruncate(results map[string]string, totalBudget int) map[string]string {
-	n := len(results)
-	if n == 0 {
-		return results
-	}
-	perBreed := totalBudget / n
-	truncated := make(map[string]string, n)
-	for breed, content := range results {
-		runes := []rune(content)
-		if len(runes) > perBreed {
-			truncated[breed] = string(runes[:perBreed]) + "\n... [truncated]"
-		} else {
-			truncated[breed] = content
-		}
-	}
-	return truncated
+	return string(r[:max])
 }
 
 // getIntConfig extracts an int value from a config map with a default fallback.
@@ -121,4 +66,71 @@ func getIntConfig(cfg map[string]any, key string, defaultVal int) int {
 func dedupKey(st SubTask) string {
 	h := sha256.Sum256([]byte(st.SuggestBreed + st.Title + st.Description))
 	return hex.EncodeToString(h[:])
+}
+
+// maxPreviousContextLen is the maximum characters of previous-step context to include.
+const maxPreviousContextLen = 12000
+
+// formatPreviousOutputs serializes previous step outputs into a readable context string.
+func formatPreviousOutputs(prev map[string]*pack.TaskOutput) string {
+	var sb strings.Builder
+	for id, out := range prev {
+		fmt.Fprintf(&sb, "## Step: %s\n", id)
+		if out != nil {
+			fmt.Fprintf(&sb, "Reason: %s\n", out.Reason)
+			if len(out.Data) > 0 {
+				b, _ := json.MarshalIndent(out.Data, "", "  ")
+				fmt.Fprintf(&sb, "```json\n%s\n```\n", string(b))
+			} else if len(out.Results) > 0 {
+				b, _ := json.MarshalIndent(out.Results, "", "  ")
+				fmt.Fprintf(&sb, "```json\n%s\n```\n", string(b))
+			}
+		}
+	}
+	if sb.Len() > maxPreviousContextLen {
+		return sb.String()[:maxPreviousContextLen] + "... [Truncated due to context limit]"
+	}
+	return sb.String()
+}
+
+// defaultAvailableBreeds is the fallback list of breed IDs.
+const defaultAvailableBreeds = "bianmu,xigou,jinmao,demu,zangao,zhonghuatianyuanquan"
+
+// getAvailableBreeds resolves the list of available breed IDs from config or env.
+func getAvailableBreeds(input *pack.TaskInput) map[string]bool {
+	// 1. Try CapabilityConfig
+	if input.CapabilityConfig != nil {
+		if v, ok := input.CapabilityConfig["available_breeds"]; ok {
+			if breeds, ok := v.([]any); ok {
+				m := make(map[string]bool, len(breeds))
+				for _, b := range breeds {
+					if s, ok := b.(string); ok {
+						m[s] = true
+					}
+				}
+				if len(m) > 0 {
+					return m
+				}
+			}
+		}
+	}
+	// 2. Try env var
+	if envBreeds := os.Getenv("AVAILABLE_BREEDS"); envBreeds != "" {
+		m := make(map[string]bool)
+		for _, b := range strings.Split(envBreeds, ",") {
+			b = strings.TrimSpace(b)
+			if b != "" {
+				m[b] = true
+			}
+		}
+		if len(m) > 0 {
+			return m
+		}
+	}
+	// 3. Default
+	m := make(map[string]bool)
+	for _, b := range strings.Split(defaultAvailableBreeds, ",") {
+		m[b] = true
+	}
+	return m
 }

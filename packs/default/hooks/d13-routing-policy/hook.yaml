@@ -1,0 +1,12 @@
+id: D13
+name: 路由策略
+stage: per-turn
+order: 1300
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

@@ -1,0 +1,12 @@
+id: S12
+name: 世界驱动
+stage: session-init
+order: 1900
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

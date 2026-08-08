@@ -1,0 +1,12 @@
+id: L6
+name: 能力唤醒指南
+stage: session-init
+order: 650
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

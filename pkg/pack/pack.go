@@ -39,7 +39,7 @@ func (p *Pack) RegisterCapability(cap Capability) error {
 	return nil
 }
 
-// Register 注册一个 breed 配置，校验 source 保护 + capabilities + workflow refs
+// Register 注册一个 breed 配置，校验 source 保护
 func (p *Pack) Register(breed *BreedConfig) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -48,23 +48,6 @@ func (p *Pack) Register(breed *BreedConfig) error {
 	if existing, ok := p.registry[breed.ID]; ok {
 		if existing.Source == BreedSourceSystem && breed.Source != BreedSourceSystem {
 			return fmt.Errorf("system breed %q cannot be overwritten", breed.ID)
-		}
-	}
-
-	// 校验所有声明的 capability 都已注册
-	bindingSet := make(map[string]bool)
-	for _, binding := range breed.Capabilities {
-		key := fmt.Sprintf("%s:%s", binding.Name, binding.Version)
-		if _, ok := p.capabilities[key]; !ok {
-			return fmt.Errorf("capability %q not registered", key)
-		}
-		bindingSet[key] = true
-	}
-
-	// 校验 workflow 中所有 capability_ref 必须存在于 capabilities binding
-	for _, step := range breed.Workflow.Steps {
-		if !bindingSet[step.CapabilityRef] {
-			return fmt.Errorf("workflow step %q references %q not in capabilities", step.ID, step.CapabilityRef)
 		}
 	}
 
@@ -100,23 +83,6 @@ func (p *Pack) Validate(breed *BreedConfig) error {
 		}
 	}
 
-	// 校验 capabilities 已注册
-	bindingSet := make(map[string]bool)
-	for _, binding := range breed.Capabilities {
-		key := fmt.Sprintf("%s:%s", binding.Name, binding.Version)
-		if _, ok := p.capabilities[key]; !ok {
-			return fmt.Errorf("capability %q not registered", key)
-		}
-		bindingSet[key] = true
-	}
-
-	// 校验 workflow refs
-	for _, step := range breed.Workflow.Steps {
-		if !bindingSet[step.CapabilityRef] {
-			return fmt.Errorf("workflow step %q references %q not in capabilities", step.ID, step.CapabilityRef)
-		}
-	}
-
 	return nil
 }
 
@@ -137,6 +103,13 @@ func (p *Pack) HasBreed(id string) bool {
 	defer p.mu.RUnlock()
 	_, ok := p.registry[id]
 	return ok
+}
+
+// GetBreed 返回指定 breed 配置
+func (p *Pack) GetBreed(id string) *BreedConfig {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.registry[id]
 }
 
 // Close 关闭所有 capability 资源

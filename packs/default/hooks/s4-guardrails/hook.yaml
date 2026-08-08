@@ -1,0 +1,12 @@
+id: S4
+name: 红旗模式
+stage: session-init
+order: 400
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

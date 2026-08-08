@@ -1,0 +1,12 @@
+id: D19
+name: 宪法知识
+stage: per-turn
+order: 1900
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

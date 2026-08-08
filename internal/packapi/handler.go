@@ -2,10 +2,12 @@ package packapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 
+	"sounds-great-ai/internal/config"
 	"sounds-great-ai/pkg/pack"
 )
 
@@ -13,12 +15,16 @@ import (
 type Handler struct {
 	pack      *pack.Pack
 	breedsDir string
+	eventBus  *config.ConfigEventBus
 }
 
 // NewHandler 创建一个新的 Handler
 func NewHandler(p *pack.Pack, breedsDir string) *Handler {
 	return &Handler{pack: p, breedsDir: breedsDir}
 }
+
+// SetEventBus 注入配置事件总线（可选）
+func (h *Handler) SetEventBus(bus *config.ConfigEventBus) { h.eventBus = bus }
 
 // Routes 返回 HTTP 路由
 func (h *Handler) Routes() *http.ServeMux {
@@ -27,6 +33,9 @@ func (h *Handler) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/breeds", h.ListBreeds)
 	mux.HandleFunc("DELETE /api/breeds/{id}", h.DeleteBreed)
 	mux.HandleFunc("POST /api/breeds/{id}/bark", h.BarkBreed)
+	mux.HandleFunc("PATCH /api/breeds/{id}", h.UpdateBreed)
+	mux.HandleFunc("GET /api/breeds/templates", h.GetTemplates)
+	mux.HandleFunc("GET /api/breeds/{id}/status", h.GetBreedStatus)
 	return mux
 }
 
@@ -87,6 +96,91 @@ func (h *Handler) BarkBreed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondOK(w, out)
+}
+
+// UpdateBreed PATCH /api/breeds/{id} — partial update breed config
+func (h *Handler) UpdateBreed(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	cfg := h.pack.GetBreed(id)
+	if cfg == nil {
+		respondError(w, http.StatusNotFound, fmt.Errorf("breed %q not found", id))
+		return
+	}
+	if cfg.Source == pack.BreedSourceSystem {
+		respondError(w, http.StatusForbidden, fmt.Errorf("system breeds cannot be modified"))
+		return
+	}
+
+	var updates map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+		respondError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if v, ok := updates["display_name"]; ok {
+		json.Unmarshal(v, &cfg.DisplayName)
+	}
+	if v, ok := updates["avatar"]; ok {
+		json.Unmarshal(v, &cfg.Avatar)
+	}
+	if v, ok := updates["personality"]; ok {
+		json.Unmarshal(v, &cfg.Personality)
+	}
+	if v, ok := updates["role_description"]; ok {
+		json.Unmarshal(v, &cfg.RoleDescription)
+	}
+	if v, ok := updates["team_strengths"]; ok {
+		json.Unmarshal(v, &cfg.TeamStrengths)
+	}
+	if v, ok := updates["mention_patterns"]; ok {
+		json.Unmarshal(v, &cfg.MentionPatterns)
+	}
+	if v, ok := updates["roles"]; ok {
+		json.Unmarshal(v, &cfg.Roles)
+	}
+	if v, ok := updates["variants"]; ok {
+		json.Unmarshal(v, &cfg.Variants)
+	}
+
+	if err := h.pack.Validate(cfg); err != nil {
+		respondError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := saveBreedFile(h.breedsDir, cfg); err != nil {
+		respondError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if h.eventBus != nil {
+		h.eventBus.Emit(config.ConfigEvent{Source: "breed-config", Scope: "domain", ChangedKeys: []string{id}})
+	}
+	respondOK(w, cfg)
+}
+
+// GetTemplates GET /api/breeds/templates — role templates
+func (h *Handler) GetTemplates(w http.ResponseWriter, r *http.Request) {
+	path := filepath.Join(h.breedsDir, "cat-template.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		respondOK(w, []any{})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
+// GetBreedStatus GET /api/breeds/{id}/status — runtime status
+func (h *Handler) GetBreedStatus(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if h.pack.GetBreed(id) == nil {
+		respondError(w, http.StatusNotFound, fmt.Errorf("breed %q not found", id))
+		return
+	}
+	respondOK(w, map[string]any{
+		"id":             id,
+		"status":         "idle",
+		"current_task":   "",
+		"last_active_at": "",
+	})
 }
 
 // saveBreedFile 将 breed 配置持久化到 JSON 文件

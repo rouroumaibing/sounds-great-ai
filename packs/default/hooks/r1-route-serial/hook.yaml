@@ -1,0 +1,12 @@
+id: R1
+name: 路由组装串行
+stage: per-turn
+order: 2200
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

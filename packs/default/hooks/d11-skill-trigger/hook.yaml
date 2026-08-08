@@ -1,0 +1,12 @@
+id: D11
+name: Skill触发
+stage: per-turn
+order: 1100
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

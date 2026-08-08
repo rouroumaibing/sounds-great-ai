@@ -1,0 +1,12 @@
+id: D1
+name: Phase锚定
+stage: per-turn
+order: 100
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: PhaseAnchorResolver
+inputs: [currentPhase, phasePrerequisites]
+safetyTier: readonly
+governanceTier: immutable

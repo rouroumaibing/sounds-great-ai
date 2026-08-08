@@ -1,0 +1,12 @@
+id: S7W
+name: Pack工作流
+stage: session-init
+order: 1400
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

@@ -1,0 +1,12 @@
+id: L2
+name: 客观性保持
+stage: session-init
+order: 250
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

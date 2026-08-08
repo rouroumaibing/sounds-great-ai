@@ -2,6 +2,7 @@ package transport
 
 import (
 	"regexp"
+	"strings"
 
 	"sounds-great-ai/pkg/pack"
 )
@@ -18,4 +19,17 @@ func parseMention(msg string, p *pack.Pack) string {
 		}
 	}
 	return "bianmu"
+}
+
+// isLeaderMention returns true if the message starts with one of the leader's
+// mention patterns (e.g. "@leader do something"). This ensures leader messages
+// are attributed as human user messages (catId=null) rather than breed-routed.
+func isLeaderMention(text string, patterns []string) bool {
+	trimmed := strings.TrimSpace(text)
+	for _, p := range patterns {
+		if strings.HasPrefix(trimmed, p) {
+			return true
+		}
+	}
+	return false
 }

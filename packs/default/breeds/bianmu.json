@@ -12,6 +12,11 @@
   "team_strengths": "任务分解、多agent调度、结果整合",
   "mention_patterns": ["@边牧", "@bianmu"],
   "roles": ["orchestrator", "architect"],
+  "review_policy": {
+    "can_review": ["xigou", "demu"],
+    "cannot_review_self": true,
+    "cross_breed_preferred": true
+  },
   "default_variant_id": "bianmu-claude",
   "variants": [
     {
@@ -30,6 +35,23 @@
       "context_budget": {
         "max_prompt_tokens": 180000,
         "max_context_tokens": 160000,
+        "max_messages": 200
+      }
+    },
+    {
+      "id": "bianmu-codex",
+      "client_id": "openai",
+      "default_model": "gpt-4o",
+      "mcp_support": true,
+      "cli": {
+        "command": "codex",
+        "output_format": "stream-json"
+      },
+      "system_prompt": "你是边牧，犬种特工队的指挥官。你擅长将复杂任务拆解并分配给合适的队友。",
+      "strengths": ["orchestration", "architecture", "decomposition"],
+      "context_budget": {
+        "max_prompt_tokens": 100000,
+        "max_context_tokens": 100000,
         "max_messages": 200
       }
     }

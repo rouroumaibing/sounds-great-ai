@@ -2,7 +2,10 @@ package platform
 
 import (
 	"fmt"
+	"log"
+	"path/filepath"
 
+	"github.com/cloudwego/eino/components/embedding"
 	"sounds-great-ai/internal/adapter/claude"
 	"sounds-great-ai/internal/adapter/codex"
 	"sounds-great-ai/internal/adapter/gemini"
@@ -10,11 +13,16 @@ import (
 	"sounds-great-ai/internal/adapter/unified"
 	"sounds-great-ai/internal/a2a"
 	"sounds-great-ai/internal/config"
+	"sounds-great-ai/internal/hooks"
 	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/memory"
+	"sounds-great-ai/internal/prompt"
+	"sounds-great-ai/internal/ragstore"
 	"sounds-great-ai/internal/router"
+	"sounds-great-ai/internal/settings"
 	"sounds-great-ai/internal/skills"
 	"sounds-great-ai/internal/sop"
+	"sounds-great-ai/internal/threadstore"
 )
 
 // Platform wires together all platform-layer components.
@@ -28,6 +36,7 @@ type Platform struct {
 	// Config
 	Breeds  map[string]*config.BreedConfig
 	Loader  *config.Loader
+	Leader  *config.LeaderConfig
 
 	// Platform Services
 	Skills   *skills.SkillManager
@@ -37,15 +46,42 @@ type Platform struct {
 	SOP      *sop.SOPGuardian
 	Memory   *memory.MemoryStore
 
+	// Prompt Hooks
+	HookRegistry  *hooks.Registry
+	HookPipeline  *hooks.Pipeline
+	HookTraceStore *hooks.TraceStore
+
 	// Compressor for A2A handoffs
 	Compressor *a2a.ContextCompressor
+
+	// Stores (port/factory pattern)
+	ThreadStore   threadstore.ThreadStore
+	SettingsStore settings.SettingsStore
+	EvidenceStore memory.EvidenceStore
+
+	// Infrastructure
+	WorkspaceDir string
+	RAGRegistry  *ragstore.StoreRegistry
+	Embedder     embedding.Embedder
+
+	// Prompt
+	PromptBuilder    *prompt.Builder
+	ContextAssembler *prompt.ContextAssembler
+
+	// Messages
+	MessageStore threadstore.MessageStore
+
+	// Routing
+	MentionRouter *Router
 }
 
 // Config holds initialization parameters.
 type Config struct {
-	BreedsDir   string
-	SkillsDir   string
-	MaxA2ADepth int
+	BreedsDir    string
+	SkillsDir    string
+	MaxA2ADepth  int
+	WorkspaceDir string
+	SQLitePath   string // empty = in-memory
 }
 
 // New initializes the full platform layer.
@@ -88,11 +124,52 @@ func New(cfg Config) (*Platform, error) {
 
 	compressor := a2a.NewContextCompressor()
 
+	// Initialize stores (port/factory pattern)
+	threadStore, err := threadstore.NewThreadStore(threadstore.StoreConfig{
+		SQLitePath: cfg.SQLitePath,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create thread store: %w", err)
+	}
+	settingsStore := settings.NewSettingsStore()
+	evidenceStore := memory.NewEvidenceStore()
+
+	promptBuilder := prompt.NewBuilder(breeds, skillMgr)
+	contextAssembler := prompt.NewContextAssembler()
+
+	// Initialize prompt hooks (session-init: S1-S4)
+	hooksDir := filepath.Join(cfg.WorkspaceDir, "packs/default/hooks")
+	hookReg := hooks.NewRegistry(hooksDir)
+	if err := hookReg.Scan(); err != nil {
+		log.Printf("Warning: hooks scan failed: %v", err)
+	}
+	hookPipeline := hooks.NewPipeline(hookReg, hooks.DefaultResolvers())
+
+	// Initialize hook trace store (graceful degradation on failure)
+	var hookTraceStore *hooks.TraceStore
+	traceDBPath := filepath.Join(cfg.WorkspaceDir, "hooks_trace.db")
+	hookTraceStore, err = hooks.NewTraceStore(traceDBPath)
+	if err != nil {
+		log.Printf("Warning: hook trace store init failed: %v", err)
+		hookTraceStore = nil // continue without tracing
+	}
+	messageStore, err := threadstore.NewMessageStore(threadstore.StoreConfig{
+		SQLitePath: cfg.SQLitePath,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create message store: %w", err)
+	}
+	router := NewRouter(breeds)
+
+	// Initialize leader config with defaults
+	leaderCfg := config.DefaultLeaderConfig()
+
 	return &Platform{
 		ProcessManager: pm,
 		Adapters:       adapters,
 		Breeds:         breeds,
 		Loader:         loader,
+		Leader:         &leaderCfg,
 		Skills:         skillMgr,
 		MCP:            mcpReg,
 		Router:         routingEngine,
@@ -100,6 +177,23 @@ func New(cfg Config) (*Platform, error) {
 		SOP:            sopGuardian,
 		Memory:         memStore,
 		Compressor:     compressor,
+
+		ThreadStore:   threadStore,
+		SettingsStore: settingsStore,
+		EvidenceStore: evidenceStore,
+
+		WorkspaceDir: cfg.WorkspaceDir,
+
+		PromptBuilder:    promptBuilder,
+		ContextAssembler: contextAssembler,
+
+		HookRegistry:  hookReg,
+		HookPipeline:  hookPipeline,
+		HookTraceStore: hookTraceStore,
+
+		MessageStore: messageStore,
+
+		MentionRouter: router,
 	}, nil
 }
 
@@ -115,4 +209,38 @@ func (p *Platform) GetAdapter(cliName string) (unified.AgentExecutor, error) {
 // GetBreed returns a breed config by ID.
 func (p *Platform) GetBreed(id string) *config.BreedConfig {
 	return p.Breeds[id]
+}
+
+// BuildMCPConfig returns MCP server configurations for CLI agents.
+// This is global (not per-breed) — all MCP-supporting agents get the same config.
+func (p *Platform) BuildMCPConfig() *unified.MCPConfig {
+	if p.MCP == nil {
+		return nil
+	}
+	servers := p.MCP.ForBreed(nil, "")
+	if len(servers) == 0 {
+		return nil
+	}
+	result := &unified.MCPConfig{Servers: make([]unified.MCPServer, 0, len(servers))}
+	for _, s := range servers {
+		result.Servers = append(result.Servers, unified.MCPServer{
+			Name:    s.Name,
+			Command: s.Command,
+			Args:    s.Args,
+			Env:     s.Env,
+		})
+	}
+	return result
+}
+
+// Close releases platform resources. Called during graceful shutdown.
+func (p *Platform) Close() error {
+	// ProcessManager processes are cleaned up via context cancellation
+	// in their respective goroutines. Nothing explicit needed here.
+	return nil
+}
+
+// Ready checks if the platform is ready to serve requests.
+func (p *Platform) Ready() bool {
+	return len(p.Adapters) > 0 && len(p.Breeds) > 0
 }

@@ -160,22 +160,32 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 | Dynamic Router | 任务→agent 路由决策 | `internal/router/` |
 | SOP Guardian | SOP 规则、门禁、review 策略 | `internal/sop/` |
 | Memory & Evidence | 证据存储、决策日志、经验 | `internal/memory/` |
+| Memory Lanes | 6-organ typed memory lanes (taste/profile/entity/person/event/decision/lesson) + delta producer + human disposition + consumption tracker + lifecycle trace + private initiative | `internal/memory/lanes.go` `internal/memory/supply.go` `internal/memory/feedback.go` `internal/memory/initiative.go` |
+| Cue Plane | F287 recall opportunity catalog (closed typed predicates) + cue envelope (budget/dedupe/expiry) + lane resolver registry + consumption episode ledger + source invalidation (fail-closed) | `internal/cue/` |
+| ACP Process Pool | F149 process pool keyed by (projectPath, providerProfile) + lease mechanism (acquire/release, TTL, LRU) + health check (zombie cleanup, cwd validation) + metrics (warmHit/coldStart/eviction/zombie) | `internal/adapter/pool/` |
 | Skills Manifest | 按需 skill prompt 加载 | `internal/skills/` |
 | MCP Bridge | MCP server + client 桥接 | `internal/mcp/` |
 | RAG Store | 向量存储、embedding、检索 | `internal/ragstore/` |
+| Thread Store | 线程、会话、事件存储 | `internal/threadstore/` |
+| Settings Store | 成员、账户、系统配置 | `internal/settings/` |
+| Prompt Hooks | hook 声明、注入管道、轨迹记录 | `internal/hooks/` |
 | A2A Hub | agent 间通信 | `internal/a2a/` |
+| Eval Framework | harness eval 控制面、verdict 闭环、N-day 调度 | `internal/eval/` |
+| Eval Domains | eval domain YAML 定义（5 个初始 domain） | `packs/default/evals/` |
+| Ops Monitor | 运维监控、日志缓冲、健康状态 | `internal/ops/` |
+| Telemetry | OpenTelemetry 可观测性：traces ring buffer + metrics + Prometheus exporter + 30s 快照 + HMAC 伪匿名化。Graceful degradation：init 失败不 crash。Phase 7 扩展 | `internal/telemetry/` |
 
 ## 7. 路线图
 
 | Phase | 目标 | 状态 |
 |-------|------|------|
-| **1. Platform Infra** | CLI adapter + config + router + SOP + skills + memory + MCP | **进行中** |
-| **2. RAG Integration** | 向量存储接入平台、context_assemble | 已有代码，待整合 |
-| **3. A2A Coordination** | 多 agent 动态协作、@mention 路由 | 待开始 |
-| **4. Skills System** | skill 加载、注入、clowder-ai skill 吸收 | 框架已升级，内容待填充 |
-| **5. SOP Gates** | 质量门禁、review 流程、安全策略 | 待开始 |
-| **6. Transport** | WebSocket + HTTP API + 前端 | 待开始 |
-| **7. Polish** | 文档、示例、性能优化 | 待开始 |
+| **1. Platform Infra** | CLI adapter + config + router + SOP + skills + memory + MCP + hooks | **完成** |
+| **2. RAG Integration** | 向量存储接入平台、context_assemble、FTS5 混合检索 | **完成** |
+| **3. A2A Coordination** | 多 agent 动态协作、@mention 路由 | **完成** |
+| **4. Skills System** | skill 加载、注入、clowder-ai skill 吸收 | **完成** |
+| **5. SOP Gates** | 质量门禁、review 流程、安全策略 | **完成** |
+| **6. Transport** | WebSocket + HTTP API + 前端 | **完成** |
+| **7. Polish** | 文档、示例、性能优化、45 hook、Memory System + Cue Plane + ACP Pool + PWA | **完成** |
 
 ## 8. 愿景合规
 
@@ -207,13 +217,13 @@ Spec 必须包含 `## VISION Compatibility` 段，回答以下 7 个问题：
 |------|----------|------|
 | `AGENTS.md` Vision Check Protocol | agent 直接改代码 | **已建立** |
 | Spec 模板 + §8.1 检查清单 | agent 走 spec 流程 | 待建立模板 |
-| Prompt hooks（per-turn 注入） | 每轮自动注入身份 + 铁律 + 护栏 | 已设计（§8.4），待实现 |
+| Prompt hooks（per-turn 注入） | 每轮自动注入身份 + 铁律 + 护栏 | **已实现**（§8.4） |
 
 **clowder-ai 的经验**：最有效的机制是 hooks（`disableable: false`, `governanceTier: immutable`）——系统注入，agent 无法绕过。我们当前靠 AGENTS.md 自觉，未来应建立 hook 系统实现结构化强制。
 
-### 8.4 Prompt Hooks 系统设计（待实现）
+### 8.4 Prompt Hooks 系统设计（已实现）
 
-> 对标 clowder-ai 的 `assets/prompt-hooks/` 25+ YAML hooks。当前我们无 hook 系统，以下为设计备忘。
+> 实现路径：`internal/hooks/` + `packs/default/hooks/`。对标 clowder-ai `assets/prompt-hooks/`。
 
 **目标**：在 CLI adapter spawn 时，通过 stdin 注入结构化 prompt 片段，实现 agent 无法绕过的身份 + 铁律 + 护栏注入。
 
@@ -229,14 +239,23 @@ Spec 必须包含 `## VISION Compatibility` 段，回答以下 7 个问题：
 | `restrictions` | session-init | 限制声明表 | S2 |
 | `iron-laws` | session-init | 5 条铁律 | L4 |
 | `guardrails` | session-init | 红旗模式表 | S10 |
+| `roster` | session-init | 队友名册 | S5 |
+| `governance` | session-init | 治理摘要（VISION §0-§4） | S9 |
+| `mcp-tools` | session-init | MCP 工具列表 | S13 |
+| `a2a-format` | session-init | A2A 协作格式 | S4 |
 | `phase-anchor` | per-turn | 当前 Phase + 前置条件 | D14 |
 | `re-anchor` | per-turn | 长任务重锚定提醒 | D1 |
 
+> **per-turn hooks 已接入**：session-init hooks（S1-S8）在会话启动时注入身份、铁律、限制、护栏、名册、治理、MCP 工具、A2A 格式。per-turn hooks（D1-D2）每轮注入 Phase 锚定和重锚定提醒。session-init hooks 通过 native L0 通道（Claude `--append-system-prompt`、Codex `-c developer_instructions`）注入，压缩免疫；Gemini/OpenCode 走 stdin 前插 fallback。TraceStore（SQLite）记录每次注入的 fire/skip 事件。
+
 **实现路径**：
-1. `internal/adapter/` 在 spawn CLI 时，读取 `internal/config/hooks/` 下的 hook 定义
-2. 按 `stage` 和 `breed` 过滤适用的 hooks
-3. 将 hook 内容拼接到 stdin prompt 前
-4. `disableable: false` 的 hook 不可被 agent 跳过
+1. `internal/hooks/` Registry 扫描 `packs/default/hooks/` 下的 hook.yaml 定义
+2. Pipeline 按 `stage` 和 `order` 过滤并执行适用的 hooks
+3. `ws_handler.go` 执行 session-init + per-turn hooks，按 CLI 类型路由注入
+4. Native L0：Claude `--append-system-prompt`、Codex `-c developer_instructions`（压缩免疫）
+5. Fallback：Gemini/OpenCode 走 stdin 前插
+6. `disableable: false` 的 hook 不可被 agent 跳过
+7. `TraceStore`（SQLite）记录每次注入的 fire/skip 事件
 
 **与 AGENTS.md 的关系**：AGENTS.md 是 hook 内容的**真相源**。hook 系统实现后，AGENTS.md 的"长任务重锚定"段从自觉规则升级为系统注入。
 

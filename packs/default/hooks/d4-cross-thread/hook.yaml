@@ -1,0 +1,12 @@
+id: D4
+name: 跨Thread回复
+stage: per-turn
+order: 400
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

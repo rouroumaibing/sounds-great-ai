@@ -1,0 +1,12 @@
+id: S3
+name: 铁律
+stage: session-init
+order: 300
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

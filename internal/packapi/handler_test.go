@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"sounds-great-ai/pkg/pack"
@@ -37,13 +39,15 @@ func newTestPack(t *testing.T) *pack.Pack {
 
 func newValidBreed() pack.BreedConfig {
 	return pack.BreedConfig{
-		ID:           "user-breed",
-		Name:         "user-breed",
-		DisplayName:  "测试犬",
-		Capabilities: []pack.CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow: pack.WorkflowConfig{
-			Steps: []pack.WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}},
-		},
+		ID:               "user-breed",
+		Name:             "user-breed",
+		DisplayName:      "测试犬",
+		DefaultVariantID: "v1",
+		Variants: []pack.Variant{{
+			ID:           "v1",
+			ClientID:     "test",
+			DefaultModel: "test-model",
+		}},
 		Source: pack.BreedSourceUser,
 	}
 }
@@ -77,10 +81,10 @@ func TestListBreeds(t *testing.T) {
 
 	// Register a breed
 	p.Register(&pack.BreedConfig{
-		ID:           "breed1",
-		Capabilities: []pack.CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     pack.WorkflowConfig{Steps: []pack.WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       pack.BreedSourceUser,
+		ID:               "breed1",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           pack.BreedSourceUser,
 	})
 
 	h := NewHandler(p, dir)
@@ -103,10 +107,10 @@ func TestDeleteUserBreedSuccess(t *testing.T) {
 	p := newTestPack(t)
 
 	p.Register(&pack.BreedConfig{
-		ID:           "user-breed",
-		Capabilities: []pack.CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     pack.WorkflowConfig{Steps: []pack.WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       pack.BreedSourceUser,
+		ID:               "user-breed",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           pack.BreedSourceUser,
 	})
 
 	h := NewHandler(p, dir)
@@ -128,10 +132,10 @@ func TestDeleteSystemBreedForbidden(t *testing.T) {
 	p := newTestPack(t)
 
 	p.Register(&pack.BreedConfig{
-		ID:           "sys-breed",
-		Capabilities: []pack.CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     pack.WorkflowConfig{Steps: []pack.WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       pack.BreedSourceSystem,
+		ID:               "sys-breed",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           pack.BreedSourceSystem,
 	})
 
 	h := NewHandler(p, dir)
@@ -176,10 +180,10 @@ func TestCreateBreedDefaultSourceUser(t *testing.T) {
 
 	// Omit source — should default to user
 	cfg := pack.BreedConfig{
-		ID:           "no-source-breed",
-		Name:         "test",
-		Capabilities: []pack.CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     pack.WorkflowConfig{Steps: []pack.WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
+		ID:               "no-source-breed",
+		Name:             "test",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
 	}
 	body, _ := json.Marshal(cfg)
 	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(body))
@@ -203,10 +207,10 @@ func TestBarkBreedSuccess(t *testing.T) {
 
 	// Register a breed with the test capability
 	p.Register(&pack.BreedConfig{
-		ID:           "test-bark-breed",
-		Capabilities: []pack.CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     pack.WorkflowConfig{Steps: []pack.WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       pack.BreedSourceSystem,
+		ID:               "test-bark-breed",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           pack.BreedSourceSystem,
 	})
 
 	body, _ := json.Marshal(map[string]string{"query": "test query"})
@@ -233,5 +237,104 @@ func TestBarkBreedNotFound(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func setupTestPackHandler(t *testing.T) (*Handler, string) {
+	t.Helper()
+	dir := t.TempDir()
+	p := pack.New("test")
+	h := NewHandler(p, dir)
+	return h, dir
+}
+
+func TestGetTemplates(t *testing.T) {
+	h, dir := setupTestPackHandler(t)
+
+	// Write template file
+	templates := `[{"id":"orchestrator","name":"Orchestrator","default_roles":["orchestrator"]}]`
+	os.WriteFile(filepath.Join(dir, "cat-template.json"), []byte(templates), 0644)
+
+	mux := h.Routes()
+	req := httptest.NewRequest("GET", "/api/breeds/templates", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var result []map[string]any
+	json.NewDecoder(rec.Body).Decode(&result)
+	if len(result) != 1 || result[0]["id"] != "orchestrator" {
+		t.Fatalf("got %v, want 1 template with id=orchestrator", result)
+	}
+}
+
+func TestGetTemplates_Fallback(t *testing.T) {
+	h, _ := setupTestPackHandler(t)
+	// No template file → fallback to empty array
+	mux := h.Routes()
+	req := httptest.NewRequest("GET", "/api/breeds/templates", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var result []any
+	json.NewDecoder(rec.Body).Decode(&result)
+	if len(result) != 0 {
+		t.Fatalf("got %v, want empty array", result)
+	}
+}
+
+func TestUpdateBreed(t *testing.T) {
+	h, dir := setupTestPackHandler(t)
+
+	// Create a user breed first
+	cfg := pack.BreedConfig{
+		ID:          "test-breed",
+		Name:        "Test",
+		DisplayName: "Test Breed",
+		Source:      pack.BreedSourceUser,
+		Variants:    []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
+	}
+	h.pack.Register(&cfg)
+	saveBreedFile(dir, &cfg)
+
+	// PATCH
+	body, _ := json.Marshal(map[string]any{"display_name": "Updated Breed"})
+	req := httptest.NewRequest("PATCH", "/api/breeds/test-breed", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	mux := h.Routes()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+	var result pack.BreedConfig
+	json.NewDecoder(rec.Body).Decode(&result)
+	if result.DisplayName != "Updated Breed" {
+		t.Fatalf("DisplayName = %q, want %q", result.DisplayName, "Updated Breed")
+	}
+}
+
+func TestGetBreedStatus(t *testing.T) {
+	h, _ := setupTestPackHandler(t)
+	cfg := pack.BreedConfig{ID: "test-breed", Name: "Test", DisplayName: "Test", Source: pack.BreedSourceUser, Variants: []pack.Variant{{ID: "default"}}}
+	h.pack.Register(&cfg)
+
+	mux := h.Routes()
+	req := httptest.NewRequest("GET", "/api/breeds/test-breed/status", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var result map[string]any
+	json.NewDecoder(rec.Body).Decode(&result)
+	if result["status"] != "idle" {
+		t.Fatalf("status = %v, want idle", result["status"])
 	}
 }

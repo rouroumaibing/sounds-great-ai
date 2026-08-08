@@ -3,9 +3,13 @@ package unified
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"sounds-great-ai/internal/hooks"
 )
 
 func TestProcessManagerSpawnAndRead(t *testing.T) {
@@ -52,5 +56,45 @@ func TestProcessManagerDefaults(t *testing.T) {
 	}
 	if pm.InterruptGraceMs != 2000 {
 		t.Errorf("InterruptGraceMs = %d, want 2000", pm.InterruptGraceMs)
+	}
+}
+
+func TestSpawnWithHooks_InjectsPrompt(t *testing.T) {
+	pm := NewProcessManager()
+
+	hooksDir := t.TempDir()
+	hookDir := filepath.Join(hooksDir, "s1-test")
+	os.MkdirAll(hookDir, 0755)
+	yaml := `id: S1
+name: Test
+stage: session-init
+order: 100
+version: 1
+enabled: true
+disableable: false
+template: template.md
+safetyTier: readonly
+governanceTier: immutable
+`
+	os.WriteFile(filepath.Join(hookDir, "hook.yaml"), []byte(yaml), 0644)
+	os.WriteFile(filepath.Join(hookDir, "template.md"), []byte("INJECTED_HOOK_CONTENT"), 0644)
+
+	reg := hooks.NewRegistry(hooksDir)
+	reg.Scan()
+	pipeline := hooks.NewPipeline(reg, hooks.DefaultResolvers())
+	input := &hooks.AssemblerInput{BreedID: "bianmu", BreedName: "Border Collie"}
+
+	r, err := pm.SpawnWithHooks(context.Background(), "cat", nil, "original-input", pipeline, input)
+	if err != nil {
+		t.Fatalf("SpawnWithHooks: %v", err)
+	}
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+	if !strings.Contains(output, "INJECTED_HOOK_CONTENT") {
+		t.Errorf("output missing hook content, got %q", output)
+	}
+	if !strings.Contains(output, "original-input") {
+		t.Errorf("output missing original input, got %q", output)
 	}
 }

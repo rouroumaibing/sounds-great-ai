@@ -1,0 +1,12 @@
+id: S8C
+name: leader参考
+stage: session-init
+order: 1500
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: LeaderRefResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

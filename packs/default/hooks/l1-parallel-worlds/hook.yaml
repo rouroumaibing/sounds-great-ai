@@ -1,0 +1,12 @@
+id: L1
+name: 平行世界自我意识
+stage: session-init
+order: 150
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

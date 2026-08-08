@@ -1,0 +1,12 @@
+id: D15
+name: 语音模式
+stage: per-turn
+order: 1500
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

@@ -15,6 +15,8 @@ type BreedConfig struct {
 	MentionPatterns []string  `json:"mention_patterns,omitempty"`
 	Roles           []string  `json:"roles,omitempty"`
 
+	Review *BreedReviewPolicy `json:"review_policy,omitempty"`
+
 	DefaultVariantID string   `json:"default_variant_id"`
 	Variants         []Variant `json:"variants"`
 }
@@ -50,6 +52,26 @@ type ContextBudget struct {
 	MaxPromptTokens  int `json:"max_prompt_tokens,omitempty"`
 	MaxContextTokens int `json:"max_context_tokens,omitempty"`
 	MaxMessages      int `json:"max_messages,omitempty"`
+}
+
+// BreedReviewPolicy configures per-breed review rules.
+type BreedReviewPolicy struct {
+	CanReview           []string `json:"can_review,omitempty"`
+	CannotReviewSelf    bool     `json:"cannot_review_self"`
+	CrossBreedPreferred bool     `json:"cross_breed_preferred"`
+}
+
+// DefaultVariant returns the default variant, or the first variant if not found.
+func (b *BreedConfig) DefaultVariant() *Variant {
+	for i := range b.Variants {
+		if b.Variants[i].ID == b.DefaultVariantID {
+			return &b.Variants[i]
+		}
+	}
+	if len(b.Variants) > 0 {
+		return &b.Variants[0]
+	}
+	return nil
 }
 
 // PackConfig is the pack-level configuration.

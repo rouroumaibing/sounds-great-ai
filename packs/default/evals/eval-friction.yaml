@@ -1,0 +1,11 @@
+domainId: eval:friction
+displayName: "工具/流程摩擦评估"
+descriptionForHuman: "评估工具与流程摩擦 — CLI 超时、MCP 连接失败、adapter 重试率"
+evalBreed: demu
+frequency: weekly
+sourceAdapter: telemetry
+threadId: thread_eval_friction
+sla:
+  acknowledgeHours: 48
+  reevalWithinHours: 168
+enabled: true

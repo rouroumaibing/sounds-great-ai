@@ -38,10 +38,7 @@ func (a *Adapter) Execute(ctx context.Context, req unified.ExecuteRequest) (<-ch
 	if a.pm == nil {
 		return nil, fmt.Errorf("process manager not configured")
 	}
-	args := []string{"exec", "--json"}
-	if req.Model != "" {
-		args = append(args, "--model", req.Model)
-	}
+	args := a.buildArgs(req.Model, req.WorkDir, req.MCPConfig, req.SystemPromptL0)
 	stdinInput := a.buildStdin(req)
 	reader, err := a.pm.Spawn(ctx, a.BinaryPath, args, stdinInput)
 	if err != nil {
@@ -50,8 +47,28 @@ func (a *Adapter) Execute(ctx context.Context, req unified.ExecuteRequest) (<-ch
 	return a.streamEvents(reader), nil
 }
 
+func (a *Adapter) buildArgs(model, workDir string, mcp *unified.MCPConfig, systemPromptL0 string) []string {
+	args := []string{"exec", "--json"}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	if systemPromptL0 != "" {
+		args = append(args, "-c", "developer_instructions="+systemPromptL0)
+	}
+	if mcp != nil && len(mcp.Servers) > 0 && workDir != "" {
+		if configPath, err := unified.WriteMCPConfigFile(mcp, workDir); err == nil && configPath != "" {
+			args = append(args, "--mcp-config", configPath)
+		}
+	}
+	return args
+}
+
 func (a *Adapter) buildStdin(req unified.ExecuteRequest) string {
 	var sb strings.Builder
+	if req.SystemPrompt != "" {
+		sb.WriteString(req.SystemPrompt)
+		sb.WriteString("\n\n")
+	}
 	for _, msg := range req.Messages {
 		sb.WriteString(msg.Content)
 		sb.WriteString("\n")

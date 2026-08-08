@@ -1,0 +1,11 @@
+domainId: eval:task-outcome
+displayName: "任务交付质量评估"
+descriptionForHuman: "评估任务交付质量 — 完成率、返工率、SOP 门禁通过率"
+evalBreed: bianmu
+frequency: daily
+sourceAdapter: telemetry
+threadId: thread_eval_task_outcome
+sla:
+  acknowledgeHours: 24
+  reevalWithinHours: 72
+enabled: true

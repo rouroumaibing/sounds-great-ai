@@ -1,7 +1,13 @@
 package a2a
 
 import (
+	"context"
+
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"sounds-great-ai/internal/telemetry"
 )
 
 type Message struct {
@@ -55,4 +61,48 @@ func (h *A2AHub) CreateThread(task string, participants []string) *Thread {
 
 func (h *A2AHub) GetThread(id string) *Thread {
 	return h.threads[id]
+}
+
+// Handoff records a task handoff from one breed to another in the thread.
+// It increments the review round counter, appends the artifact to history,
+// and adds the target breed to participants if not already present.
+func (h *A2AHub) Handoff(thread *Thread, hf Handoff) (*Thread, error) {
+	// Telemetry: record handoff span + counter
+	if telemetry.IsInitialized() {
+		ctx := context.Background()
+		tracer := otel.Tracer("sounds-great-ai")
+		_, span := tracer.Start(ctx, "a2a.handoff")
+		span.SetAttributes(
+			attribute.String("from", hf.FromBreed),
+			attribute.String("to", hf.ToBreed),
+		)
+		defer span.End()
+		if telemetry.A2AHandoffCount != nil {
+			telemetry.A2AHandoffCount.Add(ctx, 1,
+				metric.WithAttributes(
+					attribute.String("from", hf.FromBreed),
+					attribute.String("to", hf.ToBreed),
+				))
+		}
+	}
+
+	thread.IncrementReviewRound()
+	thread.History = append(thread.History, Message{
+		ID:        uuid.New().String(),
+		FromBreed: hf.FromBreed,
+		Content:   hf.Artifact,
+		Role:      "handoff",
+	})
+	thread.Participants = appendUnique(thread.Participants, hf.ToBreed)
+	return thread, nil
+}
+
+// appendUnique appends s to list only if not already present.
+func appendUnique(list []string, s string) []string {
+	for _, v := range list {
+		if v == s {
+			return list
+		}
+	}
+	return append(list, s)
 }

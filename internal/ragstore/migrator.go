@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -35,6 +36,9 @@ func NewMigrator(registry *StoreRegistry, dbPath string) (*Migrator, error) {
 	if err != nil {
 		return nil, err
 	}
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 	_, _ = db.Exec("PRAGMA journal_mode=WAL")
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS migration_log (

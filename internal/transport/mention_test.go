@@ -9,19 +9,16 @@ import (
 func newMentionTestPack() *pack.Pack {
 	p := pack.New("test")
 	p.Register(&pack.BreedConfig{
-		ID:           "xigou",
-		Capabilities: []pack.CapabilityBinding{},
-		Source:       pack.BreedSourceSystem,
+		ID:     "xigou",
+		Source: pack.BreedSourceSystem,
 	})
 	p.Register(&pack.BreedConfig{
-		ID:           "zhonghuatianyuanquan",
-		Capabilities: []pack.CapabilityBinding{},
-		Source:       pack.BreedSourceSystem,
+		ID:     "zhonghuatianyuanquan",
+		Source: pack.BreedSourceSystem,
 	})
 	p.Register(&pack.BreedConfig{
-		ID:           "bianmu",
-		Capabilities: []pack.CapabilityBinding{},
-		Source:       pack.BreedSourceSystem,
+		ID:     "bianmu",
+		Source: pack.BreedSourceSystem,
 	})
 	return p
 }
@@ -63,5 +60,26 @@ func TestParseMentionAtLineStart(t *testing.T) {
 	got := parseMention("@zhonghuatianyuanquan 检查安全", p)
 	if got != "zhonghuatianyuanquan" {
 		t.Errorf("line start match, got %q, want %q", got, "zhonghuatianyuanquan")
+	}
+}
+
+func TestIsLeaderMention(t *testing.T) {
+	patterns := []string{"@leader", "@owner"}
+	tests := []struct {
+		text string
+		want bool
+	}{
+		{"@leader do something", true},
+		{"@owner check this", true},
+		{"  @leader trimmed", true},
+		{"hello @leader", false},
+		{"@bianmu help", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		got := isLeaderMention(tt.text, patterns)
+		if got != tt.want {
+			t.Errorf("isLeaderMention(%q) = %v, want %v", tt.text, got, tt.want)
+		}
 	}
 }

@@ -12,6 +12,11 @@
   "team_strengths": "代码搜索、静态分析、重构建议",
   "mention_patterns": ["@灵缇", "@xigou"],
   "roles": ["code-hunter", "reviewer"],
+  "review_policy": {
+    "can_review": ["bianmu", "demu"],
+    "cannot_review_self": true,
+    "cross_breed_preferred": true
+  },
   "default_variant_id": "xigou-codex",
   "variants": [
     {

@@ -1,0 +1,12 @@
+id: D2
+name: 重锚定
+stage: per-turn
+order: 200
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: ReAnchorResolver
+inputs: [toolCallCount, breedId, breedName, currentPhase]
+safetyTier: readonly
+governanceTier: immutable

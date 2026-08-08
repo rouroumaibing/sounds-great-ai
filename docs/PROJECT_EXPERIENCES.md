@@ -264,3 +264,42 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 来源锚点：`docs/PROJECT_EXPERIENCES.md` §6.3
 
 - 关联：§6.3 参考代码引入
+
+### LL-009: 路线图项必须经参考架构验证后再纳入
+- 状态：validated
+- 更新时间：2026-08-07
+
+- 坑：README v2 列了 17 个"差距"模块，其中 10 个经 clowder-ai 架构调研后评估为不需要（clowder-ai 也不做，或过度工程）。
+- 根因：Gap Analysis 基于名称对比而非架构理解——看到 clowder-ai 有 `Invocation/Queue` 就列为差距，没有评估 clowder-ai 为何有它、我们是否需要。
+- 触发条件：基于参考项目的模块名/目录名做 Gap Analysis，而非理解其架构决策。
+- 修复：每项差距必须回答：clowder-ai 为何有这个？我们是否需要同样的设计？不需要则不纳入路线图。
+- 防护：路线图项纳入前必须通过"参考架构验证"——确认参考项目确实做了这件事 + 我们确实需要。
+- 来源锚点：`README.md` v2 段 + clowder-ai 架构调研
+
+- 关联：P1 Vision-First, P5 Spec Compatibility Check
+
+### LL-010: 共享能力不得绑定到特定犬种 — 警惕心智模型惯性
+- 状态：validated
+- 更新时间：2026-08-07
+
+- 坑：RAG 设计中反复把 `search_knowledge` 能力绑定到 jinmao 犬种（硬编码 breedID、roles 判断、Gemini 降级时"建议 @jinmao"）。用户三次纠正后才完全对齐 clowder-ai 的"共享服务"模式。**第 5 次复发（Phase 7 Polish）**：给每个 breed 硬编码 `cautions`（"不直接写业务代码"、"不做RAG检索"...），本质是把 AGENTS.md 共享治理规则拆碎到 breed config 中。用户再次纠正。
+- 根因：**心智模型惯性** — 从"某犬种负责某事"开始思考，遇到设计需求就 fallback 到"按犬种分配"，而非"共享治理"。breed config 中 `roles` 字段潜意识强化了"某能力是某犬种的 job"。`cautions` 是同一枚硬币的反面：定义"不能做"和定义"能做"一样是 breed-binding。
+- 触发条件：设计共享能力或治理规则时，把它们放到 breed config 而非平台层（hooks/AGENTS.md）。
+- 修复：共享能力（RAG、MCP tools）和治理规则（限制、铁律）都是平台层服务，不绑定犬种。技术限制是 CLI 工具的限制，不是犬种角色分配。治理规则在 AGENTS.md + hooks S2 中，不在 breed config 中重复。
+- 防护：spec 审查时搜索：(1) 犬种名 + 能力关键词（如 `jinmao.*rag`）；(2) breed config 中的行为约束字段（如 `cautions`、`restrictions`、`cannot_do`）。如果共享治理规则出现在 breed config 中，阻断。
+- 来源锚点：`2026-08-07-rag-mcp-server-design.md` §2.2 + `2026-08-03-jinmao-rag-design.md`（已废弃）
+
+- 关联：P1 Vision-First, P3 No Architecture Reversal
+
+### LL-011: 设计文档示例中不得使用具体犬种名 — 用 @dog 泛指
+- 状态：validated
+- 更新时间：2026-08-07
+
+- 坑：SOP handoff spec 数据流示例中用 `@xigou`（后改为 `@jinmao`）作为 @mention 示例，暗示特定犬种是典型 handoff 目标。用户要求改为 `@dog` 泛指。
+- 根因：LL-010 的变体 — 不只在能力绑定中，**示例文本**也会暗示犬种与能力的固定关联。`@xigou 审查代码` 暗示"代码审查是 xigou 的 job"。
+- 触发条件：写 spec/设计文档的数据流示例、伪代码注释、用例描述时，用具体犬种名（jinmao/xigou/demu 等）作为示例。
+- 修复：设计文档中所有示例一律用 `@dog` 泛指犬种。代码中变量名 `fromBreed`/`toBreed` 不受此约束（它们是参数，不是示例）。
+- 防护：spec 自审时搜索具体犬种 ID（jinmao|xigou|demu|zangao|bianmu|zhonghuatianyuanquan），出现在示例/注释/用例描述中时替换为 `@dog`。代码签名和变量名不在此列。
+- 来源锚点：`2026-08-07-sop-handoff-design.md` §2.1 数据流示例
+
+- 关联：LL-010, P1 Vision-First

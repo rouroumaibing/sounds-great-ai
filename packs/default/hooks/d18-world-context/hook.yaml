@@ -1,0 +1,12 @@
+id: D18
+name: 世界上下文
+stage: per-turn
+order: 1800
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

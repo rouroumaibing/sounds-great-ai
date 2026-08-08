@@ -1,0 +1,12 @@
+id: S7
+name: MCP工具列表
+stage: session-init
+order: 700
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

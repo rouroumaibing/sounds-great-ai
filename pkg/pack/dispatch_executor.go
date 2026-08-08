@@ -3,7 +3,6 @@ package pack
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 
 	"sounds-great-ai/pkg/pack/orchestrator"
@@ -86,21 +85,9 @@ func (p *Pack) ExecuteDispatch(ctx context.Context, plan orchestrator.DispatchPl
 			continue
 		}
 		p.mu.RLock()
-		breed, breedExists := p.registry[entry.BreedID]
+		_, breedExists := p.registry[entry.BreedID]
 		p.mu.RUnlock()
-		if breedExists {
-			blocked := false
-			for _, b := range breed.Capabilities {
-				if b.Name == "dispatch_execute" {
-					blocked = true
-					break
-				}
-			}
-			if blocked {
-				entryErrors[entry.SubTaskID] = fmt.Sprintf("disallowed_recursion: target breed %s has dispatch_execute capability", entry.BreedID)
-				continue
-			}
-		}
+		_ = breedExists // breed exists check; capabilities removed in variant format
 		pending = append(pending, entry)
 	}
 

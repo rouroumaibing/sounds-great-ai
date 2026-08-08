@@ -12,6 +12,11 @@
   "team_strengths": "输出格式化、Markdown渲染、流式响应",
   "mention_patterns": ["@藏獒", "@zangao"],
   "roles": ["presenter", "formatter"],
+  "review_policy": {
+    "can_review": [],
+    "cannot_review_self": true,
+    "cross_breed_preferred": false
+  },
   "default_variant_id": "zangao-claude",
   "variants": [
     {

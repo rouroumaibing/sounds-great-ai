@@ -15,6 +15,7 @@ const (
 	EventTerminalOutput EventType = "TERMINAL_OUTPUT"
 	EventUserInput      EventType = "USER_INPUT"
 	EventHITLApproval   EventType = "HITL_APPROVAL"
+	EventHitlResponse   EventType = "HITL_RESPONSE"
 )
 
 // Event 是 WebSocket 协议的统一事件结构
@@ -22,6 +23,7 @@ type Event struct {
 	Type      EventType       `json:"type"`
 	SessionID string          `json:"session_id"`
 	Timestamp int64           `json:"timestamp"`
+	Seq       uint64          `json:"seq,omitempty"`
 	Payload   json.RawMessage `json:"payload"`
 }
 
@@ -78,6 +80,13 @@ type HITLApprovalPayload struct {
 	Impact    string `json:"impact"`
 }
 
+// HitlResponsePayload is the payload for HITL_RESPONSE events (client → server)
+type HitlResponsePayload struct {
+	RequestID string `json:"request_id"`
+	Approved  bool   `json:"approved"`
+	Reason    string `json:"reason"`
+}
+
 // Bark 事件类型
 const (
 	EventBarkStart  EventType = "BARK_START"
@@ -110,4 +119,17 @@ type BarkResultPayload struct {
 type BarkErrorPayload struct {
 	Breed string `json:"breed"`
 	Error string `json:"error"`
+}
+
+// System notice 事件类型
+const (
+	EventSystemNotice EventType = "SYSTEM_NOTICE"
+)
+
+// SystemNoticePayload 是 SYSTEM_NOTICE 事件的 payload
+type SystemNoticePayload struct {
+	Severity  string `json:"severity"`  // "critical", "warning", "info", "recovery"
+	Title     string `json:"title"`
+	Message   string `json:"message"`
+	Timestamp string `json:"timestamp"` // ISO 8601
 }

@@ -12,13 +12,18 @@
   "team_strengths": "RAG检索、上下文组装、知识管理",
   "mention_patterns": ["@金毛", "@jinmao"],
   "roles": ["knowledge", "retriever"],
+  "review_policy": {
+    "can_review": [],
+    "cannot_review_self": true,
+    "cross_breed_preferred": false
+  },
   "default_variant_id": "jinmao-gemini",
   "variants": [
     {
       "id": "jinmao-gemini",
       "client_id": "google",
       "default_model": "gemini-2.5-pro",
-      "mcp_support": false,
+      "mcp_support": true,
       "cli": {
         "command": "gemini",
         "output_format": "stream-json",

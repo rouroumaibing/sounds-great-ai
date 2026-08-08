@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"sounds-great-ai/internal/a2a"
+	"sounds-great-ai/internal/sop"
 	"sounds-great-ai/pkg/pack"
 	"sounds-great-ai/pkg/protocol"
 )
@@ -104,12 +106,10 @@ func TestWSHandlerBarkStartAndResult(t *testing.T) {
 		t.Fatalf("RegisterCapability: %v", err)
 	}
 
-	// Register breed with workflow
+	// Register breed
 	p.Register(&pack.BreedConfig{
-		ID:           "zhonghuatianyuanquan",
-		Capabilities: []pack.CapabilityBinding{{Name: "command_check", Version: "v1"}},
-		Workflow:     pack.WorkflowConfig{Steps: []pack.WorkflowStep{{ID: "s1", CapabilityRef: "command_check:v1"}}},
-		Source:       pack.BreedSourceSystem,
+		ID:     "zhonghuatianyuanquan",
+		Source: pack.BreedSourceSystem,
 	})
 
 	handler := NewWSHandler(p)
@@ -212,10 +212,8 @@ func newConcurrentTestPack(t *testing.T) *pack.Pack {
 		t.Fatalf("RegisterCapability: %v", err)
 	}
 	p.Register(&pack.BreedConfig{
-		ID:           "zhonghuatianyuanquan",
-		Capabilities: []pack.CapabilityBinding{{Name: "command_check", Version: "v1"}},
-		Workflow:     pack.WorkflowConfig{Steps: []pack.WorkflowStep{{ID: "s1", CapabilityRef: "command_check:v1"}}},
-		Source:       pack.BreedSourceSystem,
+		ID:     "zhonghuatianyuanquan",
+		Source: pack.BreedSourceSystem,
 	})
 	return p
 }
@@ -297,5 +295,123 @@ func TestWSHandlerWriteSafetyNoPanic(t *testing.T) {
 		if _, _, err := conn.ReadMessage(); err != nil {
 			t.Fatalf("read event %d/%d failed: %v", i+1, expectedEvents, err)
 		}
+	}
+}
+
+func TestDetectMentionInResponse(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "no mention",
+			input:    "just a regular response",
+			expected: nil,
+		},
+		{
+			name:     "single mention",
+			input:    "need @xigou review code",
+			expected: []string{"xigou"},
+		},
+		{
+			name:     "multiple mentions",
+			input:    "@bianmu decompose task, then @demu trace logs",
+			expected: []string{"bianmu", "demu"},
+		},
+		{
+			name:     "mention with surrounding text",
+			input:    "I think @jinmao should retrieve the knowledge base for this",
+			expected: []string{"jinmao"},
+		},
+		{
+			name:     "duplicate mentions deduplicated",
+			input:    "@xigou check this and @xigou also that",
+			expected: []string{"xigou"},
+		},
+		{
+			name:     "email address not matched",
+			input:    "contact me at user@example.com",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := detectMentionInResponse(tt.input)
+			if len(got) != len(tt.expected) {
+				t.Fatalf("expected %v, got %v", tt.expected, got)
+			}
+			for i, v := range got {
+				if v != tt.expected[i] {
+					t.Errorf("index %d: expected %q, got %q", i, tt.expected[i], v)
+				}
+			}
+		})
+	}
+}
+
+func TestHandleA2AHandoffDepthExceeded(t *testing.T) {
+	guardian := sop.NewGuardian(nil, 1)
+	thread := &a2a.Thread{
+		ID:               "test-thread",
+		ReviewRoundCount: 1,
+		Participants:     []string{"bianmu"},
+	}
+
+	action := guardian.CheckA2ADepth(thread)
+	if action != sop.EscalateToCVO {
+		t.Fatalf("expected EscalateToCVO, got %d", action)
+	}
+}
+
+func TestHandleA2AHandoffDepthOK(t *testing.T) {
+	guardian := sop.NewGuardian(nil, 3)
+	thread := &a2a.Thread{
+		ID:               "test-thread",
+		ReviewRoundCount: 0,
+		Participants:     []string{"bianmu"},
+	}
+
+	action := guardian.CheckA2ADepth(thread)
+	if action != sop.Continue {
+		t.Fatalf("expected Continue, got %d", action)
+	}
+}
+
+func TestHandleA2AHandoffSelectReviewer(t *testing.T) {
+	reviewer := sop.SelectReviewer("bianmu", []string{"xigou", "demu"}, sop.ReviewPolicy{
+		RequireDifferentBreed: true,
+	})
+	if reviewer != "xigou" {
+		t.Fatalf("expected xigou, got %q", reviewer)
+	}
+
+	reviewer = sop.SelectReviewer("bianmu", []string{"bianmu"}, sop.ReviewPolicy{
+		RequireDifferentBreed: true,
+	})
+	if reviewer != "" {
+		t.Fatalf("expected empty, got %q", reviewer)
+	}
+}
+
+func TestExecuteWithPlatformTriggersHandoffOnMention(t *testing.T) {
+	response := "analysis done, need @xigou review code"
+	mentions := detectMentionInResponse(response)
+
+	if len(mentions) != 1 {
+		t.Fatalf("expected 1 mention, got %d", len(mentions))
+	}
+	if mentions[0] != "xigou" {
+		t.Errorf("expected xigou, got %q", mentions[0])
+	}
+}
+
+func TestExecuteWithPlatformNoHandoffWithoutMention(t *testing.T) {
+	response := "task done, code fixed"
+	mentions := detectMentionInResponse(response)
+
+	if mentions != nil {
+		t.Fatalf("expected nil, got %v", mentions)
 	}
 }

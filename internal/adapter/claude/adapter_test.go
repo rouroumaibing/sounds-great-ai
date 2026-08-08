@@ -26,7 +26,7 @@ func TestAdapterHealthMissingBinary(t *testing.T) {
 
 func TestAdapterBuildArgs(t *testing.T) {
 	a := New(nil)
-	args := a.buildArgs("claude-opus-4-6", "/tmp/work", nil)
+	args := a.buildArgs("claude-opus-4-6", "/tmp/work", nil, "")
 	found := false
 	for _, arg := range args {
 		if arg == "stream-json" {

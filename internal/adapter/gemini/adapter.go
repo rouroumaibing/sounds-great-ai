@@ -52,6 +52,10 @@ func (a *Adapter) Execute(ctx context.Context, req unified.ExecuteRequest) (<-ch
 
 func (a *Adapter) buildStdin(req unified.ExecuteRequest) string {
 	var sb strings.Builder
+	if req.SystemPrompt != "" {
+		sb.WriteString(req.SystemPrompt)
+		sb.WriteString("\n\n")
+	}
 	for _, msg := range req.Messages {
 		sb.WriteString(msg.Content)
 		sb.WriteString("\n")

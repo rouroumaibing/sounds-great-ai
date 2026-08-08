@@ -62,3 +62,32 @@ func TestBreedConfigNoCapabilities(t *testing.T) {
 		t.Errorf("ID = %s, want test", bc.ID)
 	}
 }
+
+func TestBreedConfigReviewPolicy(t *testing.T) {
+	jsonData := `{
+		"id": "test",
+		"name": "test",
+		"display_name": "test",
+		"personality": "test",
+		"review_policy": {
+			"can_review": ["xigou", "demu"],
+			"cannot_review_self": true,
+			"cross_breed_preferred": true
+		},
+		"default_variant_id": "v1",
+		"variants": [{"id": "v1", "client_id": "test", "cli": {"command": "test"}}]
+	}`
+	var breed BreedConfig
+	if err := json.Unmarshal([]byte(jsonData), &breed); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if breed.Review == nil {
+		t.Fatal("expected review_policy to be non-nil")
+	}
+	if len(breed.Review.CanReview) != 2 {
+		t.Errorf("expected 2 can_review, got %d", len(breed.Review.CanReview))
+	}
+	if !breed.Review.CannotReviewSelf {
+		t.Error("expected cannot_review_self to be true")
+	}
+}

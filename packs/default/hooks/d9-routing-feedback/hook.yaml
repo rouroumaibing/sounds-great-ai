@@ -1,0 +1,12 @@
+id: D9
+name: 路由反馈
+stage: per-turn
+order: 900
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

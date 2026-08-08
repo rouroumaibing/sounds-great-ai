@@ -32,3 +32,12 @@ func (r *MCPRegistry) ForBreed(breed *config.BreedConfig, task string) []*MCPSer
 	}
 	return result
 }
+
+// All returns all registered MCP server configs (including disabled ones).
+func (r *MCPRegistry) All() []*MCPServerConfig {
+	result := make([]*MCPServerConfig, 0, len(r.servers))
+	for _, s := range r.servers {
+		result = append(result, s)
+	}
+	return result
+}

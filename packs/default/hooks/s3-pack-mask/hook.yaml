@@ -1,0 +1,12 @@
+id: S3M
+name: Pack能力覆盖
+stage: session-init
+order: 900
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

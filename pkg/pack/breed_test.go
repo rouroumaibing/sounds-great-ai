@@ -26,36 +26,22 @@ func TestBreedSourceConstants(t *testing.T) {
 
 func TestBreedConfigJSONRoundTrip(t *testing.T) {
 	breed := BreedConfig{
-		ID:           "bianmu",
-		Name:         "bianmu",
-		DisplayName:  "边牧",
-		Avatar:       "🐕‍🦺",
-		Personality:  "聪明、敏锐、善于统筹全局",
-		SystemPrompt: "你是边牧，Pack 的协调者。",
-		ModelConfig: ModelConfig{
-			Provider:       "openai",
-			Model:          "gpt-4o",
-			Temperature:    0.3,
-			MaxTokens:      4096,
-			TimeoutSeconds: 30,
-		},
-		Capabilities: []CapabilityBinding{
-			{Name: "task_decompose", Version: "v1"},
-			{Name: "agent_dispatch", Version: "v1", Config: map[string]any{"top_k": 5}},
-		},
-		Workflow: WorkflowConfig{
-			Steps: []WorkflowStep{
-				{ID: "decompose", CapabilityRef: "task_decompose:v1"},
-				{ID: "dispatch", CapabilityRef: "agent_dispatch:v1", Depends: []string{"decompose"}},
-			},
-		},
-		Security: SecurityPolicy{
-			Network:    true,
-			Filesystem: FileSystemPolicy{Write: false, Paths: []string{}},
-		},
-		Mentions: []string{"zhonghuatianyuanquan", "zangao"},
-		Source:   BreedSourceSystem,
-		Version:  "v1",
+		ID:               "bianmu",
+		Name:             "bianmu",
+		DisplayName:      "边牧",
+		Avatar:           "🐕‍🦺",
+		Personality:      "聪明、敏锐、善于统筹全局",
+		MentionPatterns:  []string{"@bianmu"},
+		DefaultVariantID: "v1",
+		Variants: []Variant{{
+			ID:           "v1",
+			ClientID:     "openai",
+			DefaultModel: "gpt-4o",
+			MCPSupport:   false,
+			CLI:          CLIConfig{Command: "claude", OutputFormat: "json"},
+			SystemPrompt: "你是边牧，Pack 的协调者。",
+		}},
+		Source: BreedSourceSystem,
 	}
 
 	data, err := json.Marshal(breed)
@@ -74,20 +60,20 @@ func TestBreedConfigJSONRoundTrip(t *testing.T) {
 	if decoded.DisplayName != "边牧" {
 		t.Errorf("DisplayName = %q, want %q", decoded.DisplayName, "边牧")
 	}
-	if decoded.ModelConfig.TimeoutSeconds != 30 {
-		t.Errorf("TimeoutSeconds = %d, want 30", decoded.ModelConfig.TimeoutSeconds)
+	if len(decoded.Variants) != 1 {
+		t.Fatalf("Variants len = %d, want 1", len(decoded.Variants))
 	}
-	if len(decoded.Capabilities) != 2 {
-		t.Fatalf("Capabilities len = %d, want 2", len(decoded.Capabilities))
+	if decoded.Variants[0].DefaultModel != "gpt-4o" {
+		t.Errorf("DefaultModel = %q, want %q", decoded.Variants[0].DefaultModel, "gpt-4o")
 	}
-	if decoded.Capabilities[1].Config["top_k"] != float64(5) {
-		t.Errorf("Config top_k = %v, want 5", decoded.Capabilities[1].Config["top_k"])
+	if decoded.Variants[0].SystemPrompt != "你是边牧，Pack 的协调者。" {
+		t.Errorf("SystemPrompt = %q, want %q", decoded.Variants[0].SystemPrompt, "你是边牧，Pack 的协调者。")
 	}
-	if len(decoded.Workflow.Steps) != 2 {
-		t.Fatalf("Workflow.Steps len = %d, want 2", len(decoded.Workflow.Steps))
+	if len(decoded.MentionPatterns) != 1 {
+		t.Fatalf("MentionPatterns len = %d, want 1", len(decoded.MentionPatterns))
 	}
-	if decoded.Workflow.Steps[1].Depends[0] != "decompose" {
-		t.Errorf("Depends[0] = %q, want %q", decoded.Workflow.Steps[1].Depends[0], "decompose")
+	if decoded.MentionPatterns[0] != "@bianmu" {
+		t.Errorf("MentionPatterns[0] = %q, want %q", decoded.MentionPatterns[0], "@bianmu")
 	}
 	if decoded.Source != BreedSourceSystem {
 		t.Errorf("Source = %q, want %q", decoded.Source, BreedSourceSystem)

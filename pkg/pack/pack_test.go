@@ -14,12 +14,14 @@ func TestRegisterSuccess(t *testing.T) {
 	}
 
 	breed := &BreedConfig{
-		ID:           "breed1",
-		Name:         "breed1",
-		Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow: WorkflowConfig{
-			Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}},
-		},
+		ID:               "breed1",
+		Name:             "breed1",
+		DefaultVariantID: "v1",
+		Variants: []Variant{{
+			ID:           "v1",
+			ClientID:     "test",
+			DefaultModel: "test-model",
+		}},
 		Source: BreedSourceUser,
 	}
 	if err := p.Register(breed); err != nil {
@@ -40,10 +42,10 @@ func TestRegisterSystemBreedProtection(t *testing.T) {
 	p.RegisterCapability(&mockCapability{name: "cap1", version: "v1"})
 
 	systemBreed := &BreedConfig{
-		ID:           "sys-breed",
-		Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     WorkflowConfig{Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       BreedSourceSystem,
+		ID:               "sys-breed",
+		DefaultVariantID: "v1",
+		Variants: []Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           BreedSourceSystem,
 	}
 	if err := p.Register(systemBreed); err != nil {
 		t.Fatalf("Register system: %v", err)
@@ -51,10 +53,10 @@ func TestRegisterSystemBreedProtection(t *testing.T) {
 
 	// user 尝试覆盖 system breed
 	userBreed := &BreedConfig{
-		ID:           "sys-breed",
-		Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     WorkflowConfig{Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       BreedSourceUser,
+		ID:               "sys-breed",
+		DefaultVariantID: "v1",
+		Variants: []Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           BreedSourceUser,
 	}
 	err := p.Register(userBreed)
 	if err == nil {
@@ -62,45 +64,13 @@ func TestRegisterSystemBreedProtection(t *testing.T) {
 	}
 }
 
-func TestRegisterCapabilityNotRegistered(t *testing.T) {
-	p := New("test")
-
-	breed := &BreedConfig{
-		ID:           "breed1",
-		Capabilities: []CapabilityBinding{{Name: "nonexistent", Version: "v1"}},
-		Workflow:     WorkflowConfig{Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "nonexistent:v1"}}},
-		Source:       BreedSourceUser,
-	}
-	err := p.Register(breed)
-	if err == nil {
-		t.Fatal("expected error for unregistered capability, got nil")
-	}
-}
-
-func TestRegisterWorkflowRefValidation(t *testing.T) {
-	p := New("test")
-	p.RegisterCapability(&mockCapability{name: "cap1", version: "v1"})
-
-	breed := &BreedConfig{
-		ID:           "breed1",
-		Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow: WorkflowConfig{
-			Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap2:v1"}},
-		},
-		Source: BreedSourceUser,
-	}
-	err := p.Register(breed)
-	if err == nil {
-		t.Fatal("expected error for invalid workflow ref, got nil")
-	}
-}
-
 func TestHasBreed(t *testing.T) {
 	p := New("test")
 	p.Register(&BreedConfig{
-		ID:           "test-breed",
-		Capabilities: []CapabilityBinding{},
-		Source:       BreedSourceUser,
+		ID:               "test-breed",
+		DefaultVariantID: "v1",
+		Variants:         []Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           BreedSourceUser,
 	})
 	if !p.HasBreed("test-breed") {
 		t.Error("HasBreed should return true for registered breed")
@@ -115,10 +85,10 @@ func TestUnregisterSystemBreedRejection(t *testing.T) {
 	p.RegisterCapability(&mockCapability{name: "cap1", version: "v1"})
 
 	systemBreed := &BreedConfig{
-		ID:           "sys-breed",
-		Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     WorkflowConfig{Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       BreedSourceSystem,
+		ID:               "sys-breed",
+		DefaultVariantID: "v1",
+		Variants:         []Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           BreedSourceSystem,
 	}
 	p.Register(systemBreed)
 
@@ -133,10 +103,10 @@ func TestUnregisterUserBreedSuccess(t *testing.T) {
 	p.RegisterCapability(&mockCapability{name: "cap1", version: "v1"})
 
 	userBreed := &BreedConfig{
-		ID:           "user-breed",
-		Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     WorkflowConfig{Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       BreedSourceUser,
+		ID:               "user-breed",
+		DefaultVariantID: "v1",
+		Variants:         []Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           BreedSourceUser,
 	}
 	p.Register(userBreed)
 
@@ -161,10 +131,10 @@ func TestValidateWithoutMutating(t *testing.T) {
 	p.RegisterCapability(&mockCapability{name: "cap1", version: "v1"})
 
 	breed := &BreedConfig{
-		ID:           "breed1",
-		Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     WorkflowConfig{Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       BreedSourceUser,
+		ID:               "breed1",
+		DefaultVariantID: "v1",
+		Variants:         []Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           BreedSourceUser,
 	}
 	if err := p.Validate(breed); err != nil {
 		t.Fatalf("Validate: %v", err)
@@ -205,10 +175,10 @@ func TestConcurrentRegisterAndList(t *testing.T) {
 
 	// Pre-register a breed
 	p.Register(&BreedConfig{
-		ID:           "breed1",
-		Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     WorkflowConfig{Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       BreedSourceUser,
+		ID:               "breed1",
+		DefaultVariantID: "v1",
+		Variants:         []Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           BreedSourceUser,
 	})
 
 	var wg sync.WaitGroup
@@ -217,10 +187,10 @@ func TestConcurrentRegisterAndList(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			breed := &BreedConfig{
-				ID:           fmt.Sprintf("breed-%d", n),
-				Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-				Workflow:     WorkflowConfig{Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-				Source:       BreedSourceUser,
+				ID:               fmt.Sprintf("breed-%d", n),
+				DefaultVariantID: "v1",
+				Variants:         []Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+				Source:           BreedSourceUser,
 			}
 			p.Register(breed)
 		}(i)
@@ -234,21 +204,20 @@ func TestConcurrentRegisterAndList(t *testing.T) {
 
 func TestBarkInjectsBreed(t *testing.T) {
 	p := New("test")
-	mc := &breedCapturingCapability{name: "cap1", version: "v1"}
-	p.RegisterCapability(mc)
 
 	breed := &BreedConfig{
-		ID:           "breed1",
-		Name:         "breed1",
-		Capabilities: []CapabilityBinding{{Name: "cap1", Version: "v1"}},
-		Workflow:     WorkflowConfig{Steps: []WorkflowStep{{ID: "s1", CapabilityRef: "cap1:v1"}}},
-		Source:       BreedSourceUser,
+		ID:               "breed1",
+		Name:             "breed1",
+		DefaultVariantID: "v1",
+		Variants:         []Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Source:           BreedSourceUser,
 	}
 	if err := p.Register(breed); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 
-	out, err := p.Bark(context.Background(), "breed1", &TaskInput{Query: "hello"})
+	input := &TaskInput{Query: "hello"}
+	out, err := p.Bark(context.Background(), "breed1", input)
 	if err != nil {
 		t.Fatalf("Bark: %v", err)
 	}
@@ -256,11 +225,11 @@ func TestBarkInjectsBreed(t *testing.T) {
 		t.Fatal("Bark returned nil output")
 	}
 
-	if mc.capturedBreed == nil {
+	if input.Breed == nil {
 		t.Fatal("Breed was not injected into TaskInput")
 	}
-	if mc.capturedBreed.ID != "breed1" {
-		t.Errorf("capturedBreed.ID = %q, want %q", mc.capturedBreed.ID, "breed1")
+	if input.Breed.ID != "breed1" {
+		t.Errorf("input.Breed.ID = %q, want %q", input.Breed.ID, "breed1")
 	}
 }
 

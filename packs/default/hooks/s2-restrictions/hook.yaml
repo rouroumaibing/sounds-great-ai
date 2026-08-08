@@ -1,0 +1,12 @@
+id: S2
+name: 限制声明
+stage: session-init
+order: 200
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: [breedId]
+safetyTier: readonly
+governanceTier: immutable

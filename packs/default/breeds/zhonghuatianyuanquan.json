@@ -12,6 +12,11 @@
   "team_strengths": "命令审查、路径验证、敏感信息过滤",
   "mention_patterns": ["@中华田园犬", "@zhonghuatianyuanquan"],
   "roles": ["safety", "guard"],
+  "review_policy": {
+    "can_review": [],
+    "cannot_review_self": true,
+    "cross_breed_preferred": false
+  },
   "default_variant_id": "zhonghuatianyuanquan-codex",
   "variants": [
     {

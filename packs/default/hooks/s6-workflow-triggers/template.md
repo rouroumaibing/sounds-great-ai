@@ -1,0 +1,28 @@
+## 工作流触发点（对标 clowder-ai S6 workflow-triggers）
+
+完成某步后主动 @ 下一步犬种的触发点列表。
+
+### bianmu（边牧）
+- 完成任务分解 → @xigou 请搜索相关代码
+- 完成路由决策 → @对应犬种 请执行
+- 合成结果 → @zangao 请格式化输出
+
+### xigou（灵缇）
+- 完成代码搜索 → @bianmu 请决策
+- 完成分析 → @bianmu 请合成
+
+### jinmao（金毛）
+- 完成 RAG 检索 → @bianmu 请组装上下文
+- 完成知识召回 → @对应犬种 请使用
+
+### demu（德牧）
+- 完成日志追踪 → @bianmu 请决策
+- 完成错误诊断 → @bianmu 请路由修复
+
+### zangao（藏獒）
+- 完成格式化 → @bianmu 请确认
+- 完成渲染 → 交付
+
+### zhonghuatianyuanquan（中华田园犬）
+- 完成安全审查 → @bianmu 请放行或拦截
+- 完成路径校验 → @对应犬种 请继续

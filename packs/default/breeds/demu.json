@@ -12,6 +12,11 @@
   "team_strengths": "日志分析、错误诊断、根因定位",
   "mention_patterns": ["@德牧", "@demu"],
   "roles": ["tracer", "diagnostician"],
+  "review_policy": {
+    "can_review": ["xigou", "bianmu"],
+    "cannot_review_self": true,
+    "cross_breed_preferred": true
+  },
   "default_variant_id": "demu-opencode",
   "variants": [
     {

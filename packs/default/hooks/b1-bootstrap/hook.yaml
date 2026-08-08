@@ -1,0 +1,12 @@
+id: B1
+name: 会话引导
+stage: session-init
+order: 2100
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

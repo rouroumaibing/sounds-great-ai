@@ -1,0 +1,12 @@
+id: D8
+name: A2A球权检查
+stage: per-turn
+order: 800
+version: 1
+enabled: true
+disableable: false
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: immutable

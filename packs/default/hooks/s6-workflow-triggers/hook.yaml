@@ -1,0 +1,12 @@
+id: S6W
+name: 工作流触发点
+stage: session-init
+order: 1300
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

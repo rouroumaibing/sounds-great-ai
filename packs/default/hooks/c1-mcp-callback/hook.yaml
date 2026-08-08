@@ -1,0 +1,12 @@
+id: C1
+name: MCP回调
+stage: session-init
+order: 2200
+version: 1
+enabled: true
+disableable: true
+template: template.md
+resolver: AlwaysFireResolver
+inputs: []
+safetyTier: readonly
+governanceTier: human-gated

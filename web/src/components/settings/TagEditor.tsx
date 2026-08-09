@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useI18n } from '../../store/useI18n';
 
 interface TagEditorProps {
   tags: string[];
@@ -6,7 +7,9 @@ interface TagEditorProps {
   placeholder?: string;
 }
 
-export function TagEditor({ tags, onChange, placeholder = '添加...' }: TagEditorProps) {
+export function TagEditor({ tags, onChange, placeholder: _placeholder }: TagEditorProps) {
+  const { t } = useI18n();
+  const placeholder = _placeholder ?? t('tagEditor.placeholder');
   const [input, setInput] = useState('');
 
   const addTag = () => {

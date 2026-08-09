@@ -31,7 +31,7 @@
 
 1. **CLI adapter 架构** — spawn 外部 CLI 进程，stdin/stdout pipe 通信，不内置 reasoning。
 2. **动态路由，非固定 DAG** — 根据任务类型动态决定调用哪些 agent。
-3. **Dog personas 保留** — 6 个犬种映射 personality + role + CLI binding。
+3. **Dog personas 保留** — 6 个狗狗映射 personality + role + CLI binding。
 4. **Go + Eino 平台语言** — 平台层用 Go + Eino。
 
 > **真相源**：`docs/VISION.md` 是北极星。所有 spec 必须与 VISION 兼容。

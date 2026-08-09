@@ -5,12 +5,14 @@ import { getBreedColor } from '../../lib/breed-colors';
 import { useAppStore } from '../../store/useAppStore';
 import { useThreads } from '../../hooks/useThreads';
 import { useBreeds } from '../../hooks/useBreeds';
+import { useI18n } from '../../store/useI18n';
 
 interface ThreadItemProps {
   thread: Thread;
 }
 
 export function ThreadItem({ thread }: ThreadItemProps) {
+  const { t } = useI18n();
   const activeThreadId = useAppStore((s) => s.activeThreadId);
   const switchThread = useAppStore((s) => s.switchThread);
   const { deleteThread } = useThreads();
@@ -58,7 +60,7 @@ export function ThreadItem({ thread }: ThreadItemProps) {
                 ? 'bg-rose-600 text-white'
                 : 'text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100'
             )}
-            title={confirmingDelete ? '再次点击确认删除' : '删除线程'}
+            title={confirmingDelete ? t('threads.threaditem.s1') : t('threads.threaditem.s2')}
           >
             <i className={clsx('fa-regular text-[10px]', confirmingDelete ? 'fa-trash-can' : 'fa-trash-can')}></i>
           </button>

@@ -1,7 +1,9 @@
-## SOP 阶段提示（对标 clowder-ai D14）
+## SOP 阶段（对标 clowder-ai D14）
 
-当前所处的 SOP 工作阶段。当有 SOP 阶段提示时注入。
+当前 SOP stage：{{.SOPStage}}
 
-格式：SOP: {featureId} stage={stage} → load skill: {suggestedSkill}
+SOP stage 流转：kickoff → impl → quality_gate → [fresh_context] → review → merge → completion
 
-SOP 阶段决定下一步该做什么、该加载哪个 skill。
+- SOP 写了下一步就照做，不问
+- 每个 stage 有对应的 skill 和检查项
+- 不跳 stage（除非 VISION.md 标注"Phase X 提前 + 理由"）

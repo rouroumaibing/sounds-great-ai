@@ -1,4 +1,5 @@
 import { useOpsMetrics } from "../../hooks/useOpsMetrics";
+import { useI18n } from '../../store/useI18n';
 
 function parseCounter(text: string, name: string): number {
   let total = 0;
@@ -24,8 +25,9 @@ function MetricCard({ label, value, suffix }: { label: string; value: number | s
 }
 
 function TrendChart({ snapshots }: { snapshots: { timestamp: string; text: string }[] }) {
+  const { t } = useI18n();
   const points = snapshots.slice(-60).map((s) => parseCounter(s.text, "dog_pack_invocation_completed"));
-  if (points.length < 2) return <div className="text-slate-500 text-xs py-4 text-center">暂无趋势数据</div>;
+  if (points.length < 2) return <div className="text-slate-500 text-xs py-4 text-center">{t('auto.overviewtab.4')}</div>;
   const max = Math.max(...points, 1);
   const w = 600;
   const h = 120;
@@ -44,6 +46,7 @@ function TrendChart({ snapshots }: { snapshots: { timestamp: string; text: strin
 }
 
 export function OverviewTab() {
+  const { t } = useI18n();
   const { snapshots, loading } = useOpsMetrics();
   const latest = snapshots[snapshots.length - 1]?.text ?? "";
   const ok = parseCounter(latest, "dog_pack_invocation_completed");
@@ -59,8 +62,8 @@ export function OverviewTab() {
         <MetricCard label="Snapshots" value={snapshots.length} />
       </div>
       <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
-        <div className="text-[10px] text-slate-400 font-semibold mb-2">Invocation 趋势</div>
-        {loading ? <div className="text-slate-500 text-xs py-4 text-center">加载中...</div> : <TrendChart snapshots={snapshots} />}
+        <div className="text-[10px] text-slate-400 font-semibold mb-2">{t('auto.overviewtab.5')}</div>
+        {loading ? <div className="text-slate-500 text-xs py-4 text-center">{t('common.loading')}</div> : <TrendChart snapshots={snapshots} />}
       </div>
     </div>
   );

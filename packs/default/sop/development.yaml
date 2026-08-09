@@ -86,7 +86,7 @@ stages:
           type: handle_check
           constraint: reviewer_not_author
       - id: review-cross-breed
-        text: 跨犬种 review 优先
+        text: 跨狗狗 review 优先
         severity: warn
         predicate:
           type: handle_check

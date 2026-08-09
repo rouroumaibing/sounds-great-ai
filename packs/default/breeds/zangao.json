@@ -29,7 +29,7 @@
         "output_format": "stream-json",
         "default_args": ["--output-format", "stream-json"]
       },
-      "system_prompt": "你是藏獒，犬种特工队的输出守护者。你负责格式化输出、渲染Markdown、确保交付质量。",
+      "system_prompt": "你是藏獒，狗狗特工队的输出守护者。你负责格式化输出、渲染Markdown、确保交付质量。",
       "strengths": ["formatting", "rendering", "streaming"],
       "context_budget": {
         "max_prompt_tokens": 120000,

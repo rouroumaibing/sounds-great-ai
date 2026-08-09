@@ -1,6 +1,7 @@
 import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from './http';
 import type { SettingsMemberApi, SettingsAccountApi, SystemConfigApi } from '../types/api';
 import type { SettingsMember, SettingsAccount, SystemConfigGroup, EnvSummary, RulesData, HookManifestData } from '../types';
+import { useI18n } from '../store/useI18n';
 
 function mapMemberApiToUi(m: SettingsMemberApi): SettingsMember {
   return {
@@ -44,7 +45,7 @@ function mapAccountApiToUi(a: SettingsAccountApi): SettingsAccount {
   return {
     id: a.id,
     name: a.name || a.provider,
-    details: a.key_preview || (a.key_set ? '••••••••' : '未设置'),
+    details: a.key_preview || (a.key_set ? '••••••••' : useI18n.getState().t('settings.settingsservice.s1')),
     type: (a.auth_type === 'oauth' ? 'oauth' : 'api_key') as 'oauth' | 'api_key',
     clientId: a.client_id,
     displayName: a.display_name,

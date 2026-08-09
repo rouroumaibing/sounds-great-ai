@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import clsx from 'clsx';
 import type { OpsSpan } from '../../hooks/useOpsTraces';
+import { useI18n } from '../../store/useI18n';
 
 interface TraceTreeProps {
   spans: OpsSpan[];
@@ -19,6 +20,7 @@ function toMs(t: string): number {
 }
 
 export function TraceTree({ spans, traceId, onSelectSpan }: TraceTreeProps) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // 按 parentID 构建树
@@ -121,7 +123,7 @@ export function TraceTree({ spans, traceId, onSelectSpan }: TraceTreeProps) {
   };
 
   if (spans.length === 0) {
-    return <div className="text-center text-slate-500 text-xs py-4">无 span 数据</div>;
+    return <div className="text-center text-slate-500 text-xs py-4">{t('auto.tracetree.6')}</div>;
   }
 
   return (

@@ -3,8 +3,10 @@ import clsx from 'clsx';
 import { useAppStore } from '../../store/useAppStore';
 import { useChatStore } from '../../store/useChatStore';
 import { MentionPopover } from './MentionPopover';
+import { useI18n } from '../../store/useI18n';
 
 export function CommandBar() {
+  const { t } = useI18n();
   const userPromptInput = useAppStore((s) => s.userPromptInput);
   const setUserPromptInput = useAppStore((s) => s.setUserPromptInput);
   const mentionOpen = useAppStore((s) => s.mentionOpen);
@@ -94,7 +96,7 @@ export function CommandBar() {
             <span className={clsx(
               'inline-block w-2 h-2 rounded-full',
               wsConnected ? 'bg-emerald-500' : wsReadyState === WebSocket.CONNECTING ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
-            )} title={wsConnected ? '已连接' : '未连接'}></span>
+            )} title={wsConnected ? t('im.connected') : t('im.notConnected')}></span>
           </div>
           <textarea
             ref={textareaRef}
@@ -104,7 +106,7 @@ export function CommandBar() {
             onCompositionStart={() => setIsComposing(true)}
             onCompositionEnd={() => setIsComposing(false)}
             rows={1}
-            placeholder={wsConnected ? '向犬种特工队下发 CVO 指令... (Shift+Enter 换行, @ 唤起上下文)' : '正在连接 WebSocket...'}
+            placeholder={wsConnected ? t('workspace.commandBar.placeholder') : t('workspace.commandBar.connecting')}
             className="flex-1 bg-transparent border-none text-xs text-slate-100 placeholder-slate-500 focus:outline-none font-mono resize-none max-h-36 overflow-y-auto"
           />
           <button
@@ -120,11 +122,11 @@ export function CommandBar() {
             {isGenerating ? (
               <>
                 <i className="fa-solid fa-spinner fa-spin text-[10px]"></i>
-                <span>生成中</span>
+                <span>{t('workspace.commandBar.generating')}</span>
               </>
             ) : (
               <>
-                <span>发送</span>
+                <span>{t('workspace.commandBar.send')}</span>
                 <i className="fa-solid fa-paper-plane text-[10px]"></i>
               </>
             )}

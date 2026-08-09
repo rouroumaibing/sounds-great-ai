@@ -72,7 +72,7 @@ func TraceMiddleware(next http.Handler) http.Handler {
 				Name:      r.Method + " " + r.URL.Path,
 				StartTime: start,
 				EndTime:   time.Now(),
-				Attributes: map[string]interface{}{
+				Attributes: map[string]any{
 					"http.method":  r.Method,
 					"http.path":    r.URL.Path,
 					"http.status":  ww.status,

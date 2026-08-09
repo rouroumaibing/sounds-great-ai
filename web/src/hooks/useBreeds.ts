@@ -3,6 +3,7 @@ import { breedService, breedConfigToDogAgent } from '../services/breedService';
 import { useAppStore } from '../store/useAppStore';
 import type { BreedConfig } from '../types/api';
 import type { DogAgent } from '../types';
+import { useI18n } from '../store/useI18n';
 
 let breedCache: BreedConfig[] | null = null;
 
@@ -11,6 +12,7 @@ export function useBreeds() {
   const [dogs, setDogs] = useState<DogAgent[]>([]);
   const [loading, setLoading] = useState(breedCache === null);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
   const showToast = useAppStore((s) => s.showToast);
 
   const fetchBreeds = useCallback(async () => {
@@ -24,18 +26,13 @@ export function useBreeds() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      showToast({ message: `加载犬种失败: ${msg}`, type: 'error' });
+      showToast({ message: t('hooks.usebreeds.s1').replace('{msg}', msg), type: 'error' });
     } finally {
       setLoading(false);
     }
   }, [showToast]);
 
   useEffect(() => {
-    if (breedCache) {
-      setDogs(breedCache.map(breedConfigToDogAgent));
-      setLoading(false);
-      return;
-    }
     fetchBreeds();
   }, [fetchBreeds]);
 
@@ -49,7 +46,7 @@ export function useBreeds() {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      showToast({ message: `更新犬种失败: ${msg}`, type: 'error' });
+      showToast({ message: t('hooks.usebreeds.s2').replace('{msg}', msg), type: 'error' });
     }
   }, [showToast]);
 
@@ -63,7 +60,7 @@ export function useBreeds() {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      showToast({ message: `删除犬种失败: ${msg}`, type: 'error' });
+      showToast({ message: t('hooks.usebreeds.s3').replace('{msg}', msg), type: 'error' });
     }
   }, [showToast]);
 

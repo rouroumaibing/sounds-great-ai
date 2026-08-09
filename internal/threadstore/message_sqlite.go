@@ -74,7 +74,7 @@ func (s *sqliteMessageStore) Append(msg *Message) error {
 
 func (s *sqliteMessageStore) GetByThread(threadID string, limit int) ([]*Message, error) {
 	query := `SELECT id, thread_id, role, content, sender, timestamp FROM messages WHERE thread_id = ? ORDER BY timestamp ASC`
-	args := []interface{}{threadID}
+	args := []any{threadID}
 
 	if limit > 0 {
 		query += ` LIMIT ?`
@@ -103,19 +103,19 @@ func (s *sqliteMessageStore) GetByThread(threadID string, limit int) ([]*Message
 
 func (s *sqliteMessageStore) GetByThreadBefore(threadID string, before time.Time, beforeID string, limit int) ([]*Message, error) {
 	var query string
-	var args []interface{}
+	var args []any
 
 	if before.IsZero() {
 		// No cursor — return most recent N messages
 		query = `SELECT id, thread_id, role, content, sender, timestamp FROM messages WHERE thread_id = ? ORDER BY timestamp DESC`
-		args = []interface{}{threadID}
+		args = []any{threadID}
 	} else {
 		// Cursor query: messages older than (before, beforeID)
 		// Same timestamp uses ID lexicographic tiebreaker
 		query = `SELECT id, thread_id, role, content, sender, timestamp FROM messages
 			WHERE thread_id = ? AND (timestamp < ? OR (timestamp = ? AND id < ?))
 			ORDER BY timestamp DESC`
-		args = []interface{}{threadID, before.UnixNano(), before.UnixNano(), beforeID}
+		args = []any{threadID, before.UnixNano(), before.UnixNano(), beforeID}
 	}
 
 	if limit > 0 {

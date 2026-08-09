@@ -8,7 +8,7 @@ import (
 
 // bufferPool reuses []byte slices for JSON marshaling to reduce GC pressure.
 var bufferPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		b := make([]byte, 0, 512)
 		return &b
 	},
@@ -27,7 +27,7 @@ func PutBuffer(b *[]byte) {
 
 // eventPool reuses protocol.Event structs to reduce allocations.
 var eventPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &protocol.Event{}
 	},
 }

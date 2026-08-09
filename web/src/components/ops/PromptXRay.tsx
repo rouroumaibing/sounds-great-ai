@@ -1,4 +1,5 @@
 import type { OpsSpan } from '../../hooks/useOpsTraces';
+import { useI18n } from '../../store/useI18n';
 
 interface PromptXRayProps {
   span: OpsSpan | null;
@@ -12,6 +13,7 @@ function attrStr(span: OpsSpan, key: string): string {
 }
 
 export function PromptXRay({ span, onClose }: PromptXRayProps) {
+  const { t } = useI18n();
   if (!span) return null;
 
   const systemPrompt = attrStr(span, 'prompt.system');
@@ -84,7 +86,7 @@ export function PromptXRay({ span, onClose }: PromptXRayProps) {
           )}
 
           {!systemPrompt && !userPrompt && (
-            <div className="text-center text-slate-500 text-xs py-4">此 span 无 prompt 数据</div>
+            <div className="text-center text-slate-500 text-xs py-4">{t('auto.promptxray.7')}</div>
           )}
         </div>
       </div>

@@ -254,7 +254,7 @@ func TestGetTemplates(t *testing.T) {
 
 	// Write template file
 	templates := `[{"id":"orchestrator","name":"Orchestrator","default_roles":["orchestrator"]}]`
-	os.WriteFile(filepath.Join(dir, "cat-template.json"), []byte(templates), 0644)
+	os.WriteFile(filepath.Join(dir, "dog-template.json"), []byte(templates), 0644)
 
 	mux := h.Routes()
 	req := httptest.NewRequest("GET", "/api/breeds/templates", nil)

@@ -64,8 +64,8 @@ func TestIntegrationPromptBuilderWithRealBreeds(t *testing.T) {
 				for _, line := range lines {
 					if strings.Contains(line, "|") && strings.Contains(line, breed.DisplayName) {
 						// This line has the breed name in a table row — could be roster
-						// The roster header line is "| 犬种 | @mention |" so skip that
-						if !strings.Contains(line, "犬种") && !strings.Contains(line, "---") {
+						// The roster header line is "| 狗狗 | @mention |" so skip that
+						if !strings.Contains(line, "狗狗") && !strings.Contains(line, "---") {
 							t.Errorf("self appears in roster: %s", line)
 						}
 					}

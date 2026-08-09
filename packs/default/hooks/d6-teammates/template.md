@@ -1,8 +1,14 @@
-## 本次队友（对标 clowder-ai D6）
+## 队友状态（对标 clowder-ai D6）
 
-当前活跃队友的实时状态。当有活跃队友时注入队友列表。
+当前 thread 中的活跃狗狗：
 
-队友状态包括：
-- 当前持球状态
-- 正在执行的任务
-- 最近活动时间
+| 代号 | 狗狗 | 状态 |
+|------|------|------|
+| bianmu | 边牧 | {{.BianmuStatus}} |
+| xigou | 灵缇 | {{.XigouStatus}} |
+| jinmao | 金毛 | {{.JinmaoStatus}} |
+| demu | 德牧 | {{.DemuStatus}} |
+| zangao | 藏獒 | {{.ZangaoStatus}} |
+| zhonghuatianyuanquan | 中华田园犬 | {{.RuralDogStatus}} |
+
+协作方式：用 `@代号` 提及队友。不同狗狗有不同认知风格，对等协作不是重复劳动。

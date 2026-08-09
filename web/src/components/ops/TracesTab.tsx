@@ -3,8 +3,10 @@ import { useOpsTraces, type OpsSpan } from "../../hooks/useOpsTraces";
 import { TraceTree } from "./TraceTree";
 import { SpanDetail } from "./SpanDetail";
 import { PromptXRay } from "./PromptXRay";
+import { useI18n } from '../../store/useI18n';
 
 export function TracesTab() {
+  const { t } = useI18n();
   const [traceId, setTraceId] = useState("");
   const [breedId, setBreedId] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -35,9 +37,9 @@ export function TracesTab() {
         </div>
       )}
       {loading ? (
-        <div className="text-slate-500 text-xs py-4 text-center">加载中...</div>
+        <div className="text-slate-500 text-xs py-4 text-center">{t('common.loading')}</div>
       ) : traces.spans.length === 0 ? (
-        <div className="text-slate-500 text-xs py-4 text-center">暂无 trace 数据</div>
+        <div className="text-slate-500 text-xs py-4 text-center">{t('auto.tracestab.8')}</div>
       ) : (
         <ul className="divide-y divide-slate-800/40">
           {traces.spans.map((s) => (

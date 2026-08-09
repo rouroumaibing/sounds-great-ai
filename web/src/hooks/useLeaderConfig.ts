@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet, apiPatch } from '../services/http';
 import { useAppStore } from '../store/useAppStore';
+import { useI18n } from '../store/useI18n';
 
 export interface LeaderConfig {
   name: string;
@@ -24,6 +25,7 @@ let leaderCache: LeaderConfig | null = null;
 export function useLeaderConfig() {
   const [leader, setLeader] = useState<LeaderConfig>(leaderCache ?? DEFAULT_LEADER);
   const [loading, setLoading] = useState(leaderCache === null);
+  const { t } = useI18n();
   const showToast = useAppStore((s) => s.showToast);
 
   const fetchLeader = useCallback(async () => {
@@ -55,11 +57,11 @@ export function useLeaderConfig() {
       const data = await apiPatch<LeaderConfig>('/api/config/leader', cfg);
       leaderCache = data;
       setLeader(data);
-      showToast({ message: 'Leader 设置已保存', type: 'success' });
+      showToast({ message: t('hooks.useleaderconfig.s1'), type: 'success' });
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      showToast({ message: `保存 Leader 失败: ${msg}`, type: 'error' });
+      showToast({ message: t('hooks.useleaderconfig.s2').replace('{msg}', msg), type: 'error' });
       return false;
     }
   }, [showToast]);

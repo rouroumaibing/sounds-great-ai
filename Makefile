@@ -32,7 +32,7 @@ dev:
 		if [ ! -f web/node_modules/.bin/vite ]; then \
 			echo "Error: vite not found. Run 'make install' first."; exit 1; \
 		fi; \
-		go build -o bin/server-dev cmd/server/main.go; \
+		go build -o bin/server-dev ./cmd/server/; \
 		if [ $$? -ne 0 ]; then echo "Error: backend build failed"; exit 1; fi; \
 		( exec ./bin/server-dev > .logs/backend.log 2>&1 ) & \
 		echo $$! > .pids/backend.pid; \
@@ -103,7 +103,7 @@ frontend:
 
 install:
 	go mod download
-	cd web && npm ci
+	cd web && env -u npm_config_allow_scripts -u npm_config_shamefully_hoist -u npm_config_auto_install_peers npm install
 
 upgrade:
 	@read -p "是否需要拉取最新的代码？(y/n) " choice; \

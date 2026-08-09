@@ -30,7 +30,7 @@
         "default_args": ["--output-format", "stream-json"],
         "effort": "max"
       },
-      "system_prompt": "你是边牧，犬种特工队的指挥官。你擅长将复杂任务拆解并分配给合适的队友。",
+      "system_prompt": "你是边牧，狗狗特工队的指挥官。你擅长将复杂任务拆解并分配给合适的队友。",
       "strengths": ["orchestration", "architecture", "decomposition"],
       "context_budget": {
         "max_prompt_tokens": 180000,
@@ -47,7 +47,7 @@
         "command": "codex",
         "output_format": "stream-json"
       },
-      "system_prompt": "你是边牧，犬种特工队的指挥官。你擅长将复杂任务拆解并分配给合适的队友。",
+      "system_prompt": "你是边牧，狗狗特工队的指挥官。你擅长将复杂任务拆解并分配给合适的队友。",
       "strengths": ["orchestration", "architecture", "decomposition"],
       "context_budget": {
         "max_prompt_tokens": 100000,

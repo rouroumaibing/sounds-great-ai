@@ -1,13 +1,13 @@
-## 能力唤醒指南（对标 clowder-ai L6）
+## 技能唤醒（对标 clowder-ai L6）
 
-非 SOP 默认链。"坏直觉 → 该用的"。场景到 skill 的触发反射映射：
+非 SOP 默认链。"坏直觉 → 该用的"。不熟用 tool_search 搜 skill 名：
 
-- 想发一堆文字 / 日志 / 步骤 → 富文本格式化（卡片 / 列表 / diff）
-- 需要图（架构 / mock / 真实场景） → AI 生图
-- 架构决定 / bug 死磕 / 多视角 → 多犬辩论；多犬表决用投票工具（不无限互 @）
-- 压缩后失忆 / 找旧决策 → 证据搜索 + drilldown，不单刀
-- 收到上下文管理警告 → 自检上下文窗口
-- 阶段进度给下棒可见 → 更新工作流状态（不只发聊天）
-- 纠正/表扬不决定存哪，按内容走对应路径；重复工具/流程摩擦 → 代码守护（搜证据→代码守护）
-
-> Skills 在 manifest ≠ 在认知路径。完整集见能力唤醒索引。
+- 想发一堆文字/日志/步骤 → rich-messaging（卡片/列表/diff/语音/图）
+- 改前端 UI 想看效果 → browser-preview（渲染到 Hub panel）
+- 需要图 → image-generation（AI 生图）
+- 想说"文件在 X 路径" → workspace-navigator（程式打开）
+- 架构决定/bug 死磕/多视角 → collaborative-thinking（多犬辩论）
+- 压缩后失忆/找旧决策 → memory-navigation（三入口路由）
+- 收到 context_management_hint → context-self-management（自检）
+- 阶段进度给下棒可见 → update-workflow（推告示牌）
+- 纠正/表扬/Magic Word → 按内容走 profile/taste/harness

@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { threadService } from '../services/threadService';
 import { useAppStore } from '../store/useAppStore';
 import type { Thread } from '../types';
+import { useI18n } from '../store/useI18n';
 
 export function useThreads() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
   const showToast = useAppStore((s) => s.showToast);
 
   const fetchThreads = useCallback(async () => {
@@ -18,7 +20,7 @@ export function useThreads() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      showToast({ message: `加载线程失败: ${msg}`, type: 'error' });
+      showToast({ message: t('hooks.usethreads.s1').replace('{msg}', msg), type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -35,7 +37,7 @@ export function useThreads() {
       return thread;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      showToast({ message: `创建线程失败: ${msg}`, type: 'error' });
+      showToast({ message: t('hooks.usethreads.s2').replace('{msg}', msg), type: 'error' });
       throw e;
     }
   }, [showToast]);
@@ -46,7 +48,7 @@ export function useThreads() {
       setThreads((prev) => prev.filter((t) => t.id !== id));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      showToast({ message: `删除线程失败: ${msg}`, type: 'error' });
+      showToast({ message: t('hooks.usethreads.s3').replace('{msg}', msg), type: 'error' });
       throw e;
     }
   }, [showToast]);

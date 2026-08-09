@@ -1,10 +1,12 @@
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { apiGet, ApiError } from '../../services/http';
+import { useI18n } from '../../store/useI18n';
 
 type LoadedSkill = { name: string; source: string };
 
 export function SkillsPanel() {
+  const { t } = useI18n();
   const [loadedSkills, setLoadedSkills] = useState<LoadedSkill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export function SkillsPanel() {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : '加载失败');
+          setError(err instanceof ApiError ? err.message : t('common.error'));
         }
       })
       .finally(() => {
@@ -43,12 +45,12 @@ export function SkillsPanel() {
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6">
       <div className="border-b border-slate-800/80 pb-5">
-        <h2 className="text-2xl font-bold text-slate-100">Skill 管理</h2>
-        <p className="text-xs text-slate-400 mt-1">已加载的 Skill 文件与启用状态。</p>
+        <h2 className="text-2xl font-bold text-slate-100">{t('skills.title')}</h2>
+        <p className="text-xs text-slate-400 mt-1">{t('skills.desc')}</p>
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-slate-400 text-sm">加载中...</div>
+        <div className="text-center py-12 text-slate-400 text-sm">{t('common.loading')}</div>
       ) : error ? (
         <div className="text-center py-12 text-rose-400 text-sm">{error}</div>
       ) : (
@@ -56,10 +58,10 @@ export function SkillsPanel() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-slate-800/80 text-slate-400">
-                <th className="text-left px-4 py-3 font-semibold">Skill 名称</th>
-                <th className="text-left px-4 py-3 font-semibold">源路径</th>
-                <th className="text-left px-4 py-3 font-semibold">状态</th>
-                <th className="text-right px-4 py-3 font-semibold">启用</th>
+                <th className="text-left px-4 py-3 font-semibold">{t('skills.name')}</th>
+                <th className="text-left px-4 py-3 font-semibold">{t('skills.sourcePath')}</th>
+                <th className="text-left px-4 py-3 font-semibold">{t('skills.status')}</th>
+                <th className="text-right px-4 py-3 font-semibold">{t('skills.enabled')}</th>
               </tr>
             </thead>
             <tbody>
@@ -76,7 +78,7 @@ export function SkillsPanel() {
                     <td className="px-4 py-3 font-mono text-slate-400 text-[11px]">{skill.source}</td>
                     <td className="px-4 py-3">
                       <span className={clsx('px-2 py-0.5 rounded-lg border text-[10px] font-bold font-mono', isDisabled ? 'bg-slate-800 text-slate-500 border-slate-700' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30')}>
-                        {isDisabled ? '已停用' : 'loaded'}
+                        {isDisabled ? t('skills.disabledStatus') : 'loaded'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">

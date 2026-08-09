@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { settingsService } from '../services/settingsService';
 import { useAppStore } from '../store/useAppStore';
 import type { SettingsMember, SettingsAccount, SystemConfigGroup } from '../types';
+import { useI18n } from '../store/useI18n';
 
 export function useSettings() {
   const [members, setMembers] = useState<SettingsMember[]>([]);
@@ -9,6 +10,7 @@ export function useSettings() {
   const [config, setConfig] = useState<SystemConfigGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
   const showToast = useAppStore((s) => s.showToast);
 
   const fetchAll = useCallback(async () => {
@@ -26,7 +28,7 @@ export function useSettings() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      showToast({ message: `加载设置失败: ${msg}`, type: 'error' });
+      showToast({ message: t('hooks.usesettings.s1').replace('{msg}', msg), type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -39,7 +41,7 @@ export function useSettings() {
       const newMember = await settingsService.addMember(member);
       setMembers((prev) => [...prev, newMember]);
     } catch (e) {
-      showToast({ message: '添加成员失败', type: 'error' });
+      showToast({ message: t('hooks.usesettings.s2'), type: 'error' });
       throw e;
     }
   }, [showToast]);
@@ -49,7 +51,7 @@ export function useSettings() {
       await settingsService.updateMember(id, { enabled });
       setMembers((prev) => prev.map((m) => m.id === id ? { ...m, enabled } : m));
     } catch (e) {
-      showToast({ message: '更新成员失败', type: 'error' });
+      showToast({ message: t('hooks.usesettings.s3'), type: 'error' });
     }
   }, [showToast]);
 
@@ -58,7 +60,7 @@ export function useSettings() {
       await settingsService.deleteMember(id);
       setMembers((prev) => prev.filter((m) => m.id !== id));
     } catch (e) {
-      showToast({ message: '删除成员失败', type: 'error' });
+      showToast({ message: t('hooks.usesettings.s4'), type: 'error' });
     }
   }, [showToast]);
 
@@ -67,7 +69,7 @@ export function useSettings() {
       const newAccount = await settingsService.addAccount(name, provider, apiKey);
       setAccounts((prev) => [...prev, newAccount]);
     } catch (e) {
-      showToast({ message: '添加账户失败', type: 'error' });
+      showToast({ message: t('hooks.usesettings.s5'), type: 'error' });
       throw e;
     }
   }, [showToast]);
@@ -77,7 +79,7 @@ export function useSettings() {
       await settingsService.deleteAccount(id);
       setAccounts((prev) => prev.filter((a) => a.id !== id));
     } catch (e) {
-      showToast({ message: '删除账户失败', type: 'error' });
+      showToast({ message: t('hooks.usesettings.s6'), type: 'error' });
     }
   }, [showToast]);
 

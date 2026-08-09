@@ -1,8 +1,12 @@
 ## 路由策略（对标 clowder-ai D13）
 
-当前的消息路由策略。当路由策略版本 v=1 且有活跃 scope 时注入。
+@mention 解析规则：
+- 行首 `@代号` 触发路由（行中无效）
+- 中文代号：`@边牧` `@灵缇` `@金毛` `@德牧` `@藏獒` `@中华田园犬`
+- 英文代号：`@bianmu` `@xigou` `@jinmao` `@demu` `@zangao` `@zhonghuatianyuanquan`
 
-路由策略决定消息如何在犬种之间传递：
-- 串行：按顺序依次传递
-- 并行：同时传递给多个犬种
-- 独立：不传递，自己处理
+串行 vs 并行选择：
+- 串行：A→B→C 链式，每个输出作为下一个的上下文
+- 并行：goroutine 并发 + shared streamer + WaitGroup
+
+当前路由策略：{{.RoutingStrategy}}

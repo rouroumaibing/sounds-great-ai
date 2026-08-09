@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { apiGet } from '../../services/http';
+import { useI18n } from '../../store/useI18n';
 
 interface Package {
   id: string;
@@ -16,6 +17,7 @@ interface Package {
 const CATEGORIES = ['all', 'MCP', 'Skill', 'Plugin', 'Breed'] as const;
 
 export function MarketplacePanel() {
+  const { t } = useI18n();
   const [packages, setPackages] = useState<Package[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>('all');
@@ -39,17 +41,17 @@ export function MarketplacePanel() {
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6">
       <div className="border-b border-slate-800/80 pb-5">
-        <h2 className="text-2xl font-bold text-slate-100">能力市场</h2>
-        <p className="text-xs text-slate-400 mt-1">搜索和安装 MCP 服务、Skill、Plugin 与犬种配置。</p>
+        <h2 className="text-2xl font-bold text-slate-100">{t('settings.marketplace')}</h2>
+        <p className="text-xs text-slate-400 mt-1">{t('marketplace.desc')}</p>
       </div>
 
       {/* Tabs */}
       <div className="flex items-center space-x-1">
         <button onClick={() => setTab('browse')} className={clsx('px-4 py-1.5 rounded-xl text-[11px] font-semibold transition', tab === 'browse' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200')}>
-          浏览
+          {t('common.browse')}
         </button>
         <button onClick={() => setTab('installed')} className={clsx('px-4 py-1.5 rounded-xl text-[11px] font-semibold transition', tab === 'installed' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200')}>
-          已安装 ({packages.filter(p => p.installed).length})
+          {t('marketplace.installed').replace('{count}', String(packages.filter(p => p.installed).length))}
         </button>
       </div>
 
@@ -61,7 +63,7 @@ export function MarketplacePanel() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索包名或描述..."
+            placeholder={t('marketplace.searchPlaceholder')}
             className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs text-slate-200 focus:border-indigo-500/50 transition"
           />
         </div>
@@ -72,7 +74,7 @@ export function MarketplacePanel() {
               onClick={() => setCategory(cat)}
               className={clsx('px-3 py-1.5 rounded-xl text-[11px] font-semibold transition', category === cat ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-400 hover:text-slate-200')}
             >
-              {cat === 'all' ? '全部' : cat}
+              {cat === 'all' ? t('common.all') : cat}
             </button>
           ))}
         </div>
@@ -98,14 +100,14 @@ export function MarketplacePanel() {
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">{pkg.description}</p>
             <div className="flex items-center justify-between pt-1">
-              <span className="text-[10px] text-slate-500"><i className="fa-solid fa-download mr-1"></i>{pkg.installs.toLocaleString()} 次安装</span>
+              <span className="text-[10px] text-slate-500"><i className="fa-solid fa-download mr-1"></i>{pkg.installs.toLocaleString()} {t('marketplace.installs')}</span>
               {pkg.installed ? (
                 <span className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold">
-                  <i className="fa-solid fa-check mr-1"></i>已安装
+                  <i className="fa-solid fa-check mr-1"></i>{t('marketplace.alreadyInstalled')}
                 </span>
               ) : (
                 <button onClick={() => handleInstall(pkg.id)} className="px-3 py-1 rounded-lg bg-indigo-500 text-white text-[11px] font-semibold hover:bg-indigo-400 transition">
-                  安装
+                  {t('common.install')}
                 </button>
               )}
             </div>
@@ -116,7 +118,7 @@ export function MarketplacePanel() {
       {filtered.length === 0 && (
         <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 text-center">
           <i className="fa-solid fa-store text-2xl text-slate-600"></i>
-          <p className="text-xs text-slate-500 mt-2">未找到匹配的包</p>
+          <p className="text-xs text-slate-500 mt-2">{t('marketplace.notFound')}</p>
         </div>
       )}
     </div>

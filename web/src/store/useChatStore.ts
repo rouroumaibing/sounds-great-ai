@@ -5,6 +5,7 @@ import { API_BASE } from '../services/http';
 import { useAppStore } from './useAppStore';
 import { useNoticeStore } from './useNoticeStore';
 import type { StreamEvent } from '../types';
+import { useI18n } from './useI18n';
 import type {
   WsEvent,
   BarkStartPayload,
@@ -99,7 +100,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const manager = get().wsManager;
     if (!manager || manager.readyState !== WebSocket.OPEN) {
       useAppStore.getState().showToast({
-        message: 'WebSocket 未连接，无法发送',
+        message: useI18n.getState().t('store.usechatstore.s1'),
         type: 'error',
       });
       return;
@@ -331,7 +332,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           isGenerating: { ...state.isGenerating, [threadId]: false },
         }));
         useAppStore.getState().showToast({
-          message: '系统繁忙，请稍后重试',
+          message: useI18n.getState().t('store.usechatstore.s2'),
           type: 'warning',
         });
         break;
@@ -340,7 +341,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       case 'ERROR': {
         const p = payload as ErrorPayload;
         useAppStore.getState().showToast({
-          message: `请求格式错误: ${p.error}`,
+          message: useI18n.getState().t('store.usechatstore.s3').replace('{p.error}', String(p.error)),
           type: 'error',
         });
         break;

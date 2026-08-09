@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { useEvals } from '../../hooks/useEvals';
 import { useAppStore } from '../../store/useAppStore';
+import { useI18n } from '../../store/useI18n';
 
 const verdictBadgeColors: Record<string, string> = {
   fix: 'bg-red-500/20 text-red-300 border-red-500/40',
@@ -10,14 +11,15 @@ const verdictBadgeColors: Record<string, string> = {
 };
 
 export function EvalPanel() {
+  const { t } = useI18n();
   const { summaries, loading, error, triggerRun } = useEvals();
   const showToast = useAppStore((s) => s.showToast);
 
   if (loading) {
-    return <div className="text-xs text-slate-400 p-4">加载评估数据...</div>;
+    return <div className="text-xs text-slate-400 p-4">{t('eval.loading')}</div>;
   }
   if (error) {
-    return <div className="text-xs text-red-400 p-4">加载失败: {error}</div>;
+    return <div className="text-xs text-red-400 p-4">{t('common.error')}: {error}</div>;
   }
 
   const total = summaries.length;
@@ -56,11 +58,11 @@ export function EvalPanel() {
                 <button
                   onClick={() => {
                     triggerRun(s.domain.domainId);
-                    showToast({ message: `已触发 ${s.domain.displayName}`, type: 'success' });
+                    showToast({ message: t('eval.triggered').replace('{name}', s.domain.displayName), type: 'success' });
                   }}
                   className="px-3 py-1 text-xs bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 rounded-lg hover:bg-indigo-600/30"
                 >
-                  <i className="fa-solid fa-play text-xs mr-1"></i>触发
+                  <i className="fa-solid fa-play text-xs mr-1"></i>{t('eval.trigger')}
                 </button>
               </div>
             </div>
@@ -79,7 +81,7 @@ export function EvalPanel() {
                 </div>
               </div>
             ) : (
-              <div className="text-xs text-slate-600 italic">暂无 verdict</div>
+              <div className="text-xs text-slate-600 italic">{t('eval.noVerdict')}</div>
             )}
           </div>
         ))}

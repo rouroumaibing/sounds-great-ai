@@ -85,7 +85,7 @@ func (h *OpsHandler) handleTraces(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	ts := telemetry.TraceStoreInstance()
 	if ts == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{"spans": []interface{}{}, "stats": nil})
+		json.NewEncoder(w).Encode(map[string]any{"spans": []any{}, "stats": nil})
 		return
 	}
 	traceID := r.URL.Query().Get("traceId")
@@ -98,7 +98,7 @@ func (h *OpsHandler) handleTraces(w http.ResponseWriter, r *http.Request) {
 	}
 	spans := ts.Query(traceID, breedID, limit)
 	stats := ts.Stats()
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"spans": spans,
 		"stats": stats,
 	})

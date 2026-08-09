@@ -28,7 +28,7 @@ type Event struct {
 }
 
 // NewEvent 创建一个新的事件，自动设置时间戳并序列化 payload
-func NewEvent(typ EventType, sessionID string, payload interface{}) *Event {
+func NewEvent(typ EventType, sessionID string, payload any) *Event {
 	data, _ := json.Marshal(payload)
 	return &Event{
 		Type:      typ,

@@ -85,21 +85,21 @@ type Task struct {
 	Artifacts []Artifact             `json:"artifacts,omitempty"`
 	History   []Message              `json:"history,omitempty"`
 	Trace     *TraceInfo             `json:"trace,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
 }
 
 // JSONRPCRequest JSON-RPC 2.0 request
 type JSONRPCRequest struct {
 	JSONRPC string      `json:"jsonrpc"`
-	ID      interface{} `json:"id"`
+	ID      any `json:"id"`
 	Method  string      `json:"method"`
-	Params  interface{} `json:"params"`
+	Params  any `json:"params"`
 }
 
 // JSONRPCResponse JSON-RPC 2.0 response
 type JSONRPCResponse struct {
 	JSONRPC string      `json:"jsonrpc"`
-	ID      interface{} `json:"id"`
+	ID      any `json:"id"`
 	Result  *Task       `json:"result,omitempty"`
 	Error   *RPCError   `json:"error,omitempty"`
 }

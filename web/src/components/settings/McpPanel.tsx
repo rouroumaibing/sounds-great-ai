@@ -1,10 +1,12 @@
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { apiGet, ApiError } from '../../services/http';
+import { useI18n } from '../../store/useI18n';
 
 type McpServer = { name: string; tools: string[]; enabled: boolean };
 
 export function McpPanel() {
+  const { t } = useI18n();
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export function McpPanel() {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : '加载失败');
+          setError(err instanceof ApiError ? err.message : t('common.error'));
         }
       })
       .finally(() => {
@@ -49,12 +51,12 @@ export function McpPanel() {
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6">
       <div className="border-b border-slate-800/80 pb-5">
-        <h2 className="text-2xl font-bold text-slate-100">MCP 管理</h2>
-        <p className="text-xs text-slate-400 mt-1">MCP 服务器连接状态与工具注册情况。</p>
+        <h2 className="text-2xl font-bold text-slate-100">{t('mcp.title')}</h2>
+        <p className="text-xs text-slate-400 mt-1">{t('mcp.desc')}</p>
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-slate-400 text-sm">加载中...</div>
+        <div className="text-center py-12 text-slate-400 text-sm">{t('common.loading')}</div>
       ) : error ? (
         <div className="text-center py-12 text-rose-400 text-sm">{error}</div>
       ) : (
@@ -78,7 +80,7 @@ export function McpPanel() {
                     className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
                   >
                     <i className={clsx('fa-solid', isReconnecting ? 'fa-spinner animate-spin' : 'fa-rotate')}></i>
-                    <span>{isReconnecting ? '连接中...' : '重新连接'}</span>
+                    <span>{isReconnecting ? t('mcp.reconnecting') : t('mcp.reconnect')}</span>
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">

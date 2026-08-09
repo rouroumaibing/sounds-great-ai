@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { useAppStore } from '../../store/useAppStore';
+import { useI18n } from '../../store/useI18n';
 import { useThreads } from '../../hooks/useThreads';
 import type { PrimaryNavType } from '../../types';
 
@@ -38,21 +39,22 @@ export function PrimaryNav() {
   const activeNav = useAppStore((s) => s.activeNav);
   const setActiveNav = useAppStore((s) => s.setActiveNav);
   const { threads } = useThreads();
+  const { t } = useI18n();
   const hasUnreadEscalation = threads.some((t) => t.hasEscalation);
 
   return (
     <nav className="w-14 bg-slate-950 border-r border-slate-800/80 flex flex-col items-center py-3 justify-between shrink-0 select-none">
       {/* Top Navigation Icons */}
       <div className="flex flex-col items-center space-y-3 w-full px-2">
-        <NavButton nav="threads" icon="fa-solid fa-comments" label="线程与对话 (Threads)" activeNav={activeNav} onClick={() => setActiveNav('threads')} badge={hasUnreadEscalation} />
-        <NavButton nav="agents" icon="fa-solid fa-shield-dog" label="犬种特工队 (Dog Pack)" activeNav={activeNav} onClick={() => setActiveNav('agents')} />
-        <NavButton nav="tasks" icon="fa-solid fa-diagram-project" label="任务编排 (TaskPlans)" activeNav={activeNav} onClick={() => setActiveNav('tasks')} />
-        <NavButton nav="memory" icon="fa-solid fa-database" label="共享记忆 (Memory Evidence)" activeNav={activeNav} onClick={() => setActiveNav('memory')} />
+        <NavButton nav="threads" icon="fa-solid fa-comments" label={t('nav.threads')} activeNav={activeNav} onClick={() => setActiveNav('threads')} badge={hasUnreadEscalation} />
+        <NavButton nav="agents" icon="fa-solid fa-shield-dog" label={t('nav.agents')} activeNav={activeNav} onClick={() => setActiveNav('agents')} />
+        <NavButton nav="tasks" icon="fa-solid fa-diagram-project" label={t('nav.tasks')} activeNav={activeNav} onClick={() => setActiveNav('tasks')} />
+        <NavButton nav="memory" icon="fa-solid fa-database" label={t('nav.memory')} activeNav={activeNav} onClick={() => setActiveNav('memory')} />
       </div>
 
       {/* Bottom Nav Icons */}
       <div className="flex flex-col items-center space-y-3 w-full px-2">
-        <NavButton nav="settings" icon="fa-solid fa-sliders" label="系统配置" activeNav={activeNav} onClick={() => setActiveNav('settings')} />
+        <NavButton nav="settings" icon="fa-solid fa-sliders" label={t('nav.settings')} activeNav={activeNav} onClick={() => setActiveNav('settings')} />
       </div>
     </nav>
   );

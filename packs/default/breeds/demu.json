@@ -29,7 +29,7 @@
         "output_format": "ndjson",
         "default_args": ["--output", "ndjson"]
       },
-      "system_prompt": "你是德牧，犬种特工队的日志追踪犬。你追踪日志、诊断错误、定位根因。",
+      "system_prompt": "你是德牧，狗狗特工队的日志追踪犬。你追踪日志、诊断错误、定位根因。",
       "strengths": ["log-analysis", "error-diagnosis", "root-cause"],
       "context_budget": {
         "max_prompt_tokens": 100000,

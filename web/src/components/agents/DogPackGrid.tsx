@@ -1,7 +1,9 @@
 import clsx from 'clsx';
 import { useBreeds } from '../../hooks/useBreeds';
+import { useI18n } from '../../store/useI18n';
 
 export function DogPackGrid() {
+  const { t } = useI18n();
   const { dogs, loading, error } = useBreeds();
 
   return (
@@ -15,8 +17,8 @@ export function DogPackGrid() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-        {loading && <div className="text-center text-slate-500 text-xs py-4">加载中...</div>}
-        {error && <div className="text-center text-rose-400 text-xs py-4">加载失败</div>}
+        {loading && <div className="text-center text-slate-500 text-xs py-4">{t('common.loading')}</div>}
+        {error && <div className="text-center text-rose-400 text-xs py-4">{t('common.error')}</div>}
         {!loading && !error && dogs.map((dog) => (
           <div
             key={dog.id}

@@ -46,7 +46,7 @@ Phase N merge → 碰头（不是"要不要继续"，是"方向对不对"）→ 
 | 契约 | API schema / MCP 工具签名 / CLI 输出格式 | 契约测试 + full gate + 对应独立 review |
 | 不可逆 | 删除、force push、close feat、圣域（`internal/memory/`、`internal/ragstore/`） | 先拿用户授权；机器门禁仍照常 |
 
-**元风险强制升档**：diff 触碰 `internal/sop/` 门禁逻辑或 VISION.md 不可逆决策时，直接进入 high-assurance，由非作者跨犬种 reviewer 覆盖。
+**元风险强制升档**：diff 触碰 `internal/sop/` 门禁逻辑或 VISION.md 不可逆决策时，直接进入 high-assurance，由非作者跨狗狗 reviewer 覆盖。
 
 五轴都未命中且改动可逆、无外部副作用 → 最小安全动作。信息不足不等于自动全套：先补查缺失事实，再按真实风险选车道。
 
@@ -80,11 +80,11 @@ Phase N merge → 碰头（不是"要不要继续"，是"方向对不对"）→ 
 
 ## Reviewer 配对规则
 
-动态匹配自运行时犬种配置（`internal/config/breeds/`）：
-1. 跨犬种优先 | 2. 必须有 peer-reviewer 角色 | 3. 必须 available
+动态匹配自运行时狗狗配置（`internal/config/breeds/`）：
+1. 跨狗狗优先 | 2. 必须有 peer-reviewer 角色 | 3. 必须 available
 4. 优先 lead | 5. 优先活跃犬
 
-**降级**：无跨犬种 reviewer → 同犬种不同个体 → 用户。
+**降级**：无跨狗狗 reviewer → 同狗狗不同个体 → 用户。
 **铁律**：同一个体不能 review 自己的代码。
 
 ## 代码质量工具
@@ -120,7 +120,7 @@ Phase N merge → 碰头（不是"要不要继续"，是"方向对不对"）→ 
 
 - `docs/` 下 `.md` 文件推荐有 YAML frontmatter
 - 完成后必须同步真相源
-- 教训沉淀用 LL-XXX 格式（见 `docs/PROJECT_EXPERIENCES.md`）
+- 教训沉淀用 LL-XXX 格式（见 `docs/public-lessons.md`）
 
 ## 环境变量注册
 

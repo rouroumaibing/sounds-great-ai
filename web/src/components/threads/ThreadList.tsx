@@ -4,11 +4,13 @@ import { useThreads } from '../../hooks/useThreads';
 import { ThreadItem } from './ThreadItem';
 import { VirtualList } from '../common/VirtualList';
 import type { Thread } from '../../types';
+import { useI18n } from '../../store/useI18n';
 
 const THREAD_ITEM_HEIGHT = 70;
 const VIRTUAL_THRESHOLD = 30;
 
 export function ThreadList() {
+  const { t } = useI18n();
   const threadSearchInput = useAppStore((s) => s.threadSearchInput);
   const setThreadSearchInput = useAppStore((s) => s.setThreadSearchInput);
   const threadFilter = useAppStore((s) => s.threadFilter);
@@ -29,7 +31,7 @@ export function ThreadList() {
 
   const handleCreate = async () => {
     try {
-      await createThread('新对话');
+      await createThread(t('threads.newThread'));
     } catch {
       // error handled in hook
     }
@@ -47,7 +49,7 @@ export function ThreadList() {
         </div>
         <button
           onClick={handleCreate}
-          title="创建新 Thread 线程"
+          title={t('threads.createTitle')}
           className="p-1 rounded-md bg-indigo-600/80 hover:bg-indigo-500 text-white text-xs transition"
         >
           <i className="fa-solid fa-plus"></i>
@@ -61,24 +63,24 @@ export function ThreadList() {
             value={threadSearchInput}
             onChange={(e) => setThreadSearchInput(e.target.value)}
             type="text"
-            placeholder="搜索线程或 ID..."
+            placeholder={t('threads.searchPlaceholder')}
             className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/60 transition"
           />
         </div>
         <div className="flex items-center space-x-1 text-[10px]">
-          <button onClick={() => setThreadFilter('all')} className={clsx('px-2 py-0.5 rounded-full border transition', threadFilter === 'all' ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'border-slate-800 text-slate-400 hover:text-slate-200')}>全部</button>
+          <button onClick={() => setThreadFilter('all')} className={clsx('px-2 py-0.5 rounded-full border transition', threadFilter === 'all' ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'border-slate-800 text-slate-400 hover:text-slate-200')}>{t('common.all')}</button>
           <button onClick={() => setThreadFilter('escalated')} className={clsx('px-2 py-0.5 rounded-full border transition flex items-center gap-1', threadFilter === 'escalated' ? 'bg-rose-500/20 border-rose-500/40 text-rose-300' : 'border-slate-800 text-slate-400 hover:text-slate-200')}>
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> 需裁决
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> {t('auto3.threadlist.1')}
           </button>
-          <button onClick={() => setThreadFilter('active')} className={clsx('px-2 py-0.5 rounded-full border transition', threadFilter === 'active' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'border-slate-800 text-slate-400 hover:text-slate-200')}>进行中</button>
+          <button onClick={() => setThreadFilter('active')} className={clsx('px-2 py-0.5 rounded-full border transition', threadFilter === 'active' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'border-slate-800 text-slate-400 hover:text-slate-200')}>{t('auto.threadlist.2')}</button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-        {loading && <div className="text-center text-slate-500 text-xs py-4">加载中...</div>}
-        {error && <div className="text-center text-rose-400 text-xs py-4">加载失败</div>}
+        {loading && <div className="text-center text-slate-500 text-xs py-4">{t('common.loading')}</div>}
+        {error && <div className="text-center text-rose-400 text-xs py-4">{t('common.error')}</div>}
         {!loading && !error && filteredThreads.length === 0 && (
-          <div className="text-center text-slate-500 text-xs py-4">暂无线程</div>
+          <div className="text-center text-slate-500 text-xs py-4">{t('auto.threadlist.3')}</div>
         )}
         {!loading && !error && filteredThreads.length > 0 && filteredThreads.length <= VIRTUAL_THRESHOLD && (
           filteredThreads.map((thread) => (

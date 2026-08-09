@@ -1,8 +1,9 @@
-## 同族分身提醒（对标 clowder-ai D3）
+## 同狗狗协作（对标 clowder-ai D3）
 
-⚠️ 同族分身提醒：对方是同犬种但不同 model 的独立分身——两个独立分身，不是你的旧版或新版。
+同狗狗不同个体可以 review，但**优先跨狗狗 review**。
 
-当同族犬种互相 review 时，注意：
-- 同族分身有相同的职责范围但不同的认知风格
-- 不要因为是"同族"就放松审查标准
-- 跨犬种 review 仍然优先
+- 同 breedId 不同 invocation = 不同个体，可以互审
+- 跨狗狗 review 优先（如 xigou review bianmu 的代码）
+- 同一个体不能 review 自己的代码（铁律）
+
+当前狗狗：{{.BreedName}}

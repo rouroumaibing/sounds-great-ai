@@ -97,7 +97,7 @@ func New(cfg Config) (*Platform, error) {
 	}
 
 	// Load breed configs
-	loader := config.NewLoader()
+	loader := &config.Loader{Policy: config.LoadPolicySkipInvalid}
 	breeds, err := loader.LoadFromDir(cfg.BreedsDir)
 	if err != nil {
 		return nil, fmt.Errorf("load breeds: %w", err)

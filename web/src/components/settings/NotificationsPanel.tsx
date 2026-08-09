@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useAppStore } from '../../store/useAppStore';
 import { useBreeds } from '../../hooks/useBreeds';
+import { useI18n } from '../../store/useI18n';
 
 const severityConfig = {
   info: { icon: 'fa-solid fa-circle-info', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
@@ -10,17 +11,19 @@ const severityConfig = {
 };
 
 const PREF_KEYS = ['reply', 'permission', 'mention', 'schedule', 'signal'] as const;
+const _t2 = useI18n.getState().t.bind(useI18n.getState());
 const PREF_LABELS: Record<string, { label: string; icon: string; desc: string }> = {
-  reply: { label: '犬种消息', icon: 'fa-solid fa-dog', desc: '犬种回复完成通知' },
-  permission: { label: '权限请求', icon: 'fa-solid fa-key', desc: '命令审批请求通知' },
-  mention: { label: '@提及', icon: 'fa-solid fa-at', desc: '被提及时的通知' },
-  schedule: { label: '定时任务', icon: 'fa-solid fa-clock', desc: '定时任务执行通知' },
-  signal: { label: '信号更新', icon: 'fa-solid fa-signal', desc: '系统信号变更通知' },
+  reply: { label: _t2('notif.reply'), icon: 'fa-solid fa-dog', desc: _t2('notif.replyDesc') },
+  permission: { label: _t2('notif.permission'), icon: 'fa-solid fa-key', desc: _t2('notif.permissionDesc') },
+  mention: { label: _t2('notif.mention'), icon: 'fa-solid fa-at', desc: _t2('notif.mentionDesc') },
+  schedule: { label: _t2('notif.schedule'), icon: 'fa-solid fa-clock', desc: _t2('notif.scheduleDesc') },
+  signal: { label: _t2('notif.signal'), icon: 'fa-solid fa-signal', desc: _t2('notif.signalDesc') },
 };
 
 type PrefKey = typeof PREF_KEYS[number];
 
 export function NotificationsPanel() {
+  const { t } = useI18n();
   const notifications = useAppStore((s) => s.notifications);
   const markNotificationRead = useAppStore((s) => s.markNotificationRead);
   const markAllNotificationsRead = useAppStore((s) => s.markAllNotificationsRead);
@@ -62,7 +65,7 @@ export function NotificationsPanel() {
 
   const handlePushSubscribe = async () => {
     if (!pushSupported) {
-      showToast({ message: '浏览器不支持推送通知', type: 'warning' });
+      showToast({ message: t('notif.browserNotSupport'), type: 'warning' });
       return;
     }
     try {
@@ -71,46 +74,46 @@ export function NotificationsPanel() {
       if (perm === 'granted') {
         setPushSubscribed(true);
         localStorage.setItem('push_subscribed', 'true');
-        showToast({ message: '推送通知已订阅', type: 'success' });
+        showToast({ message: t('notif.pushSubscribed'), type: 'success' });
       }
     } catch {
-      showToast({ message: '订阅失败', type: 'error' });
+      showToast({ message: t('notif.subscribeFailed'), type: 'error' });
     }
   };
 
   const handlePushUnsubscribe = () => {
     setPushSubscribed(false);
     localStorage.removeItem('push_subscribed');
-    showToast({ message: '已取消推送订阅', type: 'info' });
+    showToast({ message: t('notif.unsubscribed'), type: 'info' });
   };
 
   const handleTestNotification = () => {
     if (pushPermission === 'granted') {
-      new Notification('Sounds Great AI', { body: '这是一条测试通知 🐕' });
+      new Notification('Sounds Great AI', { body: t('notif.testBody') });
     }
-    showToast({ message: '测试通知已发送', type: 'info' });
+    showToast({ message: t('notif.testSent'), type: 'info' });
   };
 
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6">
       <div className="border-b border-slate-800/80 pb-5 flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-100">通知</h2>
-          <p className="text-xs text-slate-400 mt-1">推送订阅、通知偏好与诊断 {unreadCount > 0 && <span className="text-cyan-400">· {unreadCount} 条未读</span>}</p>
+          <h2 className="text-2xl font-bold text-slate-100">{t('notif.title')}</h2>
+          <p className="text-xs text-slate-400 mt-1">{t('notif.desc')}{unreadCount > 0 && <span className="text-cyan-400">· {unreadCount} {t('notif.countUnit')}</span>}</p>
         </div>
         <div className="flex items-center space-x-2">
           <button onClick={markAllNotificationsRead} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition">
-            全部已读
+            {t('notif.markAllRead')}
           </button>
           <button onClick={clearNotifications} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white text-[11px] font-semibold transition">
-            清空
+            {t('notif.clear')}
           </button>
         </div>
       </div>
 
       {/* 通知渠道 */}
       <div className="space-y-3">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">通知渠道</h3>
+        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">{t('notif.channels')}</h3>
 
         {/* Browser Push */}
         <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4">
@@ -120,24 +123,24 @@ export function NotificationsPanel() {
                 <i className={clsx('fa-solid fa-bell text-sm', pushSubscribed ? 'text-emerald-400' : 'text-slate-500')}></i>
               </div>
               <div>
-                <div className="text-xs font-bold text-slate-200">浏览器推送 (Web Push API)</div>
+                <div className="text-xs font-bold text-slate-200">{t('notif.webPush')}</div>
                 <div className="text-[11px] text-slate-500 mt-0.5">
-                  {!pushSupported ? '浏览器不支持' : pushSubscribed ? '已订阅' : '未订阅'}
+                  {!pushSupported ? t('notif.browserUnsupported') : pushSubscribed ? t('notif.subscribed') : t('notif.notSubscribed')}
                   {vapidKey && ` · VAPID: ${vapidKey.slice(0, 8)}...`}
                 </div>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               <button onClick={handleTestNotification} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition">
-                测试
+                {t('common.test')}
               </button>
               {pushSubscribed ? (
                 <button onClick={handlePushUnsubscribe} className="px-3 py-1.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold hover:bg-rose-500/30 transition">
-                  取消订阅
+                  {t('notif.unsubscribe')}
                 </button>
               ) : (
                 <button onClick={handlePushSubscribe} className="px-3 py-1.5 rounded-xl bg-indigo-500 text-white text-[11px] font-semibold hover:bg-indigo-400 transition">
-                  订阅
+                  {t('notif.subscribe')}
                 </button>
               )}
             </div>
@@ -152,8 +155,8 @@ export function NotificationsPanel() {
                 <i className="fa-solid fa-app-indicator text-cyan-400 text-sm"></i>
               </div>
               <div>
-                <div className="text-xs font-bold text-slate-200">应用内通知</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">始终开启</div>
+                <div className="text-xs font-bold text-slate-200">{t('notif.inApp')}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">{t('notif.alwaysOn')}</div>
               </div>
             </div>
             <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold">ON</span>
@@ -163,7 +166,7 @@ export function NotificationsPanel() {
 
       {/* 通知偏好 */}
       <div className="space-y-3">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">通知偏好</h3>
+        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">{t('notif.preferences')}</h3>
         <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 overflow-hidden">
           <div className="divide-y divide-slate-800/40">
             {PREF_KEYS.map((key) => {
@@ -189,27 +192,27 @@ export function NotificationsPanel() {
       <div className="space-y-3">
         <button onClick={() => setDiagnosticsOpen(!diagnosticsOpen)} className="flex items-center space-x-2 text-xs font-bold text-slate-300 uppercase tracking-wider hover:text-slate-100 transition">
           <i className={clsx('fa-solid fa-chevron-right transition-transform', diagnosticsOpen && 'rotate-90')}></i>
-          诊断
+          {t('notif.diagnostics')}
         </button>
         {diagnosticsOpen && (
           <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 space-y-3">
-            <DiagRow label="Notification 权限" value={pushPermission} status={pushPermission === 'granted' ? 'ok' : 'warn'} />
-            <DiagRow label="Push 支持" value={pushSupported ? '支持' : '不支持'} status={pushSupported ? 'ok' : 'error'} />
-            <DiagRow label="Push 订阅状态" value={pushSubscribed ? '已订阅' : '未订阅'} status={pushSubscribed ? 'ok' : 'warn'} />
-            <DiagRow label="VAPID 公钥" value={vapidKey ? `${vapidKey.slice(0, 16)}...` : '未配置'} status={vapidKey ? 'ok' : 'warn'} />
-            <DiagRow label="已发送通知" value={`${notifications.length} 条`} status="ok" />
-            <DiagRow label="未读通知" value={`${unreadCount} 条`} status={unreadCount > 0 ? 'warn' : 'ok'} />
+            <DiagRow label={t('notif.notifPermission')} value={pushPermission} status={pushPermission === 'granted' ? 'ok' : 'warn'} />
+            <DiagRow label={t('notif.pushSupport')} value={pushSupported ? t('notif.supported') : t('notif.unsupported')} status={pushSupported ? 'ok' : 'error'} />
+            <DiagRow label={t('notif.pushStatus')} value={pushSubscribed ? t('notif.subscribed') : t('notif.notSubscribed')} status={pushSubscribed ? 'ok' : 'warn'} />
+            <DiagRow label={t('notif.vapidKey')} value={vapidKey ? `${vapidKey.slice(0, 16)}...` : t('accounts.notConfigured')} status={vapidKey ? 'ok' : 'warn'} />
+            <DiagRow label={t('notif.sentCount')} value={t('settings.notificationspanel.s2').replace('{notifications.length}', String(notifications.length))} status="ok" />
+            <DiagRow label={t('notif.unreadCount')} value={t('settings.notificationspanel.s3').replace('{unreadCount}', String(unreadCount))} status={unreadCount > 0 ? 'warn' : 'ok'} />
           </div>
         )}
       </div>
 
       {/* 通知列表 */}
       <div className="space-y-3">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">通知列表</h3>
+        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">{t('notif.list')}</h3>
         {notifications.length === 0 ? (
           <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 text-center">
             <i className="fa-solid fa-bell-slash text-2xl text-slate-600"></i>
-            <p className="text-xs text-slate-500 mt-2">暂无通知</p>
+            <p className="text-xs text-slate-500 mt-2">{t('notif.empty')}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -233,7 +236,7 @@ export function NotificationsPanel() {
                       </div>
                       <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{n.message}</p>
                       <div className="flex items-center space-x-1 mt-1.5">
-                        <span className="text-[10px] font-mono text-slate-500">来源:</span>
+                        <span className="text-[10px] font-mono text-slate-500">{t('common.source')}</span>
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
                           {dogs.find((d) => d.id === n.source)?.name ?? n.source}
                         </span>

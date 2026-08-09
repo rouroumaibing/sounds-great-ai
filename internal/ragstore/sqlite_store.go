@@ -205,7 +205,9 @@ func (s *SQLiteStore) vectorSearch(ctx context.Context, qVec []float64, opts Sea
 		}
 		doc := &schema.Document{ID: id, Content: content}
 		if metaDataJSON != "" {
-			_ = json.Unmarshal([]byte(metaDataJSON), &doc.MetaData)
+			if err := json.Unmarshal([]byte(metaDataJSON), &doc.MetaData); err != nil {
+				doc.MetaData = map[string]any{}
+			}
 		}
 		if doc.MetaData == nil {
 			doc.MetaData = map[string]any{}
@@ -269,7 +271,9 @@ func (s *SQLiteStore) ListAll(ctx context.Context) ([]*schema.Document, error) {
 		}
 		doc := &schema.Document{ID: id, Content: content}
 		if metaDataJSON != "" {
-			_ = json.Unmarshal([]byte(metaDataJSON), &doc.MetaData)
+			if err := json.Unmarshal([]byte(metaDataJSON), &doc.MetaData); err != nil {
+				doc.MetaData = map[string]any{}
+			}
 		}
 		docs = append(docs, doc)
 	}
@@ -285,7 +289,9 @@ func (s *SQLiteStore) GetByID(ctx context.Context, id string) (*schema.Document,
 	}
 	doc := &schema.Document{ID: id, Content: content}
 	if metaDataJSON != "" {
-		_ = json.Unmarshal([]byte(metaDataJSON), &doc.MetaData)
+		if err := json.Unmarshal([]byte(metaDataJSON), &doc.MetaData); err != nil {
+			doc.MetaData = map[string]any{}
+		}
 	}
 	return doc, nil
 }

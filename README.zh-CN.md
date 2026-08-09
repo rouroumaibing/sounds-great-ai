@@ -52,19 +52,19 @@
 | 能力 | 说明 |
 |------|------|
 | **CLI 适配器架构** | 4 个 CLI agent（Claude/Codex/Gemini/opencode）作为子进程启动，stdin/stdout pipe 通信，NDJSON 流解析 |
-| **配置驱动角色系统** | 犬种角色是纯 JSON 数据，用户可在页面上创建/修改/删除狗狗，热加载立即生效 |
+| **配置驱动角色系统** | 狗狗角色是纯 JSON 数据，用户可在页面上创建/修改/删除狗狗，热加载立即生效 |
 | **平台层协调** | Go + Eino 平台处理身份、路由、安全、记忆、技能 —— 平台层不做 LLM 推理 |
 | **安全护栏（Hard Rails）** | 命令黑名单、路径校验、敏感数据过滤 —— 安全由代码强制执行，不依赖 prompt |
 | **RAG 存储** | 3 后端（Memory/SQLite/Eino）动态切换，向量检索，30 天退役池 |
 | **技能系统** | SKILL.md 提示词包从磁盘加载，注入 CLI adapter 系统提示 |
-| **热加载** | 运行时注册新犬种 → 立即生效；文件监听 + HTTP API 双路径 |
+| **热加载** | 运行时注册新狗狗 → 立即生效；文件监听 + HTTP API 双路径 |
 | **Eino 框架集成** | 基于 CloudWeGo Eino 的 ChatModel 接口，支持 OpenAI / Azure / 本地模型 |
 
-## The Pack — 犬种角色映射
+## The Pack — 狗狗角色映射
 
 六只狗狗，六个角色，各司其职：
 
-| 角色 | 犬种 | 性格特征 | 核心职责 | Capabilities |
+| 角色 | 狗狗 | 性格特征 | 核心职责 | Capabilities |
 |------|------|----------|----------|-------------|
 | **Orchestrator** | 边牧 *(bianmu)* | 极高智商、控场大师、眼神敏锐 | 任务拆解、路由调度、状态机控制 | `agent_dispatch`（路由） |
 | **Safety Guardrail** | 中华田园犬 *(zhonghuatianyuanquan)* | 忠诚可靠、警惕性高、熟悉家园环境 | 安全边界、命令黑名单、权限代码审计 | `command_check, path_validate, sensitive_filter` |
@@ -150,7 +150,7 @@ make frontend  # Vite dev server only
 Server 启动后：
 - `http://localhost:8080/health` — 健康检查
 - `http://localhost:8080/ws` — WebSocket 通信
-- `http://localhost:8080/api/breeds` — 犬种 CRUD API
+- `http://localhost:8080/api/breeds` — 狗狗 CRUD API
 
 ### 升级
 
@@ -213,7 +213,7 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 
 ### v1: 平台层（进行中）
 
-> Spec：[开发路线图](docs/superpowers/specs/2026-08-06-development-roadmap-design.md)
+> Spec：见 `docs/ROADMAP.md`
 
 **已完成：**
 
@@ -228,31 +228,32 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 | `internal/capability/` | 6 个纯逻辑能力（安全护栏 + 路由 + 上下文） | ✅ Shipped |
 | `internal/prompt/` | System Prompt Builder + Context Assembler（5 段提示，token 预算） | ✅ Shipped |
 | `internal/threadstore/` | 线程 + 消息存储（SQLite WAL + 内存，工厂模式） | ✅ Shipped |
-| `internal/router/` | 动态路由引擎 + @mention 多犬种路由 | ✅ Shipped |
+| `internal/router/` | 动态路由引擎 + @mention 多狗狗路由 | ✅ Shipped |
 | `internal/a2a/` | A2A Hub + 上下文压缩 | ✅ 最小实现 |
 | `internal/sop/` | SOP 门控 + 跨模型審查 | ✅ 最小实现 |
 | `internal/mcp/` | MCP 注册表 | ✅ 最小实现 |
 | `internal/memory/` | 共享内存 | ✅ 最小实现 |
 | `internal/settings/` | 设置存储（内存） | ✅ 最小实现 |
 
-**多犬种协作 — 已完成：**
+**多狗狗协作 — 已完成：**
 
 | 功能 | 说明 | clowder-ai 参考 |
 |------|------|----------------|
 | System Prompt Builder | 5 段提示：身份 + 限制 + 队友名册 + 角色 + 技能 | SystemPromptBuilder |
 | Context Assembler | 历史转 schema 消息，token 预算，截断 | ContextAssembler |
 | @mention 路由 | 解析 @mention（中文+英文），按 breed config 模式路由 | AgentRouter |
-| 串行执行 | 多犬种链式：每个输出作为下一个的上下文 | route-serial |
+| 串行执行 | 多狗狗链式：每个输出作为下一个的上下文 | route-serial |
 | 并行执行 | goroutine 并发 + 共享 streamer + WaitGroup | route-parallel |
 | SQLite 持久化 | WAL 模式，工厂模式，close/reopen 持久性 | ThreadStore + MessageStore |
 
 ### v2: 剩余工作
 
-> 基于 clowder-ai 架构调研评估。不需要的项已移除（见下方设计决策）。
+> Phase 7 主体已完成。以下子项仍在进行中。
 
 | 工作项 | 说明 | clowder-ai 参考 | 状态 |
 |--------|------|----------------|------|
-| Hooks 接入执行流 | 将 session-init hooks（S1-S4）接入 adapter.Execute() | SystemPromptBuilder spawn 时注入 | 下一个 |
+| 文档治理补全 | AGENTS.md 治理机制 + Skills 补充 + per-breed 身份 + memory-philosophy 补全 | clowder-ai shared-rules + 49 skills | 进行中 |
+| Hooks 内容充实 | D/L 系列 hook 模板补充实质内容 | clowder-ai prompt-hooks | 进行中 |
 | RAG 按需检索 | MCP `search_knowledge` tool → RAG store → agent 按需查询 | domains/memory/（按需，非默认前置） | 规划中 |
 | SOP 基础门禁 | SOPGuardian 接入执行流（review 触发、安全检查） | 五轴风险路由（简化版） | 规划中 |
 
@@ -349,7 +350,7 @@ npx @openai/codex-security scan . --mode deep --workers 2 --subagents 0 --stop-a
 | P1 | 角色是数据，能力是代码 | Breed 是 JSON，Capability 是 Go，互不耦合 |
 | P2 | 不改现有代码 | 适配器包装 internal/，新增能力只加不改 |
 | P3 | 热加载优先 | 用户创建角色 → 立即生效，无需重启 |
-| P4 | CLI adapter，不是 DAG | 犬种通过 CLI adapter 执行，不是固定工作流 DAG |
+| P4 | CLI adapter，不是 DAG | 狗狗通过 CLI adapter 执行，不是固定工作流 DAG |
 | P5 | 安全由代码强制 | Hard Rails 在 Pack 层，不在 prompt 里 |
 
 ## Project Structure
@@ -367,7 +368,7 @@ sounds-great-ai/
 │   ├── aspect/              # 安全护栏
 │   ├── capability/          # 6 个纯逻辑能力
 │   ├── component/           # Eino 模型工厂
-│   ├── config/              # 犬种配置加载器 (variants[] 格式)
+│   ├── config/              # 狗狗配置加载器 (variants[] 格式)
 │   ├── mcp/                 # MCP 注册表
 │   ├── memory/              # 共享内存
 │   ├── packapi/             # REST API handler
@@ -384,21 +385,22 @@ sounds-great-ai/
 │   └── workspace/           # 工作区管理
 ├── packs/
 │   └── default/
-│       ├── breeds/          # 6 个犬种 JSON 配置
+│       ├── breeds/          # 6 个狗狗 JSON 配置
 │       └── skills/          # SKILL.md 提示词包
 ├── web/                     # 前端 (React + Vite)
 └── docs/
+    ├── architecture/        # 架构文档
+    ├── decisions/           # ADR 决策记录
     ├── design/              # 设计文档
-    └── superpowers/
-        ├── specs/           # 技术规格文档
-        └── plans/           # 实现计划文档
+    ├── features/            # 功能文档
+    └── plans/               # 实现计划
 ```
 
 ## Learn More
 
-- [Pack/Breed 系统设计文档](docs/superpowers/specs/2026-07-31-pack-breed-system-design.md) — 完整的 Config-Driven 角色系统设计
-- [A2A 多 Agent 设计文档](docs/superpowers/specs/2026-07-30-a2a-multi-agent-design.md) — A2A 协议实现规格
-- [角色设定](docs/design/CHARACTER-SETTING_zh-CN.md) — 犬种角色映射表
+- [架构谱系](docs/architecture/architecture-lineage.md) — 全量架构主题索引
+- [记忆哲学](docs/architecture/memory-philosophy.md) — 7 公理、21 定律、判据
+- [角色设定](docs/design/CHARACTER-SETTING_zh-CN.md) — 狗狗角色映射表
 - [故事背景](docs/design/STORY_zh-CN.md) — 狗狗特工队的诞生故事
 
 ## Contributing
@@ -407,13 +409,13 @@ sounds-great-ai/
 
 - 遵循现有代码风格和测试规范
 - 新增 Capability 需要同时写适配器和测试
-- 新增犬种只需一个 JSON 文件
+- 新增狗狗只需一个 JSON 文件
 
 ## 鸣谢
 
 本项目站在巨人的肩膀上：
 
-- **[Eino](https://github.com/cloudwego/eino)** — CloudWeGo 的 Go LLM 应用框架。编排引擎、ChatModel 接口和 schema 类型驱动着每个犬种的智能。
+- **[Eino](https://github.com/cloudwego/eino)** — CloudWeGo 的 Go LLM 应用框架。编排引擎、ChatModel 接口和 schema 类型驱动着每个狗狗的智能。
 - **[clowder-ai](https://github.com/clowder-ai/clowder)** — 启发了犬群的多 Agent 猫咖。他们的 A2A 协议设计、Pack 系统模式和开源理念是宝贵的参考。
 
 ## License

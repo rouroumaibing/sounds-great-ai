@@ -24,4 +24,4 @@ triggers:
 | 与风险匹配的验证输出 | 始终 | BLOCKED |
 | 原始需求摘录 | 涉及用户意图 | BLOCKED |
 
-同一个体不能 review 自己。跨犬种 review 优先。
+同一个体不能 review 自己。跨狗狗 review 优先。

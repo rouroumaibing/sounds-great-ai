@@ -2,24 +2,26 @@ import { useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { settingsService } from '../../services/settingsService';
 import { useBreeds } from '../../hooks/useBreeds';
+import { useI18n } from '../../store/useI18n';
 import type { RulesData, HookManifestData } from '../../types';
 
 type Tab = 'lifecycle' | 'agent-rules';
 
 export function RulesPanel() {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('lifecycle');
 
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6">
       <div className="border-b border-slate-800/80 pb-5">
-        <h2 className="text-2xl font-bold text-slate-100">协作与规则</h2>
-        <p className="text-xs text-slate-400 mt-1">生命周期注入与 Agent 规则管理。</p>
+        <h2 className="text-2xl font-bold text-slate-100">{t('rules.title')}</h2>
+        <p className="text-xs text-slate-400 mt-1">{t('rules.desc')}</p>
       </div>
 
       {/* Sub-tabs */}
       <div className="flex items-center space-x-1 border-b border-slate-800/60">
-        <TabButton active={tab === 'lifecycle'} onClick={() => setTab('lifecycle')} icon="fa-solid fa-code-branch" label="生命周期与注入" />
-        <TabButton active={tab === 'agent-rules'} onClick={() => setTab('agent-rules')} icon="fa-solid fa-book" label="Agent 规则" />
+        <TabButton active={tab === 'lifecycle'} onClick={() => setTab('lifecycle')} icon="fa-solid fa-code-branch" label={t('rules.lifecycle')} />
+        <TabButton active={tab === 'agent-rules'} onClick={() => setTab('agent-rules')} icon="fa-solid fa-book" label={t('rules.agentRules')} />
       </div>
 
       {tab === 'lifecycle' && <LifecycleTab />}
@@ -44,6 +46,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
 }
 
 function LifecycleTab() {
+  const { t } = useI18n();
   const { dogs } = useBreeds();
   const [manifest, setManifest] = useState<HookManifestData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,13 +73,13 @@ function LifecycleTab() {
       const compiled = await settingsService.getCompilePreview(dogs[0]?.id ?? 'bianmu');
       setPreview(compiled);
     } catch {
-      setPreview('// 加载失败');
+      setPreview(`// ${t('common.error')}`);
     } finally {
       setPreviewLoading(false);
     }
   };
 
-  if (loading) return <div className="text-center text-slate-500 text-xs py-8">加载中...</div>;
+  if (loading) return <div className="text-center text-slate-500 text-xs py-8">{t('common.loading')}</div>;
 
   return (
     <div className="space-y-4">
@@ -85,7 +88,7 @@ function LifecycleTab() {
         <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4">
           <div className="flex items-center space-x-2 mb-3">
             <i className="fa-solid fa-diagram-project text-indigo-400 text-xs"></i>
-            <h4 className="text-xs font-bold text-slate-200">生命周期流程</h4>
+            <h4 className="text-xs font-bold text-slate-200">{t('rules.lifecycleFlow')}</h4>
           </div>
           <div className="flex items-center flex-wrap gap-2">
             {manifest.stages.map((stage, i) => (
@@ -103,21 +106,21 @@ function LifecycleTab() {
         <div className="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <i className="fa-solid fa-hook text-amber-400 text-xs"></i>
-            <h4 className="text-xs font-bold text-slate-200">Hook 列表</h4>
+            <h4 className="text-xs font-bold text-slate-200">{t('rules.hookList')}</h4>
           </div>
           <button onClick={handlePreview} className="px-3 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold hover:bg-indigo-500/30 transition">
-            <i className="fa-solid fa-eye mr-1"></i>编译预览
+            <i className="fa-solid fa-eye mr-1"></i>{t('rules.compilePreview')}
           </button>
         </div>
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-slate-800/80 text-slate-400">
               <th className="text-left px-4 py-2 font-semibold">ID</th>
-              <th className="text-left px-4 py-2 font-semibold">名称</th>
+              <th className="text-left px-4 py-2 font-semibold">{t('rules.name')}</th>
               <th className="text-left px-4 py-2 font-semibold">Stage</th>
               <th className="text-left px-4 py-2 font-semibold">Order</th>
               <th className="text-left px-4 py-2 font-semibold">Resolver</th>
-              <th className="text-left px-4 py-2 font-semibold">状态</th>
+              <th className="text-left px-4 py-2 font-semibold">{t('rules.status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -130,11 +133,11 @@ function LifecycleTab() {
                 <td className="px-4 py-2.5 font-mono text-slate-400 text-[11px]">{hk.resolver}</td>
                 <td className="px-4 py-2.5">
                   {hk.enabled ? (
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold">启用</span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold">{t('rules.enabled')}</span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded bg-slate-700 text-slate-400 text-[10px] font-semibold">禁用</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-700 text-slate-400 text-[10px] font-semibold">{t('rules.disabled')}</span>
                   )}
-                  {!hk.disableable && <span className="ml-1 text-[9px] text-amber-400">⚠ 不可禁</span>}
+                  {!hk.disableable && <span className="ml-1 text-[9px] text-amber-400">{t('rules.notDisableable')}</span>}
                 </td>
               </tr>
             ))}
@@ -147,13 +150,13 @@ function LifecycleTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setPreviewOpen(false)}>
           <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 w-[700px] max-w-[90vw] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-slate-100">编译预览</h3>
+              <h3 className="text-sm font-bold text-slate-100">{t('rules.compilePreview')}</h3>
               <button onClick={() => setPreviewOpen(false)} className="text-slate-400 hover:text-slate-200">
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
             <pre className="flex-1 overflow-auto text-[11px] font-mono text-slate-300 bg-slate-950/50 rounded-xl p-4 border border-slate-800">
-              {previewLoading ? '加载中...' : preview || '(空)'}
+              {previewLoading ? t('common.loading') : preview || t('rules.previewEmpty')}
             </pre>
           </div>
         </div>
@@ -163,6 +166,7 @@ function LifecycleTab() {
 }
 
 function AgentRulesTab() {
+  const { t } = useI18n();
   const [rules, setRules] = useState<RulesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewModal, setPreviewModal] = useState<{ title: string; content: string } | null>(null);
@@ -174,7 +178,7 @@ function AgentRulesTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-center text-slate-500 text-xs py-8">加载中...</div>;
+  if (loading) return <div className="text-center text-slate-500 text-xs py-8">{t('common.loading')}</div>;
 
   return (
     <div className="space-y-4">
@@ -182,7 +186,7 @@ function AgentRulesTab() {
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-800/80 flex items-center space-x-2">
           <i className="fa-solid fa-shield-halved text-rose-400 text-xs"></i>
-          <h4 className="text-xs font-bold text-slate-200">铁律 (Iron Laws)</h4>
+          <h4 className="text-xs font-bold text-slate-200">{t('rules.ironLaws')}</h4>
         </div>
         <div className="divide-y divide-slate-800/40">
           {rules?.iron_laws.map((law) => (
@@ -201,14 +205,14 @@ function AgentRulesTab() {
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-800/80 flex items-center space-x-2">
           <i className="fa-solid fa-dog text-amber-400 text-xs"></i>
-          <h4 className="text-xs font-bold text-slate-200">犬种限制</h4>
+          <h4 className="text-xs font-bold text-slate-200">{t('rules.dogLimits')}</h4>
         </div>
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-slate-800/80 text-slate-400">
-              <th className="text-left px-4 py-2 font-semibold">犬种</th>
-              <th className="text-left px-4 py-2 font-semibold">可以做</th>
-              <th className="text-left px-4 py-2 font-semibold">不可以做</th>
+              <th className="text-left px-4 py-2 font-semibold">{t('rules.dog')}</th>
+              <th className="text-left px-4 py-2 font-semibold">{t('rules.canDo')}</th>
+              <th className="text-left px-4 py-2 font-semibold">{t('rules.cannotDo')}</th>
             </tr>
           </thead>
           <tbody>
@@ -227,14 +231,14 @@ function AgentRulesTab() {
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-800/80 flex items-center space-x-2">
           <i className="fa-solid fa-triangle-exclamation text-amber-400 text-xs"></i>
-          <h4 className="text-xs font-bold text-slate-200">红旗模式</h4>
+          <h4 className="text-xs font-bold text-slate-200">{t('rules.redFlags')}</h4>
         </div>
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-slate-800/80 text-slate-400">
-              <th className="text-left px-4 py-2 font-semibold">红旗</th>
-              <th className="text-left px-4 py-2 font-semibold">违反</th>
-              <th className="text-left px-4 py-2 font-semibold">正确做法</th>
+              <th className="text-left px-4 py-2 font-semibold">{t('rules.redFlag')}</th>
+              <th className="text-left px-4 py-2 font-semibold">{t('rules.violation')}</th>
+              <th className="text-left px-4 py-2 font-semibold">{t('rules.correctAction')}</th>
             </tr>
           </thead>
           <tbody>
@@ -253,7 +257,7 @@ function AgentRulesTab() {
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-800/80 flex items-center space-x-2">
           <i className="fa-solid fa-book-open text-cyan-400 text-xs"></i>
-          <h4 className="text-xs font-bold text-slate-200">模型指南</h4>
+          <h4 className="text-xs font-bold text-slate-200">{t('rules.modelGuides')}</h4>
         </div>
         <div className="divide-y divide-slate-800/40">
           {rules?.model_guides.map((g) => (
@@ -274,7 +278,7 @@ function AgentRulesTab() {
               <h4 className="text-xs font-bold text-slate-200">AGENTS.md</h4>
             </div>
             <button onClick={() => setPreviewModal({ title: 'AGENTS.md', content: rules.agents_content })} className="px-3 py-1 rounded-lg bg-slate-800 text-slate-300 text-[11px] font-semibold hover:bg-slate-700 transition">
-              <i className="fa-solid fa-expand mr-1"></i>查看全文
+              <i className="fa-solid fa-expand mr-1"></i>{t('rules.viewFull')}
             </button>
           </div>
           <pre className="px-4 py-3 text-[10px] font-mono text-slate-400 max-h-40 overflow-auto whitespace-pre-wrap">{rules.agents_content.slice(0, 1000)}{rules.agents_content.length > 1000 ? '\n...' : ''}</pre>

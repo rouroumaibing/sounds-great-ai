@@ -26,7 +26,7 @@ See `AGENTS.md` for the full guide that applies to all dogs:
 ## Your Constraints（硬约束）
 
 - **不改代码逻辑** — 代码修改是 xigou 或 bianmu 的职责
-- **不做 review** — 审查是跨犬种的职责，不自行审查
+- **不做 review** — 审查是跨狗狗的职责，不自行审查
 - **不给结论，给候选** — 检索结果以候选形式呈现，判断留给请求方（M7）
 
 ## CLI Binding

@@ -13,7 +13,7 @@ type Span struct {
 	Name       string
 	StartTime  time.Time
 	EndTime    time.Time
-	Attributes map[string]interface{}
+	Attributes map[string]any
 	Status     string // "ok" | "error"
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { apiGet, apiPatch } from '../../services/http';
+import { useI18n } from '../../store/useI18n';
 
 interface Connector {
   id: string;
@@ -13,6 +14,7 @@ interface Connector {
 }
 
 export function ImPanel() {
+  const { t } = useI18n();
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -46,8 +48,8 @@ export function ImPanel() {
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6">
       <div className="border-b border-slate-800/80 pb-5">
-        <h2 className="text-2xl font-bold text-slate-100">IM 对接</h2>
-        <p className="text-xs text-slate-400 mt-1">配置即时通讯平台连接器，接收告警与犬种消息推送。</p>
+        <h2 className="text-2xl font-bold text-slate-100">{t('im.title')}</h2>
+        <p className="text-xs text-slate-400 mt-1">{t('im.desc')}</p>
       </div>
 
       <div className="space-y-3">
@@ -61,7 +63,7 @@ export function ImPanel() {
                 <div>
                   <div className="text-xs font-bold text-slate-200">{c.name}</div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    {c.status === 'testing' ? '测试中...' : c.status === 'connected' ? '已连接' : '未连接'}
+                    {c.status === 'testing' ? t('im.testing') : c.status === 'connected' ? t('im.connected') : t('im.notConnected')}
                   </div>
                 </div>
               </div>
@@ -92,7 +94,7 @@ export function ImPanel() {
                       type="text"
                       value={f.value}
                       onChange={(e) => updateField(c.id, f.key, e.target.value)}
-                      placeholder={`输入 ${f.label}`}
+                      placeholder={t('im.inputPlaceholder').replace('{label}', f.label)}
                       className="w-full mt-1 px-3 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/50 text-[11px] font-mono text-slate-200 focus:border-indigo-500/50 transition"
                     />
                   </div>
@@ -103,9 +105,9 @@ export function ImPanel() {
                     disabled={c.status === 'testing'}
                     className="px-3 py-1.5 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold hover:bg-indigo-500/30 transition disabled:opacity-50"
                   >
-                    {c.status === 'testing' ? '测试中...' : '测试连接'}
+                    {c.status === 'testing' ? t('im.testing') : t('im.testConnect')}
                   </button>
-                  {c.status === 'connected' && <span className="text-[11px] text-emerald-400"><i className="fa-solid fa-check-circle mr-1"></i>连接成功</span>}
+                  {c.status === 'connected' && <span className="text-[11px] text-emerald-400"><i className="fa-solid fa-check-circle mr-1"></i>{t('im.connectSuccess')}</span>}
                 </div>
               </div>
             )}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { settingsService } from '../../services/settingsService';
 import { useAppStore } from '../../store/useAppStore';
+import { useI18n } from '../../store/useI18n';
 import type { EnvSummary, EnvVariable } from '../../types';
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -14,6 +15,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
 export function ConfigPanel() {
+  const { t } = useI18n();
   const [summary, setSummary] = useState<EnvSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -29,7 +31,7 @@ export function ConfigPanel() {
       setDrafts({});
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      showToast({ message: `加载配置失败: ${msg}`, type: 'error' });
+      showToast({ message: t('config.loadFailed').replace('{msg}', msg), type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -68,15 +70,15 @@ export function ConfigPanel() {
       const updates = dirtyKeys.map((k) => ({ key: k, value: drafts[k] }));
       const updated = await settingsService.updateEnv(updates);
       setSaveStatus('success');
-      setSaveMsg(`已更新 ${updated.length} 项配置`);
-      showToast({ message: `配置已保存 (${updated.length} 项)`, type: 'success' });
+      setSaveMsg(t('config.updated').replace('{count}', String(updated.length)));
+      showToast({ message: t('config.saved').replace('{count}', String(updated.length)), type: 'success' });
       await fetchSummary();
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setSaveStatus('error');
       setSaveMsg(msg);
-      showToast({ message: `保存失败: ${msg}`, type: 'error' });
+      showToast({ message: t('config.saveFailed').replace('{msg}', msg), type: 'error' });
     }
   };
 
@@ -93,13 +95,13 @@ export function ConfigPanel() {
     <div className="max-w-5xl mx-auto w-full space-y-6">
       <div className="border-b border-slate-800/80 pb-5 flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-100">系统配置</h2>
-          <p className="text-xs text-slate-400 mt-1">后端环境变量与运行时配置（可编辑）。</p>
+          <h2 className="text-2xl font-bold text-slate-100">{t('config.title')}</h2>
+          <p className="text-xs text-slate-400 mt-1">{t('config.desc')}</p>
         </div>
         <div className="flex items-center space-x-2">
           {isDirty && (
             <button onClick={handleReset} className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition">
-              重置
+              {t('common.reset')}
             </button>
           )}
           <button
@@ -114,7 +116,7 @@ export function ConfigPanel() {
               !isDirty && 'bg-slate-800 text-slate-500 cursor-not-allowed',
             )}
           >
-            {saveStatus === 'saving' ? '保存中...' : saveStatus === 'success' ? '已保存' : saveStatus === 'error' ? '保存失败' : '保存'}
+            {saveStatus === 'saving' ? t('common.saving') : saveStatus === 'success' ? t('common.saved') : saveStatus === 'error' ? t('common.saveFailed') : t('common.save')}
           </button>
         </div>
       </div>
@@ -130,8 +132,8 @@ export function ConfigPanel() {
         <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start space-x-2">
           <i className="fa-solid fa-triangle-exclamation text-amber-400 text-xs mt-0.5"></i>
           <div>
-            <div className="text-xs font-bold text-amber-300">存储模式: memory（非持久化）</div>
-            <div className="text-[11px] text-amber-400/80 mt-0.5">RAG 数据存储在内存中，重启后丢失。建议设置 RAG_STORE_BACKEND=sqlite 以持久化。</div>
+            <div className="text-xs font-bold text-amber-300">{t('config.storageMode')}</div>
+            <div className="text-[11px] text-amber-400/80 mt-0.5">{t('config.storageHint')}</div>
           </div>
         </div>
       )}
@@ -141,7 +143,7 @@ export function ConfigPanel() {
         <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4">
           <div className="flex items-center space-x-2 mb-2">
             <i className="fa-solid fa-folder-tree text-indigo-400 text-xs"></i>
-            <h4 className="text-xs font-bold text-slate-200">数据目录</h4>
+            <h4 className="text-xs font-bold text-slate-200">{t('config.dataDir')}</h4>
           </div>
           <div className="space-y-1.5">
             {Object.entries(summary.data_dirs).map(([key, path]) => (
@@ -154,7 +156,7 @@ export function ConfigPanel() {
         </div>
       )}
 
-      {loading && <div className="text-center text-slate-500 text-xs py-8">加载中...</div>}
+      {loading && <div className="text-center text-slate-500 text-xs py-8">{t('common.loading')}</div>}
 
       {/* Config grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -184,7 +186,7 @@ export function ConfigPanel() {
                         type={item.sensitive ? 'password' : 'text'}
                         value={displayVal}
                         onChange={(e) => handleDraftChange(item.key, e.target.value)}
-                        placeholder={item.sensitive ? '••••••••' : '(未设置)'}
+                        placeholder={item.sensitive ? '••••••••' : t('common.notSet')}
                         className={clsx(
                           'text-[11px] font-mono ml-3 shrink-0 w-40 px-2 py-1 rounded-lg border bg-slate-800/50 transition',
                           isDirtyItem

@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import type { OpsSpan } from '../../hooks/useOpsTraces';
+import { useI18n } from '../../store/useI18n';
 
 interface SpanDetailProps {
   span: OpsSpan | null;
@@ -13,8 +14,9 @@ function attrStr(span: OpsSpan, key: string): string {
 }
 
 export function SpanDetail({ span, onShowXRay }: SpanDetailProps) {
+  const { t } = useI18n();
   if (!span) {
-    return <div className="text-center text-slate-500 text-xs py-4">选择一个 span 查看详情</div>;
+    return <div className="text-center text-slate-500 text-xs py-4">{t('auto.spandetail.9')}</div>;
   }
 
   const duration = new Date(span.EndTime).getTime() - new Date(span.StartTime).getTime();

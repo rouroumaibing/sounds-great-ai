@@ -1,84 +1,75 @@
-<br />
+# CLI 安装指南
 
-npm install -g @anthropic-ai/claude-code\@latest
+## 安装 CLI 工具
 
-npm install -g opencode-ai\@latest
+### Claude Code
 
-npm install -g @openai/codex\@latest
+```bash
+npm install -g @anthropic-ai/claude-code@latest
+```
 
-npm install -g @google/gemini-cli\@latest
+配置文件：`~/.claude/8/CLAUDE.md`
 
-npm install -g @moonshot-ai/kimi-code\@latest
+登录：启动 `claude` → `/login` → 选择 "Claude account with subscription" → `/exit`
 
-touch \~/.claude/CLAUDE.md
+### OpenCode
 
-touch \~/.config/opencode/AGENTS.md
+```bash
+npm install -g opencode-ai@latest
+```
 
-touch \~/.codex/AGENTS.md
+配置文件：`~/.config/opencode/AGENTS.md`
 
-touch \~/.gemini/GEMINI.md
+### Codex
 
-npm install -g @qianwenai/qianwen-cli\@latest
+```bash
+npm install -g @openai/codex@latest
+```
 
-<br />
+配置文件：`~/.codex/AGENTS.md`
 
-<br />
+登录：启动 `codex` → `/login` → "Sign in with ChatGPT" → `/exit`
 
-cli安装后登录
+### Gemini CLI
 
-### kimi
+```bash
+npm install -g @google/gemini-cli@latest
+```
 
+配置文件：`~/.gemini/GEMINI.md`
 
-/login
+登录：启动 `gemini` → `/auth signin` → "Sign in with Google"
 
+### Kimi Code
 
-Kimi Code (OAuth)
+```bash
+npm install -g @moonshot-ai/kimi-code@latest
+```
 
+登录：启动 `kimi` → `/login` → "Kimi Code (OAuth)" → `/exit`
 
-/exit
+### Qianwen CLI
 
-<br />
+```bash
+npm install -g @qianwenai/qianwen-cli@latest
+```
 
-claude
+登录：启动 `qianwen` → `auth login` → `exit`
 
+## 配置文件汇总
 
-/login
+| CLI | 配置文件路径 | 说明 |
+|-----|-------------|------|
+| Claude | `~/.claude/CLAUDE.md` | Claude 身份和指令 |
+| OpenCode | `~/.config/opencode/AGENTS.md` | OpenCode agent 指令 |
+| Codex | `~/.codex/AGENTS.md` | Codex agent 指令 |
+| Gemini | `~/.gemini/GEMINI.md` | Gemini 身份和指令 |
 
+## 初始化配置文件
 
-Claude account with subscription
-
-
-/exit
-
-<br />
-
-codex
-
-
-/login
-
-
-Sign in with ChatGPT
-
-
-/exit
-
-<br />
-
-gemini
-
-
-/auth
-
-&#x20;signin
-Sign in with Google
-
-<br />
-
-qianwen
-
-
-auth login
-
-
-exit
+```bash
+touch ~/.claude/CLAUDE.md
+touch ~/.config/opencode/AGENTS.md
+touch ~/.codex/AGENTS.md
+touch ~/.gemini/GEMINI.md
+```

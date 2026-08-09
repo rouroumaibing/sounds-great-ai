@@ -34,7 +34,7 @@ type ClosureEvent struct {
 	Type      string                 `json:"type"`
 	Timestamp time.Time              `json:"timestamp"`
 	Actor     string                 `json:"actor"`
-	Data      map[string]interface{} `json:"data,omitempty"`
+	Data      map[string]any `json:"data,omitempty"`
 }
 
 var ErrDuplicateEvent = errors.New("duplicate event")
@@ -99,7 +99,7 @@ func (s *RedisClosureService) AppendEvent(ctx context.Context, verdictID string,
 	if err != nil {
 		return fmt.Errorf("eval lua: %w", err)
 	}
-	vals, ok := res.([]interface{})
+	vals, ok := res.([]any)
 	if !ok || len(vals) < 1 {
 		return fmt.Errorf("unexpected lua result: %v", res)
 	}

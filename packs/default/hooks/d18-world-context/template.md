@@ -1,11 +1,10 @@
 ## 世界上下文（对标 clowder-ai D18）
 
-当前世界/项目的环境上下文。当世界上下文存在时注入。
+项目路径：{{.ProjectPath}}
+Worktree：{{.WorktreePath}}
+Git 分支：{{.GitBranch}}
+Git 状态：{{.GitStatus}}
 
-包括：
-- 世界名称和状态
-- 宪法/治理规则
-- 当前场景和状态
-- 角色列表
-- 正典知识
-- 最近事件
+- 项目路径决定工作目录
+- Worktree 隔离代码变更
+- Git 状态影响 SOP stage 流转

@@ -83,7 +83,7 @@ func TestEventMarshalUnmarshal(t *testing.T) {
 				t.Errorf("timestamp mismatch: got %d, want %d", decoded.Timestamp, tt.event.Timestamp)
 			}
 
-			var originalPayload, decodedPayload map[string]interface{}
+			var originalPayload, decodedPayload map[string]any
 			if err := json.Unmarshal(tt.event.Payload, &originalPayload); err != nil {
 				t.Fatalf("unmarshal original payload failed: %v", err)
 			}
@@ -325,7 +325,7 @@ func TestNewEventPreservesTypeAndSession(t *testing.T) {
 		name      string
 		typ       EventType
 		sessionID string
-		payload   interface{}
+		payload   any
 	}{
 		{"thinking", EventThinking, "s1", &ThinkingPayload{Step: 1, Content: "hi"}},
 		{"tool_call", EventToolCall, "s2", &ToolCallPayload{Tool: "t"}},

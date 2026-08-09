@@ -27,7 +27,7 @@ func TestRedactor_Pseudonymize_Length(t *testing.T) {
 
 func TestRedactor_RedactSpan(t *testing.T) {
 	r := NewRedactor("test-salt")
-	span := Span{Attributes: map[string]interface{}{"threadID": "secret-123", "breed": "bianmu"}}
+	span := Span{Attributes: map[string]any{"threadID": "secret-123", "breed": "bianmu"}}
 	r.RedactSpan(&span)
 	if span.Attributes["threadID"] == "secret-123" {
 		t.Fatal("expected threadID to be pseudonymized")

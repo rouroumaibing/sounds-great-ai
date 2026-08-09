@@ -1,6 +1,6 @@
 domainId: eval:a2a
 displayName: "A2A 协作评估"
-descriptionForHuman: "评估犬种间协作质量 — handoff 深度、review 轮次、@mention 路由准确性"
+descriptionForHuman: "评估狗狗间协作质量 — handoff 深度、review 轮次、@mention 路由准确性"
 evalBreed: bianmu
 frequency: daily
 sourceAdapter: telemetry

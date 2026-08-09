@@ -1,15 +1,17 @@
 import type { CvoEscalationEvent } from '../../types';
+import { useI18n } from '../../store/useI18n';
 
 export function CvoEscalation({ event }: { event: CvoEscalationEvent }) {
+  const { t } = useI18n();
   const resolveEscalation = (_decision: string) => {};
 
-  const title = event.escalationTitle ?? '跨犬种冲突升级';
+  const title = event.escalationTitle ?? t('workspace.escalation.title');
   const optionA = event.options?.[0];
   const optionB = event.options?.[1];
   const optionAId = optionA?.id ?? 'option_1';
-  const optionALabel = optionA?.label ?? '采纳方案 A';
+  const optionALabel = optionA?.label ?? t('workspace.escalation.optionA');
   const optionBId = optionB?.id ?? 'option_2';
-  const optionBLabel = optionB?.label ?? '采纳方案 B';
+  const optionBLabel = optionB?.label ?? t('workspace.escalation.optionB');
 
   return (
     <div className="my-3 bg-rose-950/40 border border-rose-500/60 rounded-2xl p-4 shadow-xl animate-pulse-border space-y-3">
@@ -20,7 +22,7 @@ export function CvoEscalation({ event }: { event: CvoEscalationEvent }) {
           </div>
           <div>
             <h4 className="font-bold text-sm text-slate-100">A2A Depth Hard Rail Hit (max_a2a_depth = 3)</h4>
-            <p className="text-xs text-rose-300/80">{title}：互审已满 3 轮，无法对流式响应缓冲策略达成共识。过程已硬轨熔断，等待人类 CVO 裁决！</p>
+            <p className="text-xs text-rose-300/80">{title}{t('workspace.escalation.desc')}</p>
           </div>
         </div>
         <span className="font-mono text-[10px] bg-rose-500/20 text-rose-300 px-2 py-1 rounded-md border border-rose-500/40 shrink-0">ACTION REQUIRED</span>
@@ -38,7 +40,7 @@ export function CvoEscalation({ event }: { event: CvoEscalationEvent }) {
         </button>
         <button onClick={() => resolveEscalation('intervene')} className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
           <i className="fa-solid fa-terminal"></i>
-          <span>下发自定义 CVO 指令...</span>
+          <span>{t('workspace.escalation.customCvo')}</span>
         </button>
       </div>
     </div>

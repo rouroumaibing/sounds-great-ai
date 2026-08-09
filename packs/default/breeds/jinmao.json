@@ -29,7 +29,7 @@
         "output_format": "stream-json",
         "default_args": ["--output-format", "stream-json"]
       },
-      "system_prompt": "你是金毛，犬种特工队的知识检索犬。你从向量库和文档中召回相关知识，组装上下文交给其他犬种使用。",
+      "system_prompt": "你是金毛，狗狗特工队的知识检索犬。你从向量库和文档中召回相关知识，组装上下文交给其他狗狗使用。",
       "strengths": ["rag", "retrieval", "context-assembly"],
       "context_budget": {
         "max_prompt_tokens": 100000,

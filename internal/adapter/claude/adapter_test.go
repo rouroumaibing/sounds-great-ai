@@ -5,8 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
 	"sounds-great-ai/internal/adapter/unified"
+
+	"github.com/cloudwego/eino/schema"
 )
 
 func TestAdapterCapabilities(t *testing.T) {

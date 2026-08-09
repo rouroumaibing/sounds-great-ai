@@ -6,6 +6,7 @@ import { CLIENT_IDS, providerFromClientId } from '../../constants/clientIds';
 import { settingsService } from '../../services/settingsService';
 import { apiGet } from '../../services/http';
 import { TagEditor } from './TagEditor';
+import { useI18n } from '../../store/useI18n';
 
 interface HubBreedEditorProps {
   breed?: BreedConfig;
@@ -33,6 +34,7 @@ function emptyBreed(): BreedConfig {
 }
 
 export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) {
+  const { t } = useI18n();
   const [form, setForm] = useState<BreedConfig>(breed ?? emptyBreed());
   const [expanded, setExpanded] = useState<number>(0);
   const [accounts, setAccounts] = useState<SettingsAccount[]>([]);
@@ -122,7 +124,7 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
             <i className="fa-solid fa-dog text-amber-400"></i>
-            <span>{isEdit ? '编辑犬种' : '创建犬种'}</span>
+            <span>{isEdit ? t('personas.editDog') : t('personas.create')}</span>
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
             <i className="fa-solid fa-xmark"></i>
@@ -131,10 +133,10 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
 
         {!isEdit && templates.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-xs font-bold text-slate-300">成员模板</h4>
+            <h4 className="text-xs font-bold text-slate-300">{t('breedEditor.memberTemplate')}</h4>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => handleTemplateSelect(null)} className={clsx('px-3 py-1.5 rounded-xl text-xs font-medium transition', selectedTemplateId === 'custom' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200')}>
-                自定义
+                {t('accounts.customTag')}
               </button>
               {templates.map(t => (
                 <button key={t.id} onClick={() => handleTemplateSelect(selectedTemplateId === t.id ? null : t)} className={clsx('px-3 py-1.5 rounded-xl text-xs font-medium transition', selectedTemplateId === t.id ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200')}>
@@ -146,26 +148,26 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
         )}
 
         <div className="space-y-2 text-xs">
-          <CollapsibleSection title="身份信息" isOpen={expanded === 0} onToggle={() => setExpanded(expanded === 0 ? -1 : 0)}>
+          <CollapsibleSection title={t('breedEditor.identityInfo')} isOpen={expanded === 0} onToggle={() => setExpanded(expanded === 0 ? -1 : 0)}>
             <IdentitySection form={form} color={color} update={update} updateColor={updateColor} />
           </CollapsibleSection>
-          <CollapsibleSection title="账户绑定" isOpen={expanded === 1} onToggle={() => setExpanded(expanded === 1 ? -1 : 1)}>
+          <CollapsibleSection title={t('breedEditor.accountBinding')} isOpen={expanded === 1} onToggle={() => setExpanded(expanded === 1 ? -1 : 1)}>
             <AccountSection variant={variant} updateVariant={updateVariant} accounts={filteredAccounts} loadingAccounts={loadingAccounts} onAccountChange={handleAccountChange} />
           </CollapsibleSection>
-          <CollapsibleSection title="CLI 配置" isOpen={expanded === 2} onToggle={() => setExpanded(expanded === 2 ? -1 : 2)}>
+          <CollapsibleSection title={t('breedEditor.cliConfig')} isOpen={expanded === 2} onToggle={() => setExpanded(expanded === 2 ? -1 : 2)}>
             <CliSection variant={variant} updateVariant={updateVariant} updateCli={updateCli} />
           </CollapsibleSection>
-          <CollapsibleSection title="上下文预算" isOpen={expanded === 3} onToggle={() => setExpanded(expanded === 3 ? -1 : 3)}>
+          <CollapsibleSection title={t('breedEditor.contextBudget')} isOpen={expanded === 3} onToggle={() => setExpanded(expanded === 3 ? -1 : 3)}>
             <BudgetSection variant={variant} updateBudget={updateBudget} />
           </CollapsibleSection>
-          <CollapsibleSection title="会话策略" isOpen={expanded === 4} onToggle={() => setExpanded(expanded === 4 ? -1 : 4)}>
+          <CollapsibleSection title={t('breedEditor.sessionStrategy')} isOpen={expanded === 4} onToggle={() => setExpanded(expanded === 4 ? -1 : 4)}>
             <StrategySection form={form} variant={variant} update={update} updateVariant={updateVariant} />
           </CollapsibleSection>
         </div>
 
         <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">取消</button>
-          <button onClick={handleSave} className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-lg shadow-amber-600/20">保存</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">{t('common.cancel')}</button>
+          <button onClick={handleSave} className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-lg shadow-amber-600/20">{t('common.save')}</button>
         </div>
       </div>
     </div>
@@ -199,21 +201,22 @@ function IdentitySection({ form, color, update, updateColor }: {
   form: BreedConfig; color: BreedColor;
   update: (p: Partial<BreedConfig>) => void; updateColor: (p: Partial<BreedColor>) => void;
 }) {
+  const { t } = useI18n();
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="name"><input value={form.name} onChange={e => update({ name: e.target.value })} className={inputCls} /></Field>
-        <Field label="displayName"><input value={form.display_name} onChange={e => update({ display_name: e.target.value })} className={inputCls} /></Field>
-        <Field label="nickname (可选)"><input value={form.nickname ?? ''} onChange={e => update({ nickname: e.target.value })} className={inputCls} /></Field>
-        <Field label="avatar (URL/emoji)"><input value={form.avatar} onChange={e => update({ avatar: e.target.value })} className={inputCls} /></Field>
-        <Field label="colorPrimary"><input value={color.primary} onChange={e => updateColor({ primary: e.target.value })} className={inputCls} /></Field>
-        <Field label="colorSecondary"><input value={color.secondary} onChange={e => updateColor({ secondary: e.target.value })} className={inputCls} /></Field>
+        <Field label={t('rules.name')}><input value={form.name} onChange={e => update({ name: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s1')} /></Field>
+        <Field label={t('breedEditor.displayName')}><input value={form.display_name} onChange={e => update({ display_name: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s1')} /></Field>
+        <Field label={t('breedEditor.nickname')}><input value={form.nickname ?? ''} onChange={e => update({ nickname: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s2')} /></Field>
+        <Field label={t('concierge.avatar')}><input value={form.avatar} onChange={e => update({ avatar: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s3')} /></Field>
+        <Field label={t('breedEditor.colorPrimary')}><input value={color.primary} onChange={e => updateColor({ primary: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s4')} /></Field>
+        <Field label={t('breedEditor.colorSecondary')}><input value={color.secondary} onChange={e => updateColor({ secondary: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s5')} /></Field>
       </div>
-      <Field label="mentionPatterns"><TagEditor tags={form.mention_patterns} onChange={t => update({ mention_patterns: t })} placeholder="@pattern" /></Field>
-      <Field label="roleDescription"><textarea value={form.role_description ?? ''} onChange={e => update({ role_description: e.target.value })} className={inputCls} rows={2} /></Field>
-      <Field label="personality"><textarea value={form.personality} onChange={e => update({ personality: e.target.value })} className={inputCls} rows={2} /></Field>
-      <Field label="teamStrengths"><TagEditor tags={(form.team_strengths ?? '').split(',').filter(Boolean)} onChange={t => update({ team_strengths: t.join(',') })} placeholder="能力标签" /></Field>
-      <Field label="caution"><textarea value={form.caution ?? ''} onChange={e => update({ caution: e.target.value })} className={inputCls} rows={2} /></Field>
+      <Field label={t('breedEditor.mentionPatterns')}><TagEditor tags={form.mention_patterns} onChange={t => update({ mention_patterns: t })} placeholder={t('settings.hubbreededitor.s6')} /></Field>
+      <Field label={t('breedEditor.roleDesc')}><textarea value={form.role_description ?? ''} onChange={e => update({ role_description: e.target.value })} className={inputCls} rows={2} placeholder={t('settings.hubbreededitor.s7')} /></Field>
+      <Field label={t('breedEditor.personality')}><textarea value={form.personality} onChange={e => update({ personality: e.target.value })} className={inputCls} rows={2} placeholder={t('settings.hubbreededitor.s8')} /></Field>
+      <Field label={t('breedEditor.strengths')}><TagEditor tags={(form.team_strengths ?? '').split(',').filter(Boolean)} onChange={t => update({ team_strengths: t.join(',') })} placeholder={t('settings.hubbreededitor.s9')} /></Field>
+      <Field label={t('breedEditor.caution')}><textarea value={form.caution ?? ''} onChange={e => update({ caution: e.target.value })} className={inputCls} rows={2} placeholder={t('settings.hubbreededitor.s10')} /></Field>
     </>
   );
 }
@@ -222,20 +225,21 @@ function AccountSection({ variant, updateVariant, accounts, loadingAccounts, onA
   variant: Variant; updateVariant: (p: Partial<Variant>) => void;
   accounts: SettingsAccount[]; loadingAccounts: boolean; onAccountChange: (id: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Field label="clientId">
+      <Field label={t('breedEditor.client')}>
         <select value={variant.client_id} onChange={e => updateVariant({ client_id: e.target.value })} className={inputCls}>
           <option value="">—</option>
           {CLIENT_IDS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
       </Field>
-      <Field label="provider (自动)"><input value={providerFromClientId(variant.client_id)} disabled className={clsx(inputCls, 'opacity-60')} /></Field>
-      <Field label="accountRef">
+      <Field label={t('breedEditor.provider')}><input value={providerFromClientId(variant.client_id)} disabled className={clsx(inputCls, 'opacity-60')} placeholder={t('breedEditor.providerHint')} /></Field>
+      <Field label={t('breedEditor.boundAccount')}>
         {loadingAccounts ? (
-          <input value="加载中..." disabled className={clsx(inputCls, 'opacity-60')} />
+          <input value={t('common.loading')} disabled className={clsx(inputCls, 'opacity-60')} />
         ) : accounts.length === 0 ? (
-          <p className="text-[11px] text-slate-500 italic">暂无可用账号，请先在账户与密钥中添加</p>
+          <p className="text-[11px] text-slate-500 italic">{t('breedEditor.noAccount')}</p>
         ) : (
           <select value={variant.account_ref ?? ''} onChange={e => onAccountChange(e.target.value)} className={inputCls}>
             <option value="">—</option>
@@ -243,7 +247,7 @@ function AccountSection({ variant, updateVariant, accounts, loadingAccounts, onA
           </select>
         )}
       </Field>
-      <Field label="defaultModel"><input value={variant.default_model} onChange={e => updateVariant({ default_model: e.target.value })} className={inputCls} /></Field>
+      <Field label={t('breedEditor.defaultModel')}><input value={variant.default_model} onChange={e => updateVariant({ default_model: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s11')} /></Field>
     </div>
   );
 }
@@ -251,22 +255,23 @@ function AccountSection({ variant, updateVariant, accounts, loadingAccounts, onA
 function CliSection({ variant, updateVariant, updateCli }: {
   variant: Variant; updateVariant: (p: Partial<Variant>) => void; updateCli: (p: Record<string, string | string[] | undefined>) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Field label="command"><input value={variant.cli.command} onChange={e => updateCli({ command: e.target.value })} className={inputCls} /></Field>
-      <Field label="outputFormat">
+      <Field label={t('breedEditor.command')}><input value={variant.cli.command} onChange={e => updateCli({ command: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s12')} /></Field>
+      <Field label={t('breedEditor.outputFormat')}>
         <select value={variant.cli.output_format} onChange={e => updateCli({ output_format: e.target.value })} className={inputCls}>
           <option value="">—</option><option value="text">text</option><option value="json">json</option><option value="stream">stream</option>
         </select>
       </Field>
-      <Field label="defaultArgs"><input value={(variant.cli.default_args ?? []).join(' ')} onChange={e => updateCli({ default_args: e.target.value.split(' ').filter(Boolean) })} className={inputCls} /></Field>
-      <Field label="effort">
+      <Field label={t('breedEditor.defaultArgs')}><input value={(variant.cli.default_args ?? []).join(' ')} onChange={e => updateCli({ default_args: e.target.value.split(' ').filter(Boolean) })} className={inputCls} placeholder={t('settings.hubbreededitor.s13')} /></Field>
+      <Field label={t('breedEditor.effort')}>
         <select value={variant.cli.effort ?? ''} onChange={e => updateCli({ effort: e.target.value })} className={inputCls}>
           <option value="">—</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
         </select>
       </Field>
-      <Field label="contextWindow"><input type="number" value={variant.context_budget?.max_context_tokens ?? ''} onChange={e => updateVariant({ context_budget: { ...variant.context_budget ?? {}, max_context_tokens: Number(e.target.value) || undefined } })} className={inputCls} /></Field>
-      <Field label="autoCompactTokenLimit"><input type="number" value={variant.auto_compact_token_limit ?? ''} onChange={e => updateVariant({ auto_compact_token_limit: Number(e.target.value) || undefined })} className={inputCls} /></Field>
+      <Field label={t('breedEditor.contextWindow')}><input type="number" value={variant.context_budget?.max_context_tokens ?? ''} onChange={e => updateVariant({ context_budget: { ...variant.context_budget ?? {}, max_context_tokens: Number(e.target.value) || undefined } })} className={inputCls} placeholder={t('settings.hubbreededitor.s14')} /></Field>
+      <Field label={t('breedEditor.autoCompact')}><input type="number" value={variant.auto_compact_token_limit ?? ''} onChange={e => updateVariant({ auto_compact_token_limit: Number(e.target.value) || undefined })} className={inputCls} placeholder={t('settings.hubbreededitor.s15')} /></Field>
     </div>
   );
 }
@@ -274,13 +279,14 @@ function CliSection({ variant, updateVariant, updateCli }: {
 function BudgetSection({ variant, updateBudget }: {
   variant: Variant; updateBudget: (p: Record<string, number | undefined>) => void;
 }) {
+  const { t } = useI18n();
   const b = variant.context_budget ?? {};
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Field label="maxPromptTokens"><input type="number" value={b.max_prompt_tokens ?? ''} onChange={e => updateBudget({ max_prompt_tokens: Number(e.target.value) || undefined })} className={inputCls} /></Field>
-      <Field label="maxContextTokens"><input type="number" value={b.max_context_tokens ?? ''} onChange={e => updateBudget({ max_context_tokens: Number(e.target.value) || undefined })} className={inputCls} /></Field>
-      <Field label="maxMessages"><input type="number" value={b.max_messages ?? ''} onChange={e => updateBudget({ max_messages: Number(e.target.value) || undefined })} className={inputCls} /></Field>
-      <Field label="maxContentLengthPerMsg"><input type="number" value={b.max_content_length_per_msg ?? ''} onChange={e => updateBudget({ max_content_length_per_msg: Number(e.target.value) || undefined })} className={inputCls} /></Field>
+      <Field label={t('breedEditor.maxPromptTokens')}><input type="number" value={b.max_prompt_tokens ?? ''} onChange={e => updateBudget({ max_prompt_tokens: Number(e.target.value) || undefined })} className={inputCls} placeholder={t('settings.hubbreededitor.s16')} /></Field>
+      <Field label={t('breedEditor.maxContextTokens')}><input type="number" value={b.max_context_tokens ?? ''} onChange={e => updateBudget({ max_context_tokens: Number(e.target.value) || undefined })} className={inputCls} placeholder={t('settings.hubbreededitor.s14')} /></Field>
+      <Field label={t('breedEditor.maxMessages')}><input type="number" value={b.max_messages ?? ''} onChange={e => updateBudget({ max_messages: Number(e.target.value) || undefined })} className={inputCls} placeholder={t('settings.hubbreededitor.s17')} /></Field>
+      <Field label={t('breedEditor.maxContentLength')}><input type="number" value={b.max_content_length_per_msg ?? ''} onChange={e => updateBudget({ max_content_length_per_msg: Number(e.target.value) || undefined })} className={inputCls} placeholder={t('settings.hubbreededitor.s18')} /></Field>
     </div>
   );
 }
@@ -288,21 +294,22 @@ function BudgetSection({ variant, updateBudget }: {
 function StrategySection({ form, variant, update, updateVariant }: {
   form: BreedConfig; variant: Variant; update: (p: Partial<BreedConfig>) => void; updateVariant: (p: Partial<Variant>) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-        <span className="text-slate-300">mcpSupport</span>
+        <span className="text-slate-300">{t('breedEditor.mcpSupport')}</span>
         <Toggle on={variant.mcp_support} onChange={v => updateVariant({ mcp_support: v })} />
       </div>
       <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-        <span className="text-slate-300">sessionChain</span>
+        <span className="text-slate-300">{t('breedEditor.sessionChain')}</span>
         <Toggle on={variant.session_chain ?? false} onChange={v => updateVariant({ session_chain: v })} />
       </div>
       <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-        <span className="text-slate-300">enabled</span>
+        <span className="text-slate-300">{t('common.enabled')}</span>
         <Toggle on={form.enabled} onChange={v => update({ enabled: v })} />
       </div>
-      <Field label="strategy">
+      <Field label={t('breedEditor.sessionStrategy')}>
         <select value={variant.strategy ?? ''} onChange={e => updateVariant({ strategy: e.target.value })} className={inputCls}>
           <option value="">—</option><option value="handoff">handoff</option><option value="compress">compress</option><option value="hybrid">hybrid</option>
         </select>

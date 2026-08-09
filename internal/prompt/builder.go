@@ -124,7 +124,7 @@ func (b *Builder) buildIdentity(breed *config.BreedConfig) string {
 	var sb strings.Builder
 
 	sb.WriteString("# 身份\n\n")
-	sb.WriteString(fmt.Sprintf("你是 **%s**（%s），犬种特工队的成员。\n\n", breed.DisplayName, breed.Name))
+	sb.WriteString(fmt.Sprintf("你是 **%s**（%s），狗狗特工队的成员。\n\n", breed.DisplayName, breed.Name))
 
 	if breed.Personality != "" {
 		sb.WriteString(fmt.Sprintf("**性格：** %s\n\n", breed.Personality))
@@ -153,7 +153,7 @@ func (b *Builder) buildRoster(selfID string) string {
 
 	var sb strings.Builder
 	sb.WriteString("## 队友名册\n\n")
-	sb.WriteString("| 犬种 | @mention | 擅长 | 职责 |\n")
+	sb.WriteString("| 狗狗 | @mention | 擅长 | 职责 |\n")
 	sb.WriteString("|------|----------|------|------|\n")
 
 	for id, breed := range b.breeds {

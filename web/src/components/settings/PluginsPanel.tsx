@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { apiGet, apiPatch } from '../../services/http';
+import { useI18n } from '../../store/useI18n';
 
 interface Plugin {
   id: string;
@@ -12,6 +13,7 @@ interface Plugin {
 }
 
 export function PluginsPanel() {
+  const { t } = useI18n();
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [installUrl, setInstallUrl] = useState('');
   const [configModal, setConfigModal] = useState<Plugin | null>(null);
@@ -33,15 +35,15 @@ export function PluginsPanel() {
   const install = () => {
     if (!installUrl) return;
     const name = installUrl.split('/').pop()?.replace('.git', '') ?? 'new-plugin';
-    setPlugins((prev) => [...prev, { id: `p${Date.now()}`, name, version: '0.1.0', status: 'active', description: `从 ${installUrl} 安装`, enabled: true }]);
+    setPlugins((prev) => [...prev, { id: `p${Date.now()}`, name, version: '0.1.0', status: 'active', description: t('settings.pluginspanel.s1').replace('{installUrl}', installUrl), enabled: true }]);
     setInstallUrl('');
   };
 
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6">
       <div className="border-b border-slate-800/80 pb-5">
-        <h2 className="text-2xl font-bold text-slate-100">插件集成</h2>
-        <p className="text-xs text-slate-400 mt-1">管理已安装插件，启用/禁用/安装/卸载。</p>
+        <h2 className="text-2xl font-bold text-slate-100">{t('settings.plugins')}</h2>
+        <p className="text-xs text-slate-400 mt-1">{t('plugins.desc')}</p>
       </div>
 
       {/* Install from URL */}
@@ -55,7 +57,7 @@ export function PluginsPanel() {
             className="flex-1 px-3 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/50 text-[11px] font-mono text-slate-200 focus:border-indigo-500/50 transition"
           />
           <button onClick={install} disabled={!installUrl} className="px-4 py-1.5 rounded-xl bg-indigo-500 text-white text-[11px] font-semibold hover:bg-indigo-400 transition disabled:opacity-50">
-            <i className="fa-solid fa-download mr-1"></i>安装
+            <i className="fa-solid fa-download mr-1"></i>{t('common.install')}
           </button>
         </div>
       </div>
@@ -64,7 +66,7 @@ export function PluginsPanel() {
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-800/80 flex items-center space-x-2">
           <i className="fa-solid fa-puzzle-piece text-amber-400 text-xs"></i>
-          <h4 className="text-xs font-bold text-slate-200">已安装插件 ({plugins.length})</h4>
+          <h4 className="text-xs font-bold text-slate-200">{t('plugins.installed').replace('{count}', String(plugins.length))}</h4>
         </div>
         <div className="divide-y divide-slate-800/40">
           {plugins.map((p) => (
@@ -101,13 +103,13 @@ export function PluginsPanel() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setConfigModal(null)}>
           <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 w-96 space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-100">{configModal.name} 配置</h3>
+              <h3 className="text-sm font-bold text-slate-100">{configModal.name} {t('plugins.config')}</h3>
               <button onClick={() => setConfigModal(null)} className="text-slate-400 hover:text-slate-200"><i className="fa-solid fa-xmark"></i></button>
             </div>
             <div className="space-y-2 text-[11px]">
-              <div className="flex justify-between"><span className="text-slate-500">版本</span><span className="text-slate-200 font-mono">v{configModal.version}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">状态</span><span className="text-slate-200">{configModal.status}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">描述</span><span className="text-slate-300 text-right max-w-[200px]">{configModal.description}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500t('settings.pluginspanel.s2')text-slate-200 font-mono">v{configModal.version}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500t('settings.pluginspanel.s3')text-slate-200">{configModal.status}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500t('settings.pluginspanel.s4')text-slate-300 text-right max-w-[200px]">{configModal.description}</span></div>
             </div>
             <pre className="text-[10px] font-mono text-slate-400 bg-slate-950/50 rounded-xl p-3 border border-slate-800">{`{\n  "enabled": ${configModal.enabled},\n  "auto_update": true\n}`}</pre>
           </div>

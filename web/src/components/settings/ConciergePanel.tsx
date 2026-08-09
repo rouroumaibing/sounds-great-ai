@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { apiGet, apiPatch } from '../../services/http';
 import { useBreeds } from '../../hooks/useBreeds';
+import { useI18n } from '../../store/useI18n';
 
 const AVATAR_OPTIONS = ['🐕', '🦮', '🐩', '🐕‍🦺', '🐺', '🦊'];
 const COLOR_OPTIONS = ['#4A90D9', '#E84393', '#F39C12', '#27AE60', '#8E44AD', '#2C3E50'];
 
 export function ConciergePanel() {
+  const { t } = useI18n();
   const { dogs } = useBreeds();
   const [avatar, setAvatar] = useState('🐕');
   const [color, setColor] = useState('#4A90D9');
   const [size, setSize] = useState(56);
-  const [personality, setPersonality] = useState('热情友好的犬队管家，擅长任务分发与进度追踪。');
-  const [greeting, setGreeting] = useState('你好！我是犬队管家，有什么可以帮你的吗？🐕');
+  const [personality, setPersonality] = useState(t('concierge.personalityDefault'));
+  const [greeting, setGreeting] = useState(t('concierge.greetingDefault'));
   const [dutyBreed, setDutyBreed] = useState('bianmu');
   const [autoSuggestThreshold, setAutoSuggestThreshold] = useState(3);
   const [proactivityLevel, setProactivityLevel] = useState<'low' | 'medium' | 'high'>('medium');
@@ -37,15 +39,15 @@ export function ConciergePanel() {
   return (
     <div className="max-w-5xl mx-auto w-full space-y-6">
       <div className="border-b border-slate-800/80 pb-5">
-        <h2 className="text-2xl font-bold text-slate-100">犬种球</h2>
-        <p className="text-xs text-slate-400 mt-1">配置悬浮球形象、人设与主动性策略。</p>
+        <h2 className="text-2xl font-bold text-slate-100">{t('concierge.title')}</h2>
+        <p className="text-xs text-slate-400 mt-1">{t('concierge.desc')}</p>
       </div>
 
       {/* 悬浮球形象配置 */}
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 space-y-4">
         <div className="flex items-center space-x-2">
           <i className="fa-solid fa-circle-dot text-indigo-400 text-xs"></i>
-          <h4 className="text-xs font-bold text-slate-200">悬浮球形象</h4>
+          <h4 className="text-xs font-bold text-slate-200">{t('concierge.appearance')}</h4>
         </div>
 
         {/* Preview */}
@@ -60,7 +62,7 @@ export function ConciergePanel() {
 
         {/* Avatar picker */}
         <div>
-          <label className="text-[11px] text-slate-400">头像</label>
+          <label className="text-[11px] text-slate-400">{t('concierge.avatar')}</label>
           <div className="flex items-center space-x-2 mt-1.5">
             {AVATAR_OPTIONS.map((a) => (
               <button
@@ -76,7 +78,7 @@ export function ConciergePanel() {
 
         {/* Color picker */}
         <div>
-          <label className="text-[11px] text-slate-400">颜色</label>
+          <label className="text-[11px] text-slate-400">{t('concierge.color')}</label>
           <div className="flex items-center space-x-2 mt-1.5">
             {COLOR_OPTIONS.map((c) => (
               <button
@@ -91,7 +93,7 @@ export function ConciergePanel() {
 
         {/* Size slider */}
         <div>
-          <label className="text-[11px] text-slate-400">大小: {size}px</label>
+          <label className="text-[11px] text-slate-400">{t('concierge.size')} {size}px</label>
           <input
             type="range"
             min={40}
@@ -107,10 +109,10 @@ export function ConciergePanel() {
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 space-y-3">
         <div className="flex items-center space-x-2">
           <i className="fa-solid fa-user-pen text-amber-400 text-xs"></i>
-          <h4 className="text-xs font-bold text-slate-200">人设配置</h4>
+          <h4 className="text-xs font-bold text-slate-200">{t('concierge.personalityConfig')}</h4>
         </div>
         <div>
-          <label className="text-[11px] text-slate-400">人设描述</label>
+          <label className="text-[11px] text-slate-400">{t('concierge.personalityDesc')}</label>
           <textarea
             value={personality}
             onChange={(e) => setPersonality(e.target.value)}
@@ -119,7 +121,7 @@ export function ConciergePanel() {
           />
         </div>
         <div>
-          <label className="text-[11px] text-slate-400">问候语</label>
+          <label className="text-[11px] text-slate-400">{t('concierge.greeting')}</label>
           <input
             type="text"
             value={greeting}
@@ -133,7 +135,7 @@ export function ConciergePanel() {
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 space-y-3">
         <div className="flex items-center space-x-2">
           <i className="fa-solid fa-dog text-emerald-400 text-xs"></i>
-          <h4 className="text-xs font-bold text-slate-200">值班犬</h4>
+          <h4 className="text-xs font-bold text-slate-200">{t('concierge.dutyDog')}</h4>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {dogs.map((b) => (
@@ -153,10 +155,10 @@ export function ConciergePanel() {
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 space-y-3">
         <div className="flex items-center space-x-2">
           <i className="fa-solid fa-wand-magic-sparkles text-purple-400 text-xs"></i>
-          <h4 className="text-xs font-bold text-slate-200">主动性策略</h4>
+          <h4 className="text-xs font-bold text-slate-200">{t('concierge.proactiveStrategy')}</h4>
         </div>
         <div>
-          <label className="text-[11px] text-slate-400">自动建议阈值: {autoSuggestThreshold} 轮对话后</label>
+          <label className="text-[11px] text-slate-400">{t('concierge.autoSuggestThreshold')} {autoSuggestThreshold} {t('concierge.autoSuggestSuffix')}</label>
           <input
             type="range"
             min={1}
@@ -167,7 +169,7 @@ export function ConciergePanel() {
           />
         </div>
         <div>
-          <label className="text-[11px] text-slate-400">主动性级别</label>
+          <label className="text-[11px] text-slate-400">{t('concierge.proactiveLevel')}</label>
           <div className="flex items-center space-x-2 mt-1.5">
             {(['low', 'medium', 'high'] as const).map((level) => (
               <button
@@ -175,7 +177,7 @@ export function ConciergePanel() {
                 onClick={() => setProactivityLevel(level)}
                 className={clsx('px-4 py-1.5 rounded-xl text-[11px] font-semibold transition', proactivityLevel === level ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200')}
               >
-                {level === 'low' ? '低' : level === 'medium' ? '中' : '高'}
+                {level === 'low' ? t('concierge.levelLow') : level === 'medium' ? t('concierge.levelMedium') : t('concierge.levelHigh')}
               </button>
             ))}
           </div>
@@ -184,7 +186,7 @@ export function ConciergePanel() {
 
       <div className="flex justify-end">
         <button onClick={saveConfig} className="px-4 py-2 rounded-xl bg-indigo-500 text-white text-xs font-semibold hover:bg-indigo-400 transition">
-          保存配置
+          {t('common.saveConfig')}
         </button>
       </div>
     </div>

@@ -118,28 +118,52 @@ func (h *Handler) UpdateBreed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if v, ok := updates["display_name"]; ok {
-		json.Unmarshal(v, &cfg.DisplayName)
+		if err := json.Unmarshal(v, &cfg.DisplayName); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid display_name: %w", err))
+			return
+		}
 	}
 	if v, ok := updates["avatar"]; ok {
-		json.Unmarshal(v, &cfg.Avatar)
+		if err := json.Unmarshal(v, &cfg.Avatar); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid avatar: %w", err))
+			return
+		}
 	}
 	if v, ok := updates["personality"]; ok {
-		json.Unmarshal(v, &cfg.Personality)
+		if err := json.Unmarshal(v, &cfg.Personality); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid personality: %w", err))
+			return
+		}
 	}
 	if v, ok := updates["role_description"]; ok {
-		json.Unmarshal(v, &cfg.RoleDescription)
+		if err := json.Unmarshal(v, &cfg.RoleDescription); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid role_description: %w", err))
+			return
+		}
 	}
 	if v, ok := updates["team_strengths"]; ok {
-		json.Unmarshal(v, &cfg.TeamStrengths)
+		if err := json.Unmarshal(v, &cfg.TeamStrengths); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid team_strengths: %w", err))
+			return
+		}
 	}
 	if v, ok := updates["mention_patterns"]; ok {
-		json.Unmarshal(v, &cfg.MentionPatterns)
+		if err := json.Unmarshal(v, &cfg.MentionPatterns); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid mention_patterns: %w", err))
+			return
+		}
 	}
 	if v, ok := updates["roles"]; ok {
-		json.Unmarshal(v, &cfg.Roles)
+		if err := json.Unmarshal(v, &cfg.Roles); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid roles: %w", err))
+			return
+		}
 	}
 	if v, ok := updates["variants"]; ok {
-		json.Unmarshal(v, &cfg.Variants)
+		if err := json.Unmarshal(v, &cfg.Variants); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid variants: %w", err))
+			return
+		}
 	}
 
 	if err := h.pack.Validate(cfg); err != nil {
@@ -158,7 +182,7 @@ func (h *Handler) UpdateBreed(w http.ResponseWriter, r *http.Request) {
 
 // GetTemplates GET /api/breeds/templates — role templates
 func (h *Handler) GetTemplates(w http.ResponseWriter, r *http.Request) {
-	path := filepath.Join(h.breedsDir, "cat-template.json")
+	path := filepath.Join(h.breedsDir, "dog-template.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		respondOK(w, []any{})

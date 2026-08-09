@@ -8,7 +8,7 @@
 
 ## 架构角色完整映射表（Go / Eino 实现指南）
 
-| 模块 / 角色 | 犬种映射 | 形象与性格特征 | 核心职责 (Responsibilities) | Eino / Go 架构落地方案 |
+| 模块 / 角色 | 狗狗映射 | 形象与性格特征 | 核心职责 (Responsibilities) | Eino / Go 架构落地方案 |
 |---|---|---|---|---|
 | Orchestrator | 边牧 *(bianmu)* | 极高智商、控场大师、眼神敏锐 | 任务拆解、DAG 工作流调度、状态机控制 | 基于 Eino Graph，作为主控 Task Coordinator |
 | Safety Guardrail | 中华田园犬 *(zhonghuatianyuanquan)* | 忠诚可靠、警惕性高、熟悉家园环境 | 看家护院：Hard Rails 安全边界、命令黑名单、权限代码审计 | 拦截器（Interceptor）与沙盒（Sandbox）隔离校验，绝对忠诚 guard |

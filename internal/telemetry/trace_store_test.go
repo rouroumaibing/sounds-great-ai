@@ -34,8 +34,8 @@ func TestTraceStore_Capacity(t *testing.T) {
 
 func TestTraceStore_Query_ByBreed(t *testing.T) {
 	ts := NewTraceStore(100)
-	ts.Add(Span{TraceID: "t1", Attributes: map[string]interface{}{"breed": "bianmu"}, StartTime: time.Now()})
-	ts.Add(Span{TraceID: "t2", Attributes: map[string]interface{}{"breed": "xigou"}, StartTime: time.Now()})
+	ts.Add(Span{TraceID: "t1", Attributes: map[string]any{"breed": "bianmu"}, StartTime: time.Now()})
+	ts.Add(Span{TraceID: "t2", Attributes: map[string]any{"breed": "xigou"}, StartTime: time.Now()})
 	if got := len(ts.Query("", "bianmu", 10)); got != 1 {
 		t.Fatalf("expected 1 bianmu span, got %d", got)
 	}

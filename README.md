@@ -214,7 +214,7 @@ We build in the open. Here's where we are.
 
 ### v1: Platform Layer (In Progress)
 
-> Spec: [development roadmap](docs/superpowers/specs/2026-08-06-development-roadmap-design.md)
+> Spec: See `docs/ROADMAP.md`
 
 **Completed:**
 
@@ -249,11 +249,12 @@ We build in the open. Here's where we are.
 
 ### v2: Remaining Work
 
-> Evaluated against clowder-ai architecture. Items not needed were removed (see Design Decisions below).
+> Phase 7 主体已完成。以下子项仍在进行中。
 
 | Work Item | Description | clowder-ai ref | Status |
 |-----------|-------------|---------------|--------|
-| Hooks wiring | Wire session-init hooks (S1-S4) into adapter.Execute() | SystemPromptBuilder spawn-time injection | Next |
+| 文档治理补全 | AGENTS.md 治理机制 + Skills 补充 + per-breed 身份 + memory-philosophy 补全 | clowder-ai shared-rules + 49 skills | Completed |
+| Hooks 内容充实 | D/L 系列 hook 模板补充实质内容 | clowder-ai prompt-hooks | Completed |
 | RAG on-demand retrieval | MCP `search_knowledge` tool → RAG store → agent on-demand query | domains/memory/ (on-demand, not default pre-step) | Planned |
 | SOP basic gates | SOPGuardian wired into execution flow (review trigger, safety check) | 5-axis risk routing (simplified) | Planned |
 
@@ -389,16 +390,17 @@ sounds-great-ai/
 │       └── skills/          # SKILL.md prompt packs
 ├── web/                     # Frontend (React + Vite)
 └── docs/
+    ├── architecture/        # Architecture docs
+    ├── decisions/           # ADR records
     ├── design/              # Design docs
-    └── superpowers/
-        ├── specs/           # Technical spec docs
-        └── plans/           # Implementation plan docs
+    ├── features/            # Feature docs
+    └── plans/               # Implementation plans
 ```
 
 ## Learn More
 
-- [Pack/Breed System Design](docs/superpowers/specs/2026-07-31-pack-breed-system-design.md) — Complete Config-Driven role system design
-- [A2A Multi-Agent Design](docs/superpowers/specs/2026-07-30-a2a-multi-agent-design.md) — A2A protocol implementation spec
+- [Architecture Lineage](docs/architecture/architecture-lineage.md) — Full architecture topic index
+- [Memory Philosophy](docs/architecture/memory-philosophy.md) — 7 axioms, 21 laws, judgment criteria
 - [Character Setting](docs/design/CHARACTER-SETTING.md) — Breed role mapping table
 - [Origin Story](docs/design/STORY.md) — The birth story of the Dog Agent Squad
 

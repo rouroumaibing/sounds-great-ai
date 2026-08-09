@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { LeaderConfig } from '../../hooks/useLeaderConfig';
 import { TagEditor } from './TagEditor';
+import { useI18n } from '../../store/useI18n';
 
 interface HubLeaderEditorProps {
   leader: LeaderConfig;
@@ -30,6 +31,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function HubLeaderEditor({ leader, onSave, onClose }: HubLeaderEditorProps) {
+  const { t } = useI18n();
   const [name, setName] = useState(leader.name);
   const [avatar, setAvatar] = useState(leader.avatar ?? '');
   const [colorPrimary, setColorPrimary] = useState(leader.colorPrimary ?? '#6366f1');
@@ -55,11 +57,11 @@ export function HubLeaderEditor({ leader, onSave, onClose }: HubLeaderEditorProp
     const cleanedName = name.trim();
     const cleanedMentions = uniqueTags(mentionPatterns.map(normalizeMentionTag));
     if (!cleanedName) {
-      setError('Leader 名称不能为空');
+      setError(t('leader.nameEmpty'));
       return;
     }
     if (cleanedMentions.length === 0) {
-      setError('至少保留一个 @ 标签');
+      setError(t('leader.needMention'));
       return;
     }
 
@@ -89,9 +91,9 @@ export function HubLeaderEditor({ leader, onSave, onClose }: HubLeaderEditorProp
           <div>
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               <i className="fa-solid fa-user-tie text-indigo-400"></i>
-              <span>Leader 设置</span>
+              <span>{t('leader.title')}</span>
             </h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">Leader（用户/Owner）</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{t('leader.subtitle')}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
             <i className="fa-solid fa-xmark"></i>
@@ -100,13 +102,13 @@ export function HubLeaderEditor({ leader, onSave, onClose }: HubLeaderEditorProp
 
         {/* 身份信息 */}
         <div className="space-y-3">
-          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">身份信息</h4>
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">{t('breedEditor.identityInfo')}</h4>
           <div className="grid grid-cols-2 gap-3 text-xs">
-            <Field label="名称 (必填)">
-              <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Leader 显示名称" />
+            <Field label={t('leader.nameRequired')}>
+              <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder={t('leader.namePlaceholder')} />
             </Field>
             <Field label="Avatar (URL/emoji)">
-              <input value={avatar} onChange={(e) => setAvatar(e.target.value)} className={inputCls} placeholder="URL 或 emoji" />
+              <input value={avatar} onChange={(e) => setAvatar(e.target.value)} className={inputCls} placeholder={t('leader.avatarPlaceholder')} />
             </Field>
             <Field label="Color Primary">
               <input type="color" value={colorPrimary} onChange={(e) => setColorPrimary(e.target.value)} className="h-10 w-full rounded-xl border border-slate-800 bg-transparent cursor-pointer" />
@@ -122,17 +124,17 @@ export function HubLeaderEditor({ leader, onSave, onClose }: HubLeaderEditorProp
 
         {/* 别名与 @ 路由 */}
         <div className="space-y-3">
-          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">别名与 @ 路由</h4>
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">{t('leader.aliasesRouting')}</h4>
           <div className="space-y-3 text-xs">
             {/* 只读别名信息 */}
             <div className="rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-slate-400">别名</span>
-                <span className="text-amber-400/80 text-[10px]">只能编辑，不能新增或删除</span>
+                <span className="text-slate-400">{t('leader.aliases')}</span>
+                <span className="text-amber-400/80 text-[10px]">{t('leader.aliasesHint')}</span>
               </div>
               <div className="text-slate-200 font-medium">{aliasesDisplay}</div>
             </div>
-            <Field label="@ 标签 (至少 1 个)">
+            <Field label={t('leader.mentionTags')}>
               <TagEditor
                 tags={mentionPatterns}
                 onChange={(next) => setMentionPatterns(next.map(normalizeMentionTag).filter(Boolean))}
@@ -147,13 +149,13 @@ export function HubLeaderEditor({ leader, onSave, onClose }: HubLeaderEditorProp
         )}
 
         <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">取消</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">{t('common.cancel')}</button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 disabled:opacity-50"
           >
-            {saving ? '保存中…' : '保存'}
+            {saving ? t('settings.hubleadereditor.s1') : t('common.save')}
           </button>
         </div>
       </div>

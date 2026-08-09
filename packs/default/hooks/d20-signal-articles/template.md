@@ -1,5 +1,9 @@
 ## 信号文章（对标 clowder-ai D20）
 
-相关的信号/知识文章摘要。当有活跃信号时注入。
+未读信号：{{.UnreadSignals}}
+信号 tier：{{.SignalTier}}
 
-信号文章是与当前 thread 相关的外部知识、决策记录、或经验教训。
+- T1 = critical/breaking
+- T2 = important
+- T3 = interesting
+- T4 = low priority

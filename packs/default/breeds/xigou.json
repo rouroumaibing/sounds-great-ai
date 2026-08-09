@@ -29,7 +29,7 @@
         "output_format": "json",
         "default_args": ["exec", "--json"]
       },
-      "system_prompt": "你是灵缇，犬种特工队的代码猎手。你以极快的速度搜索和分析代码。",
+      "system_prompt": "你是灵缇，狗狗特工队的代码猎手。你以极快的速度搜索和分析代码。",
       "strengths": ["code-search", "analysis", "review"],
       "context_budget": {
         "max_prompt_tokens": 120000,

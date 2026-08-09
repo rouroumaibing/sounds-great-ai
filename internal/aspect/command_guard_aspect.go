@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
@@ -79,7 +80,9 @@ func (a *CommandGuardAspect) guardRunCommand(ctx context.Context, info *callback
 	var params struct {
 		Command string `json:"command"`
 	}
-	json.Unmarshal([]byte(input.ArgumentsInJSON), &params)
+	if err := json.Unmarshal([]byte(input.ArgumentsInJSON), &params); err != nil {
+		return ctx
+	}
 
 	result := a.guard.GuardCommand(params.Command)
 
@@ -98,7 +101,7 @@ func (a *CommandGuardAspect) guardRunCommand(ctx context.Context, info *callback
 
 	case GuardStatusNeedsApproval:
 		req := &ApprovalRequest{
-			RequestID: fmt.Sprintf("cmd-%d", len(input.ArgumentsInJSON)),
+			RequestID: fmt.Sprintf("cmd-%s-%d", a.sessionID, time.Now().UnixNano()),
 			Action:    params.Command,
 			Impact:    result.Reason,
 			SessionID: a.sessionID,
@@ -125,7 +128,9 @@ func (a *CommandGuardAspect) guardEditFile(ctx context.Context, info *callbacks.
 		Path    string `json:"path"`
 		Content string `json:"content"`
 	}
-	json.Unmarshal([]byte(input.ArgumentsInJSON), &params)
+	if err := json.Unmarshal([]byte(input.ArgumentsInJSON), &params); err != nil {
+		return ctx
+	}
 
 	result := a.guard.GuardFilePath(params.Path, FileOpWrite)
 

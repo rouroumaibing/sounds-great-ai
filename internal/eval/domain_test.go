@@ -11,7 +11,7 @@ func TestLoadDomainsParsesYAML(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "eval-a2a.yaml"), `
 domainId: eval:a2a
 displayName: "A2A 协作评估"
-descriptionForHuman: "评估犬种间协作质量"
+descriptionForHuman: "评估狗狗间协作质量"
 evalBreed: bianmu
 frequency: daily
 sourceAdapter: telemetry

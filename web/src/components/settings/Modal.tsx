@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useFocusTrap } from '../common/useFocusTrap';
+import { useI18n } from '../../store/useI18n';
 
 interface ModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, titleIcon, children, onSubmit, submitLabel }: ModalProps) {
+  const { t } = useI18n();
   const containerRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
     onClose,
@@ -33,7 +35,7 @@ export function Modal({ isOpen, onClose, title, titleIcon, children, onSubmit, s
         </div>
         {children}
         <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">取消</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">{t('common.cancel')}</button>
           <button onClick={onSubmit} className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-lg shadow-amber-600/20">{submitLabel}</button>
         </div>
       </div>

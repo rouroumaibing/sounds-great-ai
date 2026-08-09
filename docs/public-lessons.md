@@ -12,7 +12,7 @@
 |------|------|----------|----------|
 | 07-29 | Backend Core (Phase 1-3) | Go+Eino, WebSocket, workspace, hard rails | **保留** |
 | 07-30 | A2A Multi-Agent | A2A protocol, agent server/client, orchestrator | **废弃** → CLI adapter 取代 |
-| 07-31 | Pack/Breed System | 犬种 JSON + **固定 DAG** + capability 适配器 | **半废弃** → DAG 消除, JSON 保留 |
+| 07-31 | Pack/Breed System | 狗狗 JSON + **固定 DAG** + capability 适配器 | **半废弃** → DAG 消除, JSON 保留 |
 | 07-31 | Server-Pack Integration | pack 接入 server | **重写** |
 | 08-01 | LLM Code Search | code_search capability | **保留** |
 | 08-03 | Jinmao RAG | 向量存储 + embedding + 迁移 | **保留** |
@@ -170,7 +170,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 触发条件：多个 spec 独立设计、独立实现、独立批准，无统一 vision 约束。
 - 修复：创建 VISION.md 不可逆决策，spec 必须填 VISION Compatibility 段。
 - 防护：AGENTS.md 时刻 1 自检 + spec 模板 §8.1 检查清单。
-- 来源锚点：`docs/VISION.md` §4 + `docs/PROJECT_EXPERIENCES.md` §2.5
+- 来源锚点：`docs/VISION.md` §4 + `docs/public-lessons.md` §2.5
 
 - 关联：P1 Vision-First
 
@@ -183,7 +183,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 触发条件：新 spec 认为旧架构不合理，直接推翻而非先更新 vision。
 - 修复：VISION.md §4 锁定 4 个不可逆决策。
 - 防护：AGENTS.md 红旗模式表 + 时刻 3 架构变更检查。
-- 来源锚点：`docs/VISION.md` §4 + `docs/PROJECT_EXPERIENCES.md` §2.2
+- 来源锚点：`docs/VISION.md` §4 + `docs/public-lessons.md` §2.2
 
 - 关联：P3 No Architecture Reversal
 
@@ -196,7 +196,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 触发条件：觉得某个 Phase "看起来可以独立做"。
 - 修复：VISION.md §7 路线图标注前置条件。
 - 防护：AGENTS.md 红旗模式"跳 Phase" + 时刻 2 提交前检查。
-- 来源锚点：`docs/VISION.md` §7 + `docs/PROJECT_EXPERIENCES.md` §2.3
+- 来源锚点：`docs/VISION.md` §7 + `docs/public-lessons.md` §2.3
 
 - 关联：P4 Phase Ordering
 
@@ -209,7 +209,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 触发条件：连续做 3+ 个 spec 而不检查整体一致性。
 - 修复：每 2 个 spec 后做整合检查。
 - 防护：VISION.md §2.2 Phase 碰头机制 + P2 原则。
-- 来源锚点：`docs/PROJECT_EXPERIENCES.md` §2.4
+- 来源锚点：`docs/public-lessons.md` §2.4
 
 - 关联：P2 Integration Checkpoint
 
@@ -222,7 +222,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 触发条件：新 spec 只描述新功能，不列复用/替代/新增。
 - 修复：spec 开头必须有"与现有代码关系"段落。
 - 防护：P5 原则 + spec 模板要求。
-- 来源锚点：`docs/PROJECT_EXPERIENCES.md` §2.5
+- 来源锚点：`docs/public-lessons.md` §2.5
 
 - 关联：P5 Spec Compatibility Check
 
@@ -248,7 +248,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 触发条件：架构方向 180° 反转后。
 - 修复：分析确认无新框架需要的代码后，直接删除分支。
 - 防护：架构 pivot 后立即评估旧分支。
-- 来源锚点：`docs/PROJECT_EXPERIENCES.md` §6.2
+- 来源锚点：`docs/public-lessons.md` §6.2
 
 - 关联：§6.2 分支管理
 
@@ -261,7 +261,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 触发条件：引入外部参考代码/文档时。
 - 修复：全量适配——保留核心方法论，去掉专有引用，用通用概念替换。
 - 防护：引入外部参考前先做方法论 vs 实现细节分类。
-- 来源锚点：`docs/PROJECT_EXPERIENCES.md` §6.3
+- 来源锚点：`docs/public-lessons.md` §6.3
 
 - 关联：§6.3 参考代码引入
 
@@ -278,28 +278,28 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 
 - 关联：P1 Vision-First, P5 Spec Compatibility Check
 
-### LL-010: 共享能力不得绑定到特定犬种 — 警惕心智模型惯性
+### LL-010: 共享能力不得绑定到特定狗狗 — 警惕心智模型惯性
 - 状态：validated
 - 更新时间：2026-08-07
 
-- 坑：RAG 设计中反复把 `search_knowledge` 能力绑定到 jinmao 犬种（硬编码 breedID、roles 判断、Gemini 降级时"建议 @jinmao"）。用户三次纠正后才完全对齐 clowder-ai 的"共享服务"模式。**第 5 次复发（Phase 7 Polish）**：给每个 breed 硬编码 `cautions`（"不直接写业务代码"、"不做RAG检索"...），本质是把 AGENTS.md 共享治理规则拆碎到 breed config 中。用户再次纠正。
-- 根因：**心智模型惯性** — 从"某犬种负责某事"开始思考，遇到设计需求就 fallback 到"按犬种分配"，而非"共享治理"。breed config 中 `roles` 字段潜意识强化了"某能力是某犬种的 job"。`cautions` 是同一枚硬币的反面：定义"不能做"和定义"能做"一样是 breed-binding。
+- 坑：RAG 设计中反复把 `search_knowledge` 能力绑定到 jinmao 狗狗（硬编码 breedID、roles 判断、Gemini 降级时"建议 @jinmao"）。用户三次纠正后才完全对齐 clowder-ai 的"共享服务"模式。**第 5 次复发（Phase 7 Polish）**：给每个 breed 硬编码 `cautions`（"不直接写业务代码"、"不做RAG检索"...），本质是把 AGENTS.md 共享治理规则拆碎到 breed config 中。用户再次纠正。
+- 根因：**心智模型惯性** — 从"某狗狗负责某事"开始思考，遇到设计需求就 fallback 到"按狗狗分配"，而非"共享治理"。breed config 中 `roles` 字段潜意识强化了"某能力是某狗狗的 job"。`cautions` 是同一枚硬币的反面：定义"不能做"和定义"能做"一样是 breed-binding。
 - 触发条件：设计共享能力或治理规则时，把它们放到 breed config 而非平台层（hooks/AGENTS.md）。
-- 修复：共享能力（RAG、MCP tools）和治理规则（限制、铁律）都是平台层服务，不绑定犬种。技术限制是 CLI 工具的限制，不是犬种角色分配。治理规则在 AGENTS.md + hooks S2 中，不在 breed config 中重复。
-- 防护：spec 审查时搜索：(1) 犬种名 + 能力关键词（如 `jinmao.*rag`）；(2) breed config 中的行为约束字段（如 `cautions`、`restrictions`、`cannot_do`）。如果共享治理规则出现在 breed config 中，阻断。
+- 修复：共享能力（RAG、MCP tools）和治理规则（限制、铁律）都是平台层服务，不绑定狗狗。技术限制是 CLI 工具的限制，不是狗狗角色分配。治理规则在 AGENTS.md + hooks S2 中，不在 breed config 中重复。
+- 防护：spec 审查时搜索：(1) 狗狗名 + 能力关键词（如 `jinmao.*rag`）；(2) breed config 中的行为约束字段（如 `cautions`、`restrictions`、`cannot_do`）。如果共享治理规则出现在 breed config 中，阻断。
 - 来源锚点：`2026-08-07-rag-mcp-server-design.md` §2.2 + `2026-08-03-jinmao-rag-design.md`（已废弃）
 
 - 关联：P1 Vision-First, P3 No Architecture Reversal
 
-### LL-011: 设计文档示例中不得使用具体犬种名 — 用 @dog 泛指
+### LL-011: 设计文档示例中不得使用具体狗狗名 — 用 @dog 泛指
 - 状态：validated
 - 更新时间：2026-08-07
 
-- 坑：SOP handoff spec 数据流示例中用 `@xigou`（后改为 `@jinmao`）作为 @mention 示例，暗示特定犬种是典型 handoff 目标。用户要求改为 `@dog` 泛指。
-- 根因：LL-010 的变体 — 不只在能力绑定中，**示例文本**也会暗示犬种与能力的固定关联。`@xigou 审查代码` 暗示"代码审查是 xigou 的 job"。
-- 触发条件：写 spec/设计文档的数据流示例、伪代码注释、用例描述时，用具体犬种名（jinmao/xigou/demu 等）作为示例。
-- 修复：设计文档中所有示例一律用 `@dog` 泛指犬种。代码中变量名 `fromBreed`/`toBreed` 不受此约束（它们是参数，不是示例）。
-- 防护：spec 自审时搜索具体犬种 ID（jinmao|xigou|demu|zangao|bianmu|zhonghuatianyuanquan），出现在示例/注释/用例描述中时替换为 `@dog`。代码签名和变量名不在此列。
+- 坑：SOP handoff spec 数据流示例中用 `@xigou`（后改为 `@jinmao`）作为 @mention 示例，暗示特定狗狗是典型 handoff 目标。用户要求改为 `@dog` 泛指。
+- 根因：LL-010 的变体 — 不只在能力绑定中，**示例文本**也会暗示狗狗与能力的固定关联。`@xigou 审查代码` 暗示"代码审查是 xigou 的 job"。
+- 触发条件：写 spec/设计文档的数据流示例、伪代码注释、用例描述时，用具体狗狗名（jinmao/xigou/demu 等）作为示例。
+- 修复：设计文档中所有示例一律用 `@dog` 泛指狗狗。代码中变量名 `fromBreed`/`toBreed` 不受此约束（它们是参数，不是示例）。
+- 防护：spec 自审时搜索具体狗狗 ID（jinmao|xigou|demu|zangao|bianmu|zhonghuatianyuanquan），出现在示例/注释/用例描述中时替换为 `@dog`。代码签名和变量名不在此列。
 - 来源锚点：`2026-08-07-sop-handoff-design.md` §2.1 数据流示例
 
 - 关联：LL-010, P1 Vision-First

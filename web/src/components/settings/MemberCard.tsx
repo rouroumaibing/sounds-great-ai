@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import type { DragEvent as ReactDragEvent } from 'react';
 import type { SettingsMember } from '../../types';
+import { useI18n } from '../../store/useI18n';
 
 const RUNTIME_LABELS: Record<string, string> = {
   claude: 'Claude',
@@ -21,7 +22,7 @@ export function accountSummary(m: SettingsMember): string {
   const ref = m.accountRef?.trim() ?? '';
   if (!ref) return '';
   if (OAUTH_REFS.has(ref.toLowerCase())) return 'CLI（OAuth）';
-  return `CLI（配置） · ${ref}`;
+  return useI18n.getState().t('settings.membercard.s1').replace('{ref}', ref);
 }
 
 export function formatMentionPreview(patterns?: string[], max = 3): string {
@@ -58,6 +59,7 @@ export function MemberCard({
   onDragEnd,
   isDragging = false,
 }: MemberCardProps) {
+  const { t } = useI18n();
   const rtLabel = runtimeLabel(m.clientId);
   const acctSummary = accountSummary(m);
   const mentionPreview = formatMentionPreview(m.mentionPatterns);
@@ -77,7 +79,7 @@ export function MemberCard({
     >
       <div className="flex items-center space-x-3 min-w-0">
         {draggable && (
-          <span aria-hidden="true" title="拖动排序" className="select-none leading-none text-lg text-slate-500 hover:text-slate-300 cursor-grab shrink-0">
+          <span aria-hidden="true" title={t('members.dragSort')} className="select-none leading-none text-lg text-slate-500 hover:text-slate-300 cursor-grab shrink-0">
             ⠿
           </span>
         )}
@@ -118,13 +120,13 @@ export function MemberCard({
       </div>
       <div className="flex items-center space-x-2 shrink-0 pl-3 border-l border-slate-800/80">
         <span className={clsx('text-[11px] font-mono px-2 py-0.5 rounded-lg border font-semibold', m.enabled ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-500 border-slate-700')}>
-          {m.enabled ? '已启用' : '已停用'}
+          {m.enabled ? t('members.enabled') : t('members.disabled')}
         </span>
         <button
           onClick={(e) => { e.stopPropagation(); onToggle(m); }}
           disabled={toggling}
           className={clsx('w-11 h-6 rounded-full p-0.5 transition-colors relative focus:outline-none', m.enabled ? 'bg-amber-600' : 'bg-slate-800', toggling && 'opacity-50 cursor-wait')}
-          title={m.enabled ? '停用成员' : '启用成员'}
+          title={m.enabled ? t('members.disableMember') : t('members.enableMember')}
         >
           {toggling ? (
             <i className="fa-solid fa-spinner fa-spin text-[10px] text-slate-300 absolute top-1 left-2.5"></i>
@@ -135,7 +137,7 @@ export function MemberCard({
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(m); }}
           className="p-1.5 text-slate-500 hover:text-rose-400 transition"
-          title="删除成员"
+          title={t('members.deleteMember')}
         >
           <i className="fa-regular fa-trash-can text-xs"></i>
         </button>

@@ -29,7 +29,7 @@
         "output_format": "json",
         "default_args": ["exec", "--json"]
       },
-      "system_prompt": "你是中华田园犬，犬种特工队的安全守护者。你审查命令安全性、验证路径合法性、过滤敏感信息。",
+      "system_prompt": "你是中华田园犬，狗狗特工队的安全守护者。你审查命令安全性、验证路径合法性、过滤敏感信息。",
       "strengths": ["command-check", "path-validation", "sensitive-filter"],
       "context_budget": {
         "max_prompt_tokens": 100000,

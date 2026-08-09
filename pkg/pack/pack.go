@@ -2,7 +2,11 @@ package pack
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -110,6 +114,51 @@ func (p *Pack) GetBreed(id string) *BreedConfig {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.registry[id]
+}
+
+// ReloadFromDir re-reads all breed configs from dir, replacing the registry.
+// System breeds are preserved; user/plugin breeds are refreshed from disk.
+func (p *Pack) ReloadFromDir(dir string, policy LoadPolicy) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("read dir %q: %w", dir, err)
+	}
+
+	newRegistry := make(map[string]*BreedConfig)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			if policy == LoadPolicySkipInvalid {
+				continue
+			}
+			return fmt.Errorf("read file %q: %w", path, err)
+		}
+		var breed BreedConfig
+		if err := json.Unmarshal(data, &breed); err != nil {
+			if policy == LoadPolicySkipInvalid {
+				continue
+			}
+			return fmt.Errorf("parse file %q: %w", path, err)
+		}
+		newRegistry[breed.ID] = &breed
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// preserve system breeds that aren't on disk
+	for id, b := range p.registry {
+		if b.Source == BreedSourceSystem {
+			if _, ok := newRegistry[id]; !ok {
+				newRegistry[id] = b
+			}
+		}
+	}
+	p.registry = newRegistry
+	return nil
 }
 
 // Close 关闭所有 capability 资源

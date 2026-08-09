@@ -24,7 +24,7 @@
 
 1. **记录 handoff**：在 A2A Thread 中记录 `Handoff{From: A, To: B, Artifact: 响应文本}`
 2. **SOP 门禁**：检查 A2A 深度（默认 max=3），超限则升级到 CVO
-3. **选择 reviewer**：跨犬种 review 优先（`RequireDifferentBreed: true`）
+3. **选择 reviewer**：跨狗狗 review 优先（`RequireDifferentBreed: true`）
 4. **执行 B**：将 A 的输出作为 artifact 传给 B 执行
 
 ### A2A 消息格式
@@ -40,5 +40,7 @@ Thread {
     Depth        int
 }
 ```
+
+> **实现状态**：`internal/a2a/` 当前为 Minimal 实现。@mention 是主要协作模式，A2A Hub 是辅助。不建 HTTP server/client（VISION §4.1）。
 
 > **不可逆决策**：A2A 通信走 CLI adapter pipe，不建 HTTP server/client（VISION §4.1）。

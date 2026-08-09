@@ -3,8 +3,10 @@ import { apiGet } from '../../../services/http';
 import { useRagBackend } from '../../../hooks/useRagBackend';
 import clsx from 'clsx';
 import type { LoadedSkill, McpServer } from '../../../types';
+import { useI18n } from '../../../store/useI18n';
 
 export function McpTab() {
+  const { t } = useI18n();
   const [loadedSkills, setLoadedSkills] = useState<LoadedSkill[]>([]);
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const { backend, loading, error, syncProgress, switching, syncing, switchBackend, triggerSync } = useRagBackend();
@@ -19,8 +21,8 @@ export function McpTab() {
       {/* RAG Backend Section */}
       <div>
         <span className="font-bold text-[11px] uppercase tracking-wider text-slate-400 block mb-2">RAG Backend</span>
-        {loading && <div className="text-center text-slate-500 text-xs py-2">加载中...</div>}
-        {error && <div className="text-center text-rose-400 text-xs py-2">加载失败: {error}</div>}
+        {loading && <div className="text-center text-slate-500 text-xs py-2">{t('common.loading')}</div>}
+        {error && <div className="text-center text-rose-400 text-xs py-2">{t('common.error')}: {error}</div>}
         {backend && (
           <div className="space-y-2">
             <div className="p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
@@ -46,14 +48,14 @@ export function McpTab() {
                 disabled={switching}
                 className={clsx('px-2 py-1 rounded-lg text-[10px] font-mono transition', switching ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white')}
               >
-                {switching ? '切换中...' : `切换到 ${backend.active === 'memory' ? 'sqlite' : 'memory'}`}
+                {switching ? t('mcp.switching') : t('mcp.switchTo') + ' ' + (backend.active === 'memory' ? 'sqlite' : 'memory')}
               </button>
               <button
                 onClick={() => triggerSync(backend.active === 'memory' ? 'sqlite' : 'memory')}
                 disabled={syncing}
                 className={clsx('px-2 py-1 rounded-lg text-[10px] font-mono transition', syncing ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500 text-white')}
               >
-                {syncing ? '同步中...' : '同步数据'}
+                {syncing ? t('mcp.syncing') : t('mcp.syncData')}
               </button>
             </div>
             {syncProgress && (

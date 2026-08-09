@@ -59,7 +59,7 @@ Sounds Great AI 不是替你完成梦想，而是让你终于有机会带着自�
 
 ### 1.4 犬队 vs 猫咖
 
-我们借鉴 clowder-ai 的 "cat families" 概念，但用犬种替代猫种。原因：
+我们借鉴 clowder-ai 的 "cat families" 概念，但用狗狗替代猫种。原因：
 - 犬有**工作本能**（herding, retrieving, guarding）——更贴合"工具型 agent"
 - 犬有**团队意识**（pack）——多犬协作是天性
 - 犬有**服从性**——纪律执行更可靠
@@ -137,12 +137,12 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 
 1. **CLI adapter 架构** — 平台 spawn 外部 CLI 进程，通过 stdin/stdout pipe 通信，解析各自输出格式。不内置 agent reasoning。
 2. **动态路由，非固定 DAG** — 平台根据任务类型动态决定调用哪些 agent。不硬编码工作流。
-3. **Dog personas 保留** — 6 个犬种映射到 clowder-ai 的 "cat families" 概念：personality + role + CLI binding。
+3. **Dog personas 保留** — 6 个狗狗映射到 clowder-ai 的 "cat families" 概念：personality + role + CLI binding。
 4. **Go + Eino 平台语言** — 平台层用 Go + Eino。平台自身需要的 LLM 调用（路由、分解、合成）走 Eino。
 
-## 5. Dog Pack — 犬种角色
+## 5. Dog Pack — 狗狗角色
 
-| 角色 | 犬种 | 代号 | 职责 |
+| 角色 | 狗狗 | 代号 | 职责 |
 |------|------|------|------|
 | Orchestrator | Border Collie | bianmu | 任务分解、动态路由、结果合成 |
 | Code Hunter | Xigou | xigou | 代码搜索、分析、重构建议 |
@@ -156,7 +156,7 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 | 模块 | 职责 | 包路径 |
 |------|------|--------|
 | CLI Adapter | spawn/pipe/parse 4 个 CLI | `internal/adapter/` |
-| Identity Manager | 犬种身份、persona 持久化 | `internal/config/` |
+| Identity Manager | 狗狗身份、persona 持久化 | `internal/config/` |
 | Dynamic Router | 任务→agent 路由决策 | `internal/router/` |
 | SOP Guardian | SOP 规则、门禁、review 策略 | `internal/sop/` |
 | Memory & Evidence | 证据存储、决策日志、经验 | `internal/memory/` |
@@ -185,7 +185,20 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 | **4. Skills System** | skill 加载、注入、clowder-ai skill 吸收 | **完成** |
 | **5. SOP Gates** | 质量门禁、review 流程、安全策略 | **完成** |
 | **6. Transport** | WebSocket + HTTP API + 前端 | **完成** |
-| **7. Polish** | 文档、示例、性能优化、45 hook、Memory System + Cue Plane + ACP Pool + PWA | **完成** |
+| **7. Polish** | 文档、示例、性能优化、45 hook、Memory System + Cue Plane + ACP Pool + PWA | **主体完成，剩余子项** |
+
+### 7.1 Phase 7 剩余子项
+
+| 子项 | 状态 |
+|------|------|
+| 45 hook 模板 | 已创建，D/L 系列内容已充实 |
+| Memory System (Lanes + Cue Plane) | 已实现，文档已补全 |
+| ACP Process Pool | 已实现 |
+| PWA | 已实现 |
+| 文档治理（AGENTS.md 治理机制补全） | 完成 |
+| Skills 补充（5→25） | 完成 |
+| RAG on-demand 检索 | 规划中 |
+| SOP 基础门禁接入执行流 | 规划中 |
 
 ## 8. 愿景合规
 
@@ -235,7 +248,7 @@ Spec 必须包含 `## VISION Compatibility` 段，回答以下 7 个问题：
 
 | hook id | 时机 | 内容 | 对标 clowder-ai |
 |---------|------|------|----------------|
-| `identity` | session-init | 犬种身份 + 职责 | S1 |
+| `identity` | session-init | 狗狗身份 + 职责 | S1 |
 | `restrictions` | session-init | 限制声明表 | S2 |
 | `iron-laws` | session-init | 5 条铁律 | L4 |
 | `guardrails` | session-init | 红旗模式表 | S10 |

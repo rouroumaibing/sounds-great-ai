@@ -1,8 +1,8 @@
-## 跨 Thread 回复（对标 clowder-ai D4）
+## 跨 thread 协同（对标 clowder-ai D4）
 
-📨 来自跨线程消息时注入的上下文提示。
+跨 thread 通知和责任处置。**ACTION/BLOCKING 不转移球权。**
 
-当收到跨 thread 投递的消息时：
-- 注意消息来源 thread 和发件犬种
-- 理解消息的约束和协调要求
-- 按回复指令处理并在当前 thread 中回复
+- 用 `cross_post_message(threadId, content, targetCats)` 向另一个 thread 投递
+- 必须包含 routing credentials（targetCats 或行首 @handle）
+- 共享文件只在 main 改，改完立刻 commit + push
+- 跨 thread 阻塞依赖双写到可追溯状态；消息不是真相源

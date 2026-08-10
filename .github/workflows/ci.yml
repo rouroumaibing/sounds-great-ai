@@ -10,10 +10,13 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
+          # Disable built-in Go module cache: the automatic cache restore was
+          # failing with "/usr/bin/tar ... exit code 2" and blocking CI.
+          cache: false
       - name: Build
         run: go build ./...
       - name: Vet
@@ -24,10 +27,15 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          # Node 20 reached EOL in 2026-04; use Active LTS 22 to avoid
+          # download failures on runners.
+          node-version: '22'
+          # Disable automatic npm caching to avoid the same tar restore
+          # failures seen on the backend job.
+          package-manager-cache: false
       - name: Install
         run: cd web && npm ci
       - name: Type check

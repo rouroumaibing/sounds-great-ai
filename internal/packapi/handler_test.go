@@ -252,8 +252,8 @@ func setupTestPackHandler(t *testing.T) (*Handler, string) {
 func TestGetTemplates(t *testing.T) {
 	h, dir := setupTestPackHandler(t)
 
-	// Write template file
-	templates := `[{"id":"orchestrator","name":"Orchestrator","default_roles":["orchestrator"]}]`
+	// Write template file (consolidated format)
+	templates := `{"version":2,"role_templates":[{"id":"orchestrator","name":"Orchestrator","default_roles":["orchestrator"]}],"breeds":[]}`
 	os.WriteFile(filepath.Join(dir, "dog-template.json"), []byte(templates), 0644)
 
 	mux := h.Routes()
@@ -290,7 +290,7 @@ func TestGetTemplates_Fallback(t *testing.T) {
 }
 
 func TestUpdateBreed(t *testing.T) {
-	h, dir := setupTestPackHandler(t)
+	h, _ := setupTestPackHandler(t)
 
 	// Create a user breed first
 	cfg := pack.BreedConfig{
@@ -301,7 +301,7 @@ func TestUpdateBreed(t *testing.T) {
 		Variants:    []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
 	}
 	h.pack.Register(&cfg)
-	saveBreedFile(dir, &cfg)
+	h.persistBreed(&cfg)
 
 	// PATCH
 	body, _ := json.Marshal(map[string]any{"display_name": "Updated Breed"})
@@ -477,15 +477,22 @@ func TestDeleteBreedRemovesFile(t *testing.T) {
 		Source:           pack.BreedSourceUser,
 	}
 	p.Register(&cfg)
-	saveBreedFile(dir, &cfg)
+	h := NewHandler(p, dir)
+	h.persistBreed(&cfg)
 
-	// Verify file exists
-	filePath := filepath.Join(dir, "file-breed.json")
+	// Verify the consolidated template file exists with the breed in it.
+	filePath := filepath.Join(dir, "dog-template.json")
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		t.Fatalf("breed file should exist before delete")
+		t.Fatalf("template file should exist before delete")
+	}
+	tmpl, err := h.loadDogTemplate()
+	if err != nil {
+		t.Fatalf("loadDogTemplate: %v", err)
+	}
+	if len(tmpl.Breeds) != 1 || tmpl.Breeds[0].ID != "file-breed" {
+		t.Fatalf("expected file-breed in template before delete, got %v", tmpl.Breeds)
 	}
 
-	h := NewHandler(p, dir)
 	req := httptest.NewRequest(http.MethodDelete, "/api/breeds/file-breed", nil)
 	req.SetPathValue("id", "file-breed")
 	w := httptest.NewRecorder()
@@ -494,8 +501,14 @@ func TestDeleteBreedRemovesFile(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
 	}
-	if _, err := os.Stat(filePath); !os.IsNotExist(err) {
-		t.Errorf("breed file should be deleted, stat err = %v", err)
+	tmpl, err = h.loadDogTemplate()
+	if err != nil {
+		t.Fatalf("loadDogTemplate after delete: %v", err)
+	}
+	for _, b := range tmpl.Breeds {
+		if b.ID == "file-breed" {
+			t.Errorf("breed file-breed should be removed from template, got %v", tmpl.Breeds)
+		}
 	}
 }
 
@@ -589,7 +602,7 @@ func TestUpdateBreedInvalidJSON(t *testing.T) {
 }
 
 func TestUpdateBreedMultipleFields(t *testing.T) {
-	h, dir := setupTestPackHandler(t)
+	h, _ := setupTestPackHandler(t)
 
 	cfg := pack.BreedConfig{
 		ID:              "test-breed",
@@ -601,7 +614,7 @@ func TestUpdateBreedMultipleFields(t *testing.T) {
 		Variants:        []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
 	}
 	h.pack.Register(&cfg)
-	saveBreedFile(dir, &cfg)
+	h.persistBreed(&cfg)
 
 	body, _ := json.Marshal(map[string]any{
 		"display_name":     "Updated Name",

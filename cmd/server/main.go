@@ -22,7 +22,7 @@ import (
 func main() {
 	ctx := context.Background()
 	startTime := time.Now()
-	cfg := loadConfig()
+	cfg := LoadConfig()
 
 	logBuf := ops.NewLogBuffer(1000)
 	log.SetOutput(ops.NewLogWriter(os.Stderr, logBuf))
@@ -39,20 +39,20 @@ func main() {
 		log.Printf("Warning: model init failed (server still starts): %v", err)
 	}
 	sm := &agent.SkillManager{}
-	skillDir := getenvDefault("SKILL_DIR", "internal/agent/skills")
+	skillDir := GetenvDefault("SKILL_DIR", "internal/agent/skills")
 	if err := sm.Load(skillDir); err != nil {
 		log.Printf("Warning: skill load failed: %v", err)
 	}
 
-	workspaceDir := getenvDefault("WORKSPACE_DIR", "")
+	workspaceDir := GetenvDefault("WORKSPACE_DIR", "")
 	if workspaceDir == "" {
 		if wd, err := os.Getwd(); err == nil {
 			workspaceDir = wd
 		}
 	}
-	breedsDir := getenvDefault("BREEDS_DIR", "packs/default/breeds")
-	skillsDir := getenvDefault("SKILLS_DIR", "packs/default/skills")
-	sqlitePath := getenvDefault("SQLITE_PATH", "data/sounds-great.db")
+	breedsDir := GetenvDefault("BREEDS_DIR", "packs/default/breeds")
+	skillsDir := GetenvDefault("SKILLS_DIR", "packs/default/skills")
+	sqlitePath := GetenvDefault("SQLITE_PATH", "data/sounds-great.db")
 
 	pl, err := platform.New(platform.Config{
 		BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: workspaceDir, SQLitePath: sqlitePath,
@@ -61,7 +61,7 @@ func main() {
 		log.Printf("Warning: platform init failed (server runs in legacy mode): %v", err)
 	}
 
-	p, registry, embedder, cleaner, _ := setupPack()
+	p, registry, embedder, cleaner, _ := SetupPack()
 	defer p.Close()
 	if cleaner != nil {
 		defer cleaner.Stop()
@@ -82,11 +82,11 @@ func main() {
 		wsHandler = transport.NewWSHandlerWithPlatform(p, pl)
 	}
 
-	evalScheduler, evalHandler := setupEval(ctx, pl, workspaceDir)
+	evalScheduler, evalHandler := SetupEval(ctx, pl, workspaceDir)
 
-	mux := buildMuxWithHandler(wsHandler, p, pl, registry, embedder, workspaceDir, startTime, evalHandler, logBuf)
+	mux := BuildMuxWithHandler(wsHandler, p, pl, registry, embedder, workspaceDir, startTime, evalHandler, logBuf)
 
-	port := getenvDefault("PORT", "8080")
+	port := GetenvDefault("PORT", "8080")
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)

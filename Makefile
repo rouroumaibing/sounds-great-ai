@@ -51,7 +51,7 @@ dev:
 	else \
 		trap 'kill 0' EXIT INT TERM; \
 		echo "Starting backend on :8080..."; \
-		go run cmd/server/main.go & \
+		go run ./cmd/server/ & \
 		BACKEND_PID=$$!; \
 		echo "Starting frontend on :5173..."; \
 		cd web && npm run dev & \
@@ -67,7 +67,7 @@ prod:
 		echo "Error: web/node_modules not found. Run 'make install' first."; exit 1; \
 	fi; \
 	$(MAKE) build; \
-	go build -o bin/server cmd/server/main.go; \
+	go build -o bin/server ./cmd/server/; \
 	if [ "$(DAEMON_MODE)" = "true" ]; then \
 		mkdir -p .logs .pids; \
 		for name in backend frontend; do \
@@ -96,7 +96,7 @@ prod:
 	fi
 
 backend:
-	go run cmd/server/main.go
+	go run ./cmd/server/
 
 frontend:
 	cd web && npm run dev

@@ -19,7 +19,7 @@ func TestPlatformNew(t *testing.T) {
 		"default_variant_id": "bianmu-claude",
 		"variants": [{"id": "bianmu-claude", "client_id": "anthropic", "default_model": "claude-opus-4-6", "cli": {"command": "claude", "output_format": "stream-json"}}]
 	}`
-	os.WriteFile(filepath.Join(breedsDir, "bianmu.json"), []byte(breedJSON), 0644)
+	os.WriteFile(filepath.Join(breedsDir, "dog-template.json"), []byte(`{"version":2,"breeds":[`+breedJSON+`]}`), 0644)
 
 	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, MaxA2ADepth: 3})
 	if err != nil {
@@ -75,7 +75,7 @@ func TestPlatformReadyWithBreeds(t *testing.T) {
 	skillsDir := t.TempDir()
 
 	breedJSON := `{"id":"bianmu","name":"边牧","display_name":"边牧","default_variant_id":"v1","variants":[{"id":"v1","client_id":"anthropic","default_model":"claude-opus-4-6","cli":{"command":"claude","output_format":"stream-json"}}]}`
-	os.WriteFile(filepath.Join(breedsDir, "bianmu.json"), []byte(breedJSON), 0644)
+	os.WriteFile(filepath.Join(breedsDir, "dog-template.json"), []byte(`{"version":2,"breeds":[`+breedJSON+`]}`), 0644)
 
 	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir})
 	if err != nil {
@@ -184,7 +184,7 @@ func TestPlatformNewDefaultMaxA2ADepth(t *testing.T) {
 	skillsDir := t.TempDir()
 
 	breedJSON := `{"id":"bianmu","name":"边牧","display_name":"边牧","default_variant_id":"v1","variants":[{"id":"v1","client_id":"anthropic","default_model":"claude-opus-4-6","cli":{"command":"claude","output_format":"stream-json"}}]}`
-	os.WriteFile(filepath.Join(breedsDir, "bianmu.json"), []byte(breedJSON), 0644)
+	os.WriteFile(filepath.Join(breedsDir, "dog-template.json"), []byte(`{"version":2,"breeds":[`+breedJSON+`]}`), 0644)
 
 	tests := []struct {
 		name    string

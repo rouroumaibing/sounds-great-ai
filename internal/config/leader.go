@@ -3,7 +3,6 @@ package config
 import "fmt"
 
 // LeaderConfig holds the leader (human operator) configuration.
-// Mirrors clowder-ai's LeaderConfig.
 type LeaderConfig struct {
 	Name            string   `json:"name" yaml:"name"`
 	Aliases         []string `json:"aliases" yaml:"aliases"`

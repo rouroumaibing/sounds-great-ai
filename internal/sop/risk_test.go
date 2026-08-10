@@ -112,7 +112,7 @@ func TestAssessRiskFromFilesEmpty(t *testing.T) {
 
 func TestRouteFromChangedFiles(t *testing.T) {
 	r := NewRiskRouter()
-	track := r.RouteFromChangedFiles([]string{"internal/config/breeds/bianmu.json"})
+	track := r.RouteFromChangedFiles([]string{"packs/default/breeds/dog-template.json"})
 	if track != TrackFullGate {
 		t.Error("breed config change should be full_gate")
 	}

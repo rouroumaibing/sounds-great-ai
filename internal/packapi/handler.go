@@ -57,7 +57,7 @@ func (h *Handler) CreateBreed(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusForbidden, err)
 		return
 	}
-	if err := saveBreedFile(h.breedsDir, &cfg); err != nil {
+	if err := h.persistBreed(&cfg); err != nil {
 		h.pack.Unregister(cfg.ID) // rollback
 		respondError(w, http.StatusInternalServerError, err)
 		return
@@ -78,7 +78,10 @@ func (h *Handler) DeleteBreed(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusForbidden, err)
 		return
 	}
-	deleteBreedFile(h.breedsDir, id)
+	if err := h.removeBreed(id); err != nil {
+		respondError(w, http.StatusInternalServerError, err)
+		return
+	}
 	respondOK(w, nil)
 }
 
@@ -170,7 +173,7 @@ func (h *Handler) UpdateBreed(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, err)
 		return
 	}
-	if err := saveBreedFile(h.breedsDir, cfg); err != nil {
+	if err := h.persistBreed(cfg); err != nil {
 		respondError(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -182,14 +185,12 @@ func (h *Handler) UpdateBreed(w http.ResponseWriter, r *http.Request) {
 
 // GetTemplates GET /api/breeds/templates — role templates
 func (h *Handler) GetTemplates(w http.ResponseWriter, r *http.Request) {
-	path := filepath.Join(h.breedsDir, "dog-template.json")
-	data, err := os.ReadFile(path)
+	tmpl, err := h.loadDogTemplate()
 	if err != nil {
 		respondOK(w, []any{})
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(data)
+	respondOK(w, tmpl.RoleTemplates)
 }
 
 // GetBreedStatus GET /api/breeds/{id}/status — runtime status
@@ -207,19 +208,76 @@ func (h *Handler) GetBreedStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// saveBreedFile 将 breed 配置持久化到 JSON 文件
-func saveBreedFile(dir string, cfg *pack.BreedConfig) error {
-	path := filepath.Join(dir, cfg.ID+".json")
-	data, err := json.MarshalIndent(cfg, "", "  ")
+// breedsFilePath returns the single consolidated template file path.
+func (h *Handler) breedsFilePath() string {
+	return filepath.Join(h.breedsDir, "dog-template.json")
+}
+
+// loadDogTemplate reads the consolidated template file. If the file is missing,
+// an empty template (version 2) is returned so callers can still upsert.
+func (h *Handler) loadDogTemplate() (*pack.DogTemplateFile, error) {
+	path := h.breedsFilePath()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &pack.DogTemplateFile{Version: 2}, nil
+		}
+		return nil, err
+	}
+	var tmpl pack.DogTemplateFile
+	if err := json.Unmarshal(data, &tmpl); err != nil {
+		return nil, err
+	}
+	if tmpl.Breeds == nil {
+		tmpl.Breeds = []pack.BreedConfig{}
+	}
+	return &tmpl, nil
+}
+
+// saveDogTemplate writes the consolidated template file.
+func (h *Handler) saveDogTemplate(tmpl *pack.DogTemplateFile) error {
+	path := h.breedsFilePath()
+	data, err := json.MarshalIndent(tmpl, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
 }
 
-// deleteBreedFile 删除 breed JSON 文件
-func deleteBreedFile(dir, id string) {
-	os.Remove(filepath.Join(dir, id+".json"))
+// persistBreed upserts a breed into the consolidated template file.
+func (h *Handler) persistBreed(cfg *pack.BreedConfig) error {
+	tmpl, err := h.loadDogTemplate()
+	if err != nil {
+		return err
+	}
+	replaced := false
+	for i := range tmpl.Breeds {
+		if tmpl.Breeds[i].ID == cfg.ID {
+			tmpl.Breeds[i] = *cfg
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		tmpl.Breeds = append(tmpl.Breeds, *cfg)
+	}
+	return h.saveDogTemplate(tmpl)
+}
+
+// removeBreed deletes a breed from the consolidated template file.
+func (h *Handler) removeBreed(id string) error {
+	tmpl, err := h.loadDogTemplate()
+	if err != nil {
+		return err
+	}
+	kept := tmpl.Breeds[:0]
+	for _, b := range tmpl.Breeds {
+		if b.ID != id {
+			kept = append(kept, b)
+		}
+	}
+	tmpl.Breeds = kept
+	return h.saveDogTemplate(tmpl)
 }
 
 func respondOK(w http.ResponseWriter, data any) {

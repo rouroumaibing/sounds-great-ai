@@ -9,10 +9,6 @@ readonly-docs
 .pids/
 bin/
 
-# Stray Go binaries in root (use bin/ instead)
-main
-server
-
 # SQLite databases
 *.db
 *.db-wal

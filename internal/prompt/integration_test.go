@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -20,9 +21,9 @@ func TestIntegrationPromptBuilderWithRealBreeds(t *testing.T) {
 		t.Skipf("breeds dir not found: %v", err)
 	}
 
-	// Load real breed configs
+	// Load real breed configs from the single consolidated template file.
 	loader := config.NewLoader()
-	breeds, err := loader.LoadFromDir(breedsDir)
+	breeds, err := loader.LoadFromFile(filepath.Join(breedsDir, "dog-template.json"))
 	if err != nil {
 		t.Fatalf("failed to load breeds: %v", err)
 	}
@@ -103,7 +104,7 @@ func TestIntegrationPromptBuilderRosterContent(t *testing.T) {
 	}
 
 	loader := config.NewLoader()
-	breeds, err := loader.LoadFromDir(breedsDir)
+	breeds, err := loader.LoadFromFile(filepath.Join(breedsDir, "dog-template.json"))
 	if err != nil {
 		t.Fatalf("failed to load breeds: %v", err)
 	}

@@ -161,6 +161,37 @@ func (p *Pack) ReloadFromDir(dir string, policy LoadPolicy) error {
 	return nil
 }
 
+// ReloadFromFile re-reads the single consolidated template file, replacing the
+// registry. System breeds not present on disk are preserved.
+func (p *Pack) ReloadFromFile(path string, policy LoadPolicy) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read file %q: %w", path, err)
+	}
+	var tmpl DogTemplateFile
+	if err := json.Unmarshal(data, &tmpl); err != nil {
+		return fmt.Errorf("parse file %q: %w", path, err)
+	}
+
+	newRegistry := make(map[string]*BreedConfig)
+	for i := range tmpl.Breeds {
+		newRegistry[tmpl.Breeds[i].ID] = &tmpl.Breeds[i]
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// preserve system breeds that aren't on disk
+	for id, b := range p.registry {
+		if b.Source == BreedSourceSystem {
+			if _, ok := newRegistry[id]; !ok {
+				newRegistry[id] = b
+			}
+		}
+	}
+	p.registry = newRegistry
+	return nil
+}
+
 // Close 关闭所有 capability 资源
 func (p *Pack) Close() error {
 	p.mu.Lock()

@@ -1,0 +1,312 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+
+	"sounds-great-ai/internal/config"
+	"sounds-great-ai/internal/hooks"
+	"sounds-great-ai/internal/memory"
+	"sounds-great-ai/internal/ops"
+	"sounds-great-ai/internal/packapi"
+	"sounds-great-ai/internal/platform"
+	"sounds-great-ai/internal/ragstore"
+	"sounds-great-ai/internal/settings"
+	"sounds-great-ai/internal/telemetry"
+	"sounds-great-ai/internal/threadstore"
+	"sounds-great-ai/internal/transport"
+	"sounds-great-ai/pkg/pack"
+
+	"github.com/cloudwego/eino/components/embedding"
+)
+
+func BuildMux() http.Handler {
+	p := pack.New("default")
+	return BuildMuxWithHandler(transport.NewWSHandler(p), p, nil, nil, nil, "", time.Now(), nil, ops.NewLogBuffer(1000))
+}
+
+func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platform.Platform, registry *ragstore.StoreRegistry, embedder embedding.Embedder, workspaceDir string, startTime time.Time, evalHandler *transport.EvalHandler, logBuf *ops.LogBuffer) http.Handler {
+	auth := transport.NewAuthMiddleware()
+	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
+	cors := transport.CORSMiddleware(allowedOrigin)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
+		if pl != nil && pl.Ready() {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"status":   "ready",
+				"adapters": len(pl.Adapters),
+				"breeds":   len(pl.Breeds),
+			})
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]string{"status": "not ready"})
+		}
+	})
+	mux.HandleFunc("GET /ws", wsHandler.HandleWS)
+
+	eventBus := config.NewEventBus()
+	breedsDir := os.Getenv("BREEDS_DIR")
+	if breedsDir == "" {
+		breedsDir = "packs/default/breeds"
+	}
+
+	packAPI := packapi.NewHandler(p, breedsDir)
+	packAPI.SetEventBus(eventBus)
+	mux.Handle("/api/breeds", packAPI.Routes())
+	mux.Handle("/api/breeds/", packAPI.Routes())
+
+	if registry != nil && embedder != nil {
+		ragHandler := transport.NewRAGHandler(registry, embedder, workspaceDir)
+		mux.Handle("/api/rag/", ragHandler.Routes())
+	} else {
+		mux.HandleFunc("GET /api/rag/backend", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"active":   "none",
+				"retirees": []map[string]any{},
+				"error":    "RAG not initialized (embedding API key required)",
+			})
+		})
+	}
+
+	var threadStore threadstore.ThreadStore
+	if pl != nil {
+		threadStore = pl.ThreadStore
+	} else {
+		threadStore, _ = threadstore.NewThreadStore(threadstore.StoreConfig{})
+	}
+	var threadHandler *transport.ThreadHandler
+	if pl != nil && pl.MessageStore != nil {
+		threadHandler = transport.NewThreadHandlerWithMessages(threadStore, pl.MessageStore)
+	} else {
+		threadHandler = transport.NewThreadHandler(threadStore)
+	}
+	mux.Handle("/api/threads", threadHandler.Routes())
+	mux.Handle("/api/threads/", threadHandler.Routes())
+	mux.Handle("/api/sessions/", threadHandler.Routes())
+
+	var settingsStore settings.SettingsStore
+	if pl != nil {
+		settingsStore = pl.SettingsStore
+	} else {
+		settingsStore = settings.NewSettingsStore()
+	}
+	credStore := settings.NewMemoryCredentialStore()
+	settingsHandler := transport.NewSettingsHandlerWithCredentials(settingsStore, credStore, eventBus)
+	mux.Handle("/api/settings/", settingsHandler.Routes())
+
+	breedLoader := config.NewLoader()
+	envPath := filepath.Join(workspaceDir, ".env")
+	configHandler := transport.NewConfigHandler(breedLoader, breedsDir, settingsStore, envPath)
+	if pl != nil && pl.Leader != nil {
+		configHandler.SetLeader(pl.Leader)
+	}
+	mux.Handle("/api/config/", configHandler.Routes())
+
+	var hookReg *hooks.Registry
+	if pl != nil {
+		hookReg = pl.HookRegistry
+	}
+	rulesHandler := transport.NewRulesHandler(hookReg, breedLoader, breedsDir, "AGENTS.md")
+	mux.Handle("/api/rules", rulesHandler.Routes())
+	mux.Handle("/api/prompt-injection/", rulesHandler.Routes())
+
+	var evidenceStore memory.EvidenceStore
+	if pl != nil {
+		evidenceStore = pl.EvidenceStore
+	} else {
+		evidenceStore = memory.NewEvidenceStore()
+	}
+	memoryHandler := transport.NewMemoryHandler(evidenceStore)
+	mux.Handle("/api/memory/", memoryHandler.Routes())
+
+	notificationsHandler := transport.NewNotificationsHandler()
+	mux.Handle("/api/notifications", notificationsHandler.Routes())
+	mux.Handle("/api/notifications/", notificationsHandler.Routes())
+
+	filesHandler := transport.NewFilesHandler(workspaceDir)
+	mux.Handle("/api/files/", filesHandler.Routes())
+
+	panelsHandler := transport.NewPanelsHandler()
+	mux.Handle("/api/config/concierge", panelsHandler.Routes())
+	mux.Handle("/api/config/voice", panelsHandler.Routes())
+	mux.Handle("/api/config/connectors", panelsHandler.Routes())
+	mux.Handle("/api/plugins", panelsHandler.Routes())
+	mux.Handle("/api/plugins/", panelsHandler.Routes())
+	mux.Handle("/api/marketplace", panelsHandler.Routes())
+
+	if evalHandler != nil {
+		mux.Handle("/api/evals", evalHandler.Routes())
+	}
+
+	mux.HandleFunc("GET /api/skills", SkillsHandler(pl))
+	mux.HandleFunc("GET /api/mcp/servers", MCPServersHandler(pl))
+	mux.HandleFunc("GET /api/ops/health", OpsHealthHandler(startTime))
+	mux.HandleFunc("GET /api/ops/logs", OpsLogsHandler(logBuf))
+	mux.HandleFunc("GET /api/diagnostics/pool", DiagnosticsPoolHandler(wsHandler, logBuf, registry))
+	mux.HandleFunc("GET /api/ops/git", auth.WrapFunc(GitStatusHandler()))
+
+	opsHandler := transport.NewOpsHandler()
+	opsHandler.RegisterRoutes(mux)
+
+	mux.HandleFunc("GET /api/upgrade/info", auth.WrapFunc(UpgradeInfoHandler))
+	mux.HandleFunc("POST /api/upgrade", auth.WrapFunc(UpgradeHandler))
+
+	distDir := filepath.Join(workspaceDir, "web", "dist")
+	if _, err := os.Stat(distDir); err == nil {
+		mux.Handle("/", SPAHandler(distDir))
+	}
+
+	return telemetry.TraceMiddleware(cors(mux))
+}
+
+func SkillsHandler(pl *platform.Platform) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		type skillItem struct {
+			Name   string `json:"name"`
+			Source string `json:"source"`
+		}
+		if pl == nil || pl.Skills == nil {
+			json.NewEncoder(w).Encode([]skillItem{})
+			return
+		}
+		all := pl.Skills.All()
+		items := make([]skillItem, 0, len(all))
+		for _, s := range all {
+			items = append(items, skillItem{Name: s.ID + ".md", Source: "packs/default/skills"})
+		}
+		json.NewEncoder(w).Encode(items)
+	}
+}
+
+func MCPServersHandler(pl *platform.Platform) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		type mcpItem struct {
+			Name    string   `json:"name"`
+			Tools   []string `json:"tools"`
+			Enabled bool     `json:"enabled"`
+		}
+		if pl == nil || pl.MCP == nil {
+			json.NewEncoder(w).Encode([]mcpItem{})
+			return
+		}
+		servers := pl.MCP.All()
+		items := make([]mcpItem, 0, len(servers))
+		for _, s := range servers {
+			items = append(items, mcpItem{Name: s.Name, Tools: []string{}, Enabled: s.Enabled})
+		}
+		json.NewEncoder(w).Encode(items)
+	}
+}
+
+func OpsHealthHandler(startTime time.Time) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+		otelStatus := "disabled"
+		if telemetry.IsInitialized() {
+			otelStatus = "ok"
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"uptime":           time.Since(startTime).String(),
+			"goroutines":       runtime.NumGoroutine(),
+			"mem_alloc":        mem.Alloc,
+			"mem_total_alloc":  mem.TotalAlloc,
+			"mem_sys":          mem.Sys,
+			"mem_heap_alloc":   mem.HeapAlloc,
+			"mem_heap_sys":     mem.HeapSys,
+			"mem_heap_objects": mem.HeapObjects,
+			"mem_num_gc":       mem.NumGC,
+			"active_threads":   0,
+			"active_processes": 0,
+			"status":           "ok",
+			"otel": map[string]any{
+				"status":         otelStatus,
+				"tracesEnabled":  telemetry.IsInitialized(),
+				"metricsEnabled": telemetry.IsInitialized(),
+			},
+		})
+	}
+}
+
+func OpsLogsHandler(logBuf *ops.LogBuffer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		entries := logBuf.Recent(100)
+		if entries == nil {
+			entries = []ops.LogEntry{}
+		}
+		json.NewEncoder(w).Encode(entries)
+	}
+}
+
+func DiagnosticsPoolHandler(wsHandler *transport.WSHandler, logBuf *ops.LogBuffer, registry *ragstore.StoreRegistry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+		json.NewEncoder(w).Encode(map[string]any{
+			"goroutines": runtime.NumGoroutine(),
+			"memory": map[string]any{
+				"alloc": mem.Alloc, "total_alloc": mem.TotalAlloc, "sys": mem.Sys,
+				"heap_alloc": mem.HeapAlloc, "heap_sys": mem.HeapSys,
+				"heap_objects": mem.HeapObjects, "num_gc": mem.NumGC, "gc_pause_ns": mem.PauseTotalNs,
+			},
+			"rate_monitor": map[string]any{"tracked_sessions": wsHandler.SessionCount()},
+			"log_buffer":   map[string]any{"entries": logBuf.Len()},
+			"rag_cache":    map[string]any{"available": registry != nil},
+		})
+	}
+}
+
+func GitStatusHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		branch := ""
+		if out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
+			branch = strings.TrimSpace(string(out))
+		}
+		ahead, behind := 0, 0
+		if out, err := exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{u}").Output(); err == nil {
+			parts := strings.Fields(strings.TrimSpace(string(out)))
+			if len(parts) >= 2 {
+				fmt.Sscanf(parts[0], "%d", &ahead)
+				fmt.Sscanf(parts[1], "%d", &behind)
+			}
+		}
+		untracked, modified := 0, 0
+		if out, err := exec.Command("git", "status", "--porcelain").Output(); err == nil {
+			for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+				if line == "" {
+					continue
+				}
+				if strings.HasPrefix(line, "??") {
+					untracked++
+				} else {
+					modified++
+				}
+			}
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"branch": branch, "ahead": ahead, "behind": behind,
+			"dirty": modified > 0 || untracked > 0, "untracked": untracked, "modified": modified,
+		})
+	}
+}

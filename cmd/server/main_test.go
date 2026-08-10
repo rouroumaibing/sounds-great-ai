@@ -8,7 +8,7 @@ import (
 )
 
 func TestHealthEndpoint(t *testing.T) {
-	mux := buildMux()
+	mux := BuildMux()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
@@ -22,7 +22,7 @@ func TestHealthEndpoint(t *testing.T) {
 }
 
 func TestWebSocketEndpointExists(t *testing.T) {
-	mux := buildMux()
+	mux := BuildMux()
 	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Upgrade", "websocket")

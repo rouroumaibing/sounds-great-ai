@@ -27,6 +27,16 @@ export interface ContextBudget {
   max_content_length_per_msg?: number;
 }
 
+export interface VoiceConfig {
+  voice?: string;
+  lang_code?: string;
+  speed?: number;
+  ref_audio?: string;
+  ref_text?: string;
+  instruct?: string;
+  temperature?: number;
+}
+
 export interface Variant {
   id: string;
   client_id: string;
@@ -34,8 +44,13 @@ export interface Variant {
   mcp_support: boolean;
   cli: CLIConfig;
   system_prompt?: string;
+  personality?: string;
   strengths?: string[];
+  team_strengths?: string;
+  caution?: string;
   context_budget?: ContextBudget;
+  variant_label?: string;
+  voice_config?: VoiceConfig;
   account_ref?: string;
   provider?: string;
   session_chain?: boolean;

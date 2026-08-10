@@ -16,7 +16,9 @@ import (
 func setupConfigHandler(t *testing.T) *ConfigHandler {
 	t.Helper()
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "test.json"), []byte(`{"id":"test","name":"Test","display_name":"Test","personality":"test","variants":[{"id":"default","client_id":"anthropic","default_model":"claude"}]}`), 0644)
+	// Write the consolidated template file (single-file model).
+	breedJSON := `{"id":"test","name":"Test","display_name":"Test","personality":"test","variants":[{"id":"default","client_id":"anthropic","default_model":"claude"}]}`
+	os.WriteFile(filepath.Join(dir, "dog-template.json"), []byte(`{"version":2,"breeds":[`+breedJSON+`]}`), 0644)
 	loader := config.NewLoader()
 	store := settings.NewInMemorySettingsStore()
 	envPath := filepath.Join(dir, ".env")

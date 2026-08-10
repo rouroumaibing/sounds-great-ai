@@ -107,7 +107,7 @@ func AssessRiskFromFiles(files []string) RiskAssessment {
 			a.Contract = true
 		case containsAny(f, "internal/memory/", "internal/ragstore/", "internal/threadstore/"):
 			a.Data = true
-		case containsAny(f, "internal/config/breeds/", "docs/VISION.md"):
+		case containsAny(f, "packs/default/breeds/", "docs/VISION.md"):
 			a.Irreversible = true
 		case containsAny(f, "auth", "credential", "secret", "token", "password"):
 			a.Security = true

@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[中文](README_zh-CN.md) | **English**
+[中文](README.zh-CN.md) | **English**
 
 </div>
 
@@ -64,14 +64,14 @@ This isn't just another Agent invocation framework. It's a **Pack** — a squad 
 
 Six dogs, six roles, each with its own specialty:
 
-| Role | Breed | Personality | Core Responsibilities | Capabilities |
-|------|-------|-------------|----------------------|-------------|
-| **Orchestrator** | Border Collie *(bianmu)* | Extremely intelligent, field-control master, sharp-eyed | Task decomposition, DAG workflow scheduling, state machine control | `agent_dispatch` (routing) |
-| **Safety Guardrail** | Chinese Rural Dog *(zhonghuatianyuanquan)* | Loyal, reliable, highly alert, knows home terrain | Safety boundaries, command blocklist, permission auditing | `command_check, path_validate, sensitive_filter` |
-| **UI / CLI Presentation** | Tibetan Mastiff *(zangao)* | Majestic, imposing, steadfast, gatekeeper | TUI status rendering, log dashboard, human confirmation | CLI adapter handles output |
-| **Code Hunter** | Xigou *(xigou)* | Streamlined, lightning-fast, laser-focused | Automated Refactor, high-difficulty Bug fix code generation | CLI adapter handles code search/analysis |
-| **RAG / Retriever** | Golden Retriever *(jinmao)* | Strong retrieval instinct, gentle, dependable | Vector search, context fetching, document association | `context_assemble` + RAG via ragstore |
-| **Log & Bug Tracer** | German Shepherd *(demu)* | Alert, black-backed, upright ears, strong execution | Panic tracking, StackTrace analysis, Log tracing | CLI adapter handles log tracing |
+| Role | Breed | Personality |
+|------|-------|-------------|
+| **Orchestrator** | Border Collie *(bianmu)* | Extremely intelligent, field-control master, sharp-eyed |
+| **Safety Guardrail** | Chinese Rural Dog *(zhonghuatianyuanquan)* | Loyal, reliable, highly alert, knows home terrain |
+| **UI / CLI Presentation** | Tibetan Mastiff *(zangao)* | Majestic, imposing, steadfast, gatekeeper |
+| **Code Hunter** | Xigou *(xigou)* | Streamlined, lightning-fast, laser-focused |
+| **RAG / Retriever** | Golden Retriever *(jinmao)* | Strong retrieval instinct, gentle, dependable |
+| **Log & Bug Tracer** | German Shepherd *(demu)* | Alert, black-backed, upright ears, strong execution |
 
 > Users can create their own dogs — just one JSON file, select registered capabilities, define a workflow, and hot-reload takes effect instantly.
 
@@ -80,11 +80,10 @@ Six dogs, six roles, each with its own specialty:
 ```
 ┌───────────────────────────────────────────────────┐
 │                 packs/default/breeds/               │
-│   bianmu.json  zhonghuatianyuanquan.json  zangao.json │
-│   xigou.json   jinmao.json              demu.json      │
-│          (pure data, user-created/modifiable/hot-reload)            │
+│   dog-template.json (单文件：纯数据，用户可创建/       │
+│   修改/热加载；role_templates + breeds 同文件)         │
 └──────────────────────┬────────────────────────────┘
-                       │ LoadFromDir / POST API
+                       │ LoadFromFile / POST API
                        ▼
 ┌───────────────────────────────────────────────────┐
 │              internal/platform/ (composition root)  │
@@ -257,26 +256,6 @@ We build in the open. Here's where we are.
 | Hooks 内容充实 | D/L 系列 hook 模板补充实质内容 | clowder-ai prompt-hooks | Completed |
 | RAG on-demand retrieval | MCP `search_knowledge` tool → RAG store → agent on-demand query | domains/memory/ (on-demand, not default pre-step) | Planned |
 | SOP basic gates | SOPGuardian wired into execution flow (review trigger, safety check) | 5-axis risk routing (simplified) | Planned |
-
-### Design Decisions — Evaluated as Not Needed
-
-Based on clowder-ai architecture research:
-
-| Item | clowder-ai does it? | Why we don't need it |
-|------|---------------------|---------------------|
-| Invocation Queue/Tracker/Reconciler | Complex invocation system | ProcessManager + ProcessRegistry already covers spawn/tracking/zombie defense |
-| Multi-mention state machine | No — just @mention routing | Our @mention + serial/parallel already aligns |
-| Context-eval routing | No | clowder-ai doesn't do context-based routing |
-| Route guards | No | clowder-ai doesn't have route guardrails |
-| A2A handoff/compression | No — @mention in shared thread | A2A Hub is an empty shell; @mention is the pattern |
-| Knowledge graph | No | Over-engineering |
-| Semantic reranker | No | Over-engineering |
-| Reflection/distillation | No | Over-engineering |
-| Rich messages (audio/card/gallery) | No | Plain text sufficient |
-| MCP server bridge (50+ tools) | Registry only | Registry is sufficient for now |
-| Scheduler | No | Over-engineering |
-| Connector gateway | No | Over-engineering |
-| Telemetry | No | Not now |
 
 ## Security Audit
 

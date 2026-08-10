@@ -64,14 +64,14 @@
 
 六只狗狗，六个角色，各司其职：
 
-| 角色 | 狗狗 | 性格特征 | 核心职责 | Capabilities |
-|------|------|----------|----------|-------------|
-| **Orchestrator** | 边牧 *(bianmu)* | 极高智商、控场大师、眼神敏锐 | 任务拆解、路由调度、状态机控制 | `agent_dispatch`（路由） |
-| **Safety Guardrail** | 中华田园犬 *(zhonghuatianyuanquan)* | 忠诚可靠、警惕性高、熟悉家园环境 | 安全边界、命令黑名单、权限代码审计 | `command_check, path_validate, sensitive_filter` |
-| **UI / CLI Presentation** | 藏獒 *(zangao)* | 体型雄浑、威严沉稳、一夫当关 | TUI 状态框渲染、日志大盘展示、人类确认 | CLI adapter 处理输出 |
-| **Code Hunter** | 细狗 *(xigou)* | 身形流线、极速迅猛、目标明确 | 自动化 Refactor、高难度 Bug 修复代码生成 | CLI adapter 处理代码搜索/分析 |
-| **RAG / Retriever** | 金毛 *(jinmao)* | 寻回本能强、温和靠谱 | 向量检索、上下文叼取、文档关联 | `context_assemble` + RAG via ragstore |
-| **Log & Bug Tracer** | 德牧 *(demu)* | 警觉敏锐、黑背立耳、执行力强 | Panic 追查、StackTrace 分析、Log 溯源 | CLI adapter 处理日志追踪 |
+| 角色 | 狗狗 | 性格特征 |
+|------|------|----------|
+| **Orchestrator** | 边牧 *(bianmu)* | 极高智商、控场大师、眼神敏锐 |
+| **Safety Guardrail** | 中华田园犬 *(zhonghuatianyuanquan)* | 忠诚可靠、警惕性高、熟悉家园环境 |
+| **UI / CLI Presentation** | 藏獒 *(zangao)* | 体型雄浑、威严沉稳、一夫当关 |
+| **Code Hunter** | 细狗 *(xigou)* | 身形流线、极速迅猛、目标明确 |
+| **RAG / Retriever** | 金毛 *(jinmao)* | 寻回本能强、温和靠谱 |
+| **Log & Bug Tracer** | 德牧 *(demu)* | 警觉敏锐、黑背立耳、执行力强 |
 
 > 用户可以创建自己的狗狗 —— 只需一个 JSON 文件，选择已注册的 capability，定义工作流，热加载立即生效。
 
@@ -80,11 +80,10 @@
 ```
 ┌───────────────────────────────────────────────────┐
 │                 packs/default/breeds/               │
-│   bianmu.json  zhonghuatianyuanquan.json  zangao.json │
-│   xigou.json   jinmao.json              demu.json      │
-│          (纯数据，用户可创建/修改/热加载)              │
+│   dog-template.json (单文件：纯数据，用户可创建/       │
+│   修改/热加载；role_templates + breeds 同文件)         │
 └──────────────────────┬────────────────────────────┘
-                       │ LoadFromDir / POST API
+                       │ LoadFromFile / POST API
                        ▼
 ┌───────────────────────────────────────────────────┐
 │              internal/platform/ (组合根)             │
@@ -256,26 +255,6 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 | Hooks 内容充实 | D/L 系列 hook 模板补充实质内容 | clowder-ai prompt-hooks | 进行中 |
 | RAG 按需检索 | MCP `search_knowledge` tool → RAG store → agent 按需查询 | domains/memory/（按需，非默认前置） | 规划中 |
 | SOP 基础门禁 | SOPGuardian 接入执行流（review 触发、安全检查） | 五轴风险路由（简化版） | 规划中 |
-
-### 设计决策 — 评估为不需要
-
-基于 clowder-ai 架构调研：
-
-| 项 | clowder-ai 有做？ | 为什么不需要 |
-|----|-------------------|-------------|
-| 调用队列/跟踪/调和 | 复杂的调用系统 | ProcessManager + ProcessRegistry 已覆盖 spawn/跟踪/僵尸防御 |
-| 多 mention 状态机 | 否 — 仅 @mention 路由 | 我们的 @mention + 串行/并行已对齐 |
-| 上下文评估路由 | 否 | clowder-ai 不做基于上下文的路由 |
-| 路由护栏 | 否 | clowder-ai 没有路由护栏 |
-| A2A 交接/压缩 | 否 — @mention 在共享 thread 通信 | A2A Hub 是空壳；@mention 才是模式 |
-| 知识图谱 | 否 | 过度工程 |
-| 语义重排 | 否 | 过度工程 |
-| 反思/蒸馏 | 否 | 过度工程 |
-| 富消息（音频/卡片/画廊） | 否 | 纯文本足够 |
-| MCP server 桥接（50+ 工具） | 仅注册表 | 注册表暂时够用 |
-| 调度器 | 否 | 过度工程 |
-| 连接器网关 | 否 | 过度工程 |
-| 遥测 | 否 | 暂不需要 |
 
 ## Security Audit（安全扫描）
 

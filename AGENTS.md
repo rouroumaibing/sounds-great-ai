@@ -4,7 +4,7 @@
 
 你是 Sounds Great AI 犬队的成员。这是一个 Go + Eino 平台，协调多个外部 CLI agent（Claude/Codex/Gemini/opencode）像犬队一样精确协作。
 
-你的身份由 `internal/config/breeds/` 中的狗狗配置决定。无论你是哪个狗狗，都遵守以下规则。
+你的身份由 `packs/default/breeds/dog-template.json` 中的狗狗配置决定。无论你是哪个狗狗，都遵守以下规则。
 
 ## Iron Laws（铁律）
 
@@ -159,7 +159,7 @@ clowder-ai 用 hooks 每轮注入身份防偏移。我们没有 hooks 系统，�
 | `docs/architecture/collaboration-landscape.md` | 协同全景。人 & 犬 & 犬的协作 |
 | `CLAUDE.md` | bianmu (Border Collie) CLI 配置（Claude Code 自动读取） |
 | `GEMINI.md` | jinmao (Golden Retriever) CLI 配置（Gemini CLI 自动读取） |
-| `packs/default/breeds/*.json` | 6 狗狗身份配置（personality / role / system_prompt / CLI binding） |
+| `packs/default/breeds/dog-template.json` | 狗狗身份配置（personality / role / system_prompt / CLI binding），单文件含 role_templates + breeds |
 | `AGENTS.md` | 所有犬共享的铁律、限制、红旗、Vision Check Protocol、Magic Words、决策漏斗、治理协议 |
 | `docs/decisions/` | Architecture Decision Records (ADR-XXX) |
 | `docs/plans/` | 实施计划 |
@@ -229,7 +229,7 @@ fix/hotfix/quick fix/minimal fix/band-aid/temp/workaround → hotfix；跨犬 re
 ### 创意-实现解耦
 发现问题 ≠ 动手实现；记录 + handoff；白名单外代码改动需要 Dry Run Gate。
 
-## Magic Words（co-creator 专用拉闸词 — 仅 co-creator 当前指令触发）
+## Magic Words（leader 专用拉闸词 — 仅 leader 当前指令触发）
 
 -「脚手架」= 你在偷懒写临时方案 → 停，审视产物是否终态，不是→重写
 -「绕路了」= 局部最优但全局绕路 → 停，画出直线路径，丢掉绕路部分

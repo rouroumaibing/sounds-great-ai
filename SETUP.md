@@ -54,4 +54,4 @@ See `docs/cli.md` for installing and configuring Claude Code, Gemini CLI, Codex,
 
 - **Port already in use**: Change port with `--port` flag
 - **CLI not found**: Ensure CLI tools are installed globally (see `docs/cli.md`)
-- **Breed config not loading**: Check `packs/default/breeds/*.json` syntax
+- **Breed config not loading**: Check `packs/default/breeds/dog-template.json` syntax

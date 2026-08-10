@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"sounds-great-ai/internal/config"
@@ -65,7 +66,7 @@ func (h *ConfigHandler) SetDefaultBreed(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if body.BreedID != "" {
-		breeds, _ := h.breedLoader.LoadFromDir(h.breedsDir)
+		breeds, _ := h.breedLoader.LoadFromFile(filepath.Join(h.breedsDir, "dog-template.json"))
 		if _, ok := breeds[body.BreedID]; !ok {
 			respondJSON(w, http.StatusNotFound, map[string]string{"error": "breed not found"})
 			return
@@ -86,7 +87,7 @@ func (h *ConfigHandler) GetBreedOrder(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	breeds, _ := h.breedLoader.LoadFromDir(h.breedsDir)
+	breeds, _ := h.breedLoader.LoadFromFile(filepath.Join(h.breedsDir, "dog-template.json"))
 	order := make([]string, 0, len(breeds))
 	for id := range breeds {
 		order = append(order, id)
@@ -102,7 +103,7 @@ func (h *ConfigHandler) SetBreedOrder(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-	breeds, _ := h.breedLoader.LoadFromDir(h.breedsDir)
+	breeds, _ := h.breedLoader.LoadFromFile(filepath.Join(h.breedsDir, "dog-template.json"))
 	var missing []string
 	for _, id := range body.Order {
 		if _, ok := breeds[id]; !ok {

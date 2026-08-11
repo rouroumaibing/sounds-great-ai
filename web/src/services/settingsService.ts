@@ -146,7 +146,7 @@ export const settingsService = {
     return mapAccountApiToUi(data);
   },
 
-  async addAccountFull(account: Omit<SettingsAccount, 'id'>): Promise<SettingsAccount> {
+  async addAccountFull(account: Omit<SettingsAccount, 'id'>, apiKey?: string): Promise<SettingsAccount> {
     const data = await apiPost<SettingsAccountApi>('/api/settings/accounts', {
       name: account.name,
       provider: account.name,
@@ -159,11 +159,12 @@ export const settingsService = {
       auth_type: account.authType,
       mode: account.mode,
       builtin: account.builtin,
+      ...(apiKey ? { api_key: apiKey } : {}),
     });
     return mapAccountApiToUi(data);
   },
 
-  async updateAccount(id: string, updates: Partial<SettingsAccount>): Promise<void> {
+  async updateAccount(id: string, updates: Partial<SettingsAccount>, apiKey?: string): Promise<void> {
     const body: Record<string, unknown> = {};
     if (updates.name !== undefined) body.name = updates.name;
     if (updates.clientId !== undefined) body.client_id = updates.clientId;
@@ -175,6 +176,7 @@ export const settingsService = {
     if (updates.authType !== undefined) body.auth_type = updates.authType;
     if (updates.mode !== undefined) body.mode = updates.mode;
     if (updates.builtin !== undefined) body.builtin = updates.builtin;
+    if (apiKey !== undefined && apiKey !== '') body.api_key = apiKey;
     await apiPatch(`/api/settings/accounts/${id}`, body);
   },
 

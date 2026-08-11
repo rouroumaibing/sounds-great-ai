@@ -8,18 +8,69 @@ import { useSettings } from '../../hooks/useSettings';
 import { useBreeds } from '../../hooks/useBreeds';
 import { useLeaderConfig } from '../../hooks/useLeaderConfig';
 import { settingsService } from '../../services/settingsService';
-import { FilterChips } from './FilterChips';
 import { HubBreedEditor } from './HubBreedEditor';
 import { HubLeaderEditor } from './HubLeaderEditor';
-import { MemberCard } from './MemberCard';
 import type { SettingsMember } from '../../types';
+import {
+  SettingsBadge,
+  SettingsRow,
+  SettingsPrimaryButton,
+  SettingsStatusStrip,
+  SettingsFilterTabs,
+  SettingsText,
+  SettingsIconButton,
+  SettingsToggleSwitch,
+} from './primitives';
 
-  const _t3 = useI18n.getState().t;
-  const memberFilterChips = [
-    { id: 'all', label: _t3('members.all'), activeClass: 'bg-amber-500/20 border-amber-500/40 text-amber-300' },
-    { id: 'enabled', label: _t3('members.enabled'), activeClass: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' },
-    { id: 'disabled', label: _t3('members.disabled'), activeClass: 'bg-slate-800 border-slate-700 text-slate-300' },
-  ];
+// ---------------------------------------------------------------------------
+// Mirrors clowder-ai's member management page (config-viewer-tabs.tsx →
+// CatOverviewTab + HubMemberOverviewCard / HubCoCreatorOverviewCard /
+// DefaultCatSelector / HubOverviewToolbar). The layout is reproduced 1:1:
+//   toolbar (filter tabs + add) → global default dog → leader card →
+//   draggable member rows → disabled section.
+// The data source is the dog platform's own member/breed/leader stores.
+// ---------------------------------------------------------------------------
+
+const RUNTIME_LABELS: Record<string, string> = {
+  claude: 'Claude',
+  codex: 'Codex',
+  gemini: 'Gemini',
+  kimi: 'Kimi',
+  opencode: 'OpenCode',
+};
+
+const OAUTH_REFS = new Set(['claude', 'codex', 'gemini', 'kimi', 'opencode']);
+
+function runtimeLabel(clientId?: string): string {
+  if (!clientId) return '';
+  return RUNTIME_LABELS[clientId] ?? clientId;
+}
+
+function accountSummary(m: SettingsMember): string {
+  const ref = m.accountRef?.trim() ?? '';
+  if (!ref) return '';
+  if (OAUTH_REFS.has(ref.toLowerCase())) return 'CLI（OAuth）账号';
+  return `CLI（配置） · ${ref}`;
+}
+
+function memberMetaSummary(m: SettingsMember): string {
+  const rt = runtimeLabel(m.clientId) || m.provider || '';
+  return [rt, m.defaultModel ?? m.model, accountSummary(m)].filter(Boolean).join(' · ');
+}
+
+function isOauthMember(m: SettingsMember): boolean {
+  const ref = m.accountRef?.trim().toLowerCase() ?? '';
+  return ref !== '' && OAUTH_REFS.has(ref);
+}
+
+function formatMentionPreview(patterns?: string[], max = 3): string {
+  if (!patterns || patterns.length === 0) return '';
+  const visible = patterns.slice(0, max);
+  const rest = patterns.length - visible.length;
+  return rest > 0 ? `${visible.join(' ')}  +${rest}` : visible.join(' ');
+}
+
+// --- breed <-> member mapping (kept from the previous implementation) -------
 
 function memberToBreed(m: SettingsMember): BreedConfig {
   return {
@@ -57,6 +108,236 @@ function breedToMemberUpdates(b: BreedConfig): Partial<SettingsMember> {
   };
 }
 
+const MEMBER_FILTER_TABS = [
+  { key: 'all', label: '全部' },
+  { key: 'enabled', label: '已启用' },
+  { key: 'disabled', label: '已停用' },
+  { key: 'oauth', label: 'CLI（OAuth）' },
+  { key: 'config', label: 'CLI（配置）' },
+];
+
+// ---------------------------------------------------------------------------
+// Sub-components (mirror clowder's Hub*OverviewCard family)
+// ---------------------------------------------------------------------------
+
+function LeaderOverviewCard({ leader, onClick }: { leader: import('../../hooks/useLeaderConfig').LeaderConfig; onClick: () => void }) {
+  const { t } = useI18n();
+  const primary = leader.colorPrimary ?? '#6366f1';
+  const aliases = leader.aliases?.join(' · ') || 'Owner';
+  const mentions = leader.mentionPatterns?.join(' ') || '';
+  const initial = (leader.name?.[0] ?? 'Y').toUpperCase();
+
+  return (
+    <SettingsRow
+      icon={
+        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl text-xs font-bold text-white shadow" style={{ backgroundColor: primary }}>
+          {leader.avatar && leader.avatar.length <= 2 ? leader.avatar : initial}
+        </div>
+      }
+      title={leader.name || 'You'}
+      badges={
+        <SettingsBadge tone="amber" className="inline-flex items-center gap-1">
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+          </svg>
+          Owner
+        </SettingsBadge>
+      }
+      meta={
+        <>
+          <span>{t('members.aliases')} {aliases} · {t('members.ownerNote')}</span>
+          {mentions && (
+            <span className="mt-0.5 block" style={{ color: primary }}>{mentions}</span>
+          )}
+        </>
+      }
+      onClick={onClick}
+    />
+  );
+}
+
+function MemberOverviewCard({
+  member: m,
+  onEdit,
+  onToggle,
+  onDelete,
+  toggling = false,
+  draggable = false,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  isDragging = false,
+}: {
+  member: SettingsMember;
+  onEdit: (m: SettingsMember) => void;
+  onToggle: (m: SettingsMember) => void;
+  onDelete: (m: SettingsMember) => void;
+  toggling?: boolean;
+  draggable?: boolean;
+  onDragStart?: (m: SettingsMember, e: ReactDragEvent<HTMLElement>) => void;
+  onDragOver?: (m: SettingsMember, e: ReactDragEvent<HTMLElement>) => void;
+  onDrop?: (m: SettingsMember, e: ReactDragEvent<HTMLElement>) => void;
+  onDragEnd?: (m: SettingsMember, e: ReactDragEvent<HTMLElement>) => void;
+  isDragging?: boolean;
+}) {
+  const title = [m.breed || m.name, m.nickname].filter(Boolean).join(' · ');
+  const mentionPreview = formatMentionPreview(m.mentionPatterns);
+  const connectionBadge = isOauthMember(m) ? (
+    <SettingsBadge tone="blue" size="xxs" className="ml-1.5 inline-block">OAuth</SettingsBadge>
+  ) : m.accountRef ? (
+    <SettingsBadge tone="slate" size="xxs" className="ml-1.5 inline-block">{m.accountRef}</SettingsBadge>
+  ) : m.provider ? (
+    <SettingsBadge tone="slate" size="xxs" className="ml-1.5 inline-block">{m.provider}</SettingsBadge>
+  ) : null;
+
+  return (
+    <SettingsRow
+      data-testid={`member-card-${m.id}`}
+      draggable={draggable}
+      onDragStart={draggable ? (e) => onDragStart?.(m, e) : undefined}
+      onDragOver={draggable ? (e) => onDragOver?.(m, e) : undefined}
+      onDrop={draggable ? (e) => onDrop?.(m, e) : undefined}
+      onDragEnd={draggable ? (e) => onDragEnd?.(m, e) : undefined}
+      onClick={() => onEdit(m)}
+      isDragging={isDragging}
+      dragHandle={
+        draggable ? (
+          <span aria-hidden="true" title="拖动排序" className="select-none leading-none text-lg">⠿</span>
+        ) : undefined
+      }
+      icon={
+        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl text-xs font-bold text-white shadow" style={{ backgroundColor: m.colorPrimary ?? m.color }}>
+          {m.avatar && m.avatar.length <= 2 ? m.avatar : <i className={m.icon}></i>}
+        </div>
+      }
+      title={title}
+      meta={
+        <>
+          <span>
+            <SettingsText tone="muted" className="mr-1.5 font-mono text-micro">{m.id}</SettingsText>
+            {memberMetaSummary(m)}
+            {connectionBadge}
+          </span>
+          <span className="mt-0.5 flex flex-wrap items-center gap-2">
+            {mentionPreview && <SettingsText tone="purple">{mentionPreview}</SettingsText>}
+            <SettingsBadge tone={m.sessionChain ? 'emerald' : 'slate'} size="xxs" className="inline-block">
+              {m.sessionChain ? 'Session Chain 已开启' : 'Session Chain 未开启'}
+            </SettingsBadge>
+          </span>
+        </>
+      }
+      badges={<SettingsBadge tone={m.enabled ? 'emerald' : 'slate'}>{m.enabled ? '已启用' : '已停用'}</SettingsBadge>}
+      actions={
+        <>
+          <SettingsToggleSwitch
+            enabled={m.enabled}
+            busy={toggling}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(m);
+            }}
+            title={m.enabled ? '停用成员' : '启用成员'}
+            ariaLabel={m.enabled ? '停用成员' : '启用成员'}
+          />
+          <SettingsIconButton
+            tone="danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(m);
+            }}
+            title="删除成员"
+            aria-label="删除成员"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+          </SettingsIconButton>
+        </>
+      }
+      tone={m.enabled ? 'active' : 'inactive'}
+    />
+  );
+}
+
+function DefaultDogSelector({
+  breeds,
+  currentDefaultDogId,
+  onSelect,
+  isLoading,
+  fetchError,
+  saveError,
+  onRetry,
+}: {
+  breeds: BreedConfig[];
+  currentDefaultDogId: string;
+  onSelect: (id: string) => void;
+  isLoading?: boolean;
+  fetchError?: boolean;
+  saveError?: string | null;
+  onRetry?: () => void;
+}) {
+  const { t } = useI18n();
+  const currentBreed = breeds.find((b) => b.id === currentDefaultDogId);
+  const valueInList = currentDefaultDogId && breeds.some((b) => b.id === currentDefaultDogId);
+  const dotColor = currentBreed?.color?.primary ?? '#6366f1';
+
+  return (
+    <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 p-4 shadow-sm">
+      {fetchError && (
+        <div className="mb-3 flex items-center gap-2 text-xs text-amber-300">
+          <span>加载失败，当前默认犬未知</span>
+          {onRetry && (
+            <button type="button" onClick={onRetry} className="font-medium underline hover:text-amber-200">
+              重试
+            </button>
+          )}
+        </div>
+      )}
+      {saveError && (
+        <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">{saveError}</div>
+      )}
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-bold text-slate-100">{t('members.globalDefault')}</h3>
+          <p className="mt-0.5 text-xs text-slate-400">{t('members.globalDefaultHint')}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {currentBreed && (
+            <span className="h-3 w-3 flex-shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
+          )}
+          <select
+            value={valueInList ? currentDefaultDogId : ''}
+            disabled={isLoading}
+            onChange={(e) => onSelect(e.target.value)}
+            className={`h-[34px] w-[220px] rounded-[10px] border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 ${isLoading ? 'cursor-wait opacity-50' : 'cursor-pointer'}`}
+          >
+            {!valueInList && (
+              <option value="" disabled>
+                {currentDefaultDogId ? t('members.selectDefault') : t('members.selectDefault')}
+              </option>
+            )}
+            {breeds.map((b) => (
+              <option key={b.id} value={b.id}>{b.name} · {b.display_name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
+function reorderIds(ids: string[], srcId: string, targetId: string): string[] {
+  const withoutSrc = ids.filter((id) => id !== srcId);
+  const targetIdx = withoutSrc.indexOf(targetId);
+  if (targetIdx < 0) return ids;
+  return [...withoutSrc.slice(0, targetIdx), srcId, ...withoutSrc.slice(targetIdx)];
+}
+
 export function MemberManagement() {
   const { t } = useI18n();
   const memberFilter = useAppStore((s) => s.memberFilter);
@@ -70,6 +351,7 @@ export function MemberManagement() {
   const { members, loading, addMember, toggleMemberEnabled, deleteMember, refetch } = useSettings();
   const { breeds, error: breedsError, refetch: refetchBreeds } = useBreeds();
   const { leader, updateLeader } = useLeaderConfig();
+
   const [editingMember, setEditingMember] = useState<SettingsMember | null>(null);
   const [confirmDisable, setConfirmDisable] = useState<SettingsMember | null>(null);
   const [showLeaderEditor, setShowLeaderEditor] = useState(false);
@@ -77,6 +359,7 @@ export function MemberManagement() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [localMembers, setLocalMembers] = useState<SettingsMember[]>(members);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragError, setDragError] = useState<string | null>(null);
 
   useEffect(() => { setLocalMembers(members); }, [members]);
 
@@ -110,7 +393,7 @@ export function MemberManagement() {
 
   const handleToggleEnabled = async (m: SettingsMember) => {
     if (m.enabled) {
-      const dependents = members.filter(x => x.id !== m.id && x.breed === m.breed && x.enabled);
+      const dependents = members.filter((x) => x.id !== m.id && x.breed === m.breed && x.enabled);
       if (dependents.length > 0) {
         setConfirmDisable(m);
         return;
@@ -128,8 +411,9 @@ export function MemberManagement() {
 
   const handleDefaultDogChange = async (id: string) => {
     setSaveError(null);
+    const target = members.find((x) => x.id === id);
     try {
-      await settingsService.updateMember(id, { enabled: true }).catch(() => {});
+      if (target && !target.enabled) await toggleMemberEnabled(id, true);
       setGlobalDefaultDog(id);
     } catch {
       setSaveError(t('members.saveDefaultFailed'));
@@ -146,83 +430,65 @@ export function MemberManagement() {
   };
   const onDrop = (target: SettingsMember, e: ReactDragEvent<HTMLElement>) => {
     e.preventDefault();
-    if (!draggedId || draggedId === target.id) { setDraggedId(null); return; }
-    setLocalMembers((prev) => {
-      const enabled = prev.filter((m) => m.enabled);
-      const fromIdx = enabled.findIndex((m) => m.id === draggedId);
-      const toIdx = enabled.findIndex((m) => m.id === target.id);
-      if (fromIdx === -1 || toIdx === -1) return prev;
-      const reordered = [...enabled];
-      const [moved] = reordered.splice(fromIdx, 1);
-      reordered.splice(toIdx, 0, moved);
-      const reorderedIds = new Set(reordered.map((m) => m.id));
-      const disabled = prev.filter((m) => !m.enabled);
-      const enabledOrdered = reordered.filter((m) => reorderedIds.has(m.id));
-      return [...enabledOrdered, ...disabled];
-    });
+    const srcId = draggedId ?? e.dataTransfer.getData('text/plain') ?? '';
     setDraggedId(null);
+    if (!srcId || srcId === target.id) return;
+    setLocalMembers((prev) => {
+      const currentIds = prev.filter((m) => m.enabled).map((m) => m.id);
+      const next = reorderIds(currentIds, srcId, target.id);
+      if (next.length === 0) return prev;
+      const reorderedEnabled = next.map((id) => prev.find((m) => m.id === id)!).filter(Boolean);
+      const disabled = prev.filter((m) => !m.enabled);
+      return [...reorderedEnabled, ...disabled];
+    });
+    setDragError(null);
   };
   const onDragEnd = () => setDraggedId(null);
 
-  const showEnabled = memberFilter === 'all' || memberFilter === 'enabled';
+  const showEnabled = memberFilter === 'all' || memberFilter === 'enabled' || memberFilter === 'oauth' || memberFilter === 'config';
   const showDisabled = memberFilter === 'all' || memberFilter === 'disabled';
-  const selectedBreed = breeds.find((b) => b.id === globalDefaultDog);
-  const breedColor = selectedBreed?.color?.primary ?? '#6366f1';
+  const visibleEnabled = enabledMembers.filter((m) => {
+    if (memberFilter === 'oauth') return isOauthMember(m);
+    if (memberFilter === 'config') return !isOauthMember(m);
+    return true;
+  });
 
   return (
-    <div className="max-w-5xl mx-auto w-full space-y-6">
-      <div className="flex items-start justify-between border-b border-slate-800/80 pb-5">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2"><span>{t('members.title')}</span></h2>
-          <p className="text-xs text-slate-400 mt-1">{t('members.desc')}</p>
-        </div>
-        <button onClick={() => setShowAddMemberModal(true)} className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center gap-2 transition shadow-lg shadow-amber-600/20">
-          <i className="fa-solid fa-plus"></i><span>{t('members.add')}</span>
-        </button>
+    <div className="max-w-5xl mx-auto w-full space-y-4">
+      {/* toolbar: filter tabs + add member */}
+      <div className="flex items-center justify-between gap-3">
+        <SettingsFilterTabs
+          tabs={MEMBER_FILTER_TABS}
+          activeKey={memberFilter}
+          onTabChange={(key) => setMemberFilter(key as MemberFilterType)}
+        />
+        <SettingsPrimaryButton onClick={() => setShowAddMemberModal(true)}>
+          + {t('members.add')}
+        </SettingsPrimaryButton>
       </div>
 
-      <LeaderCard leader={leader} onClick={() => setShowLeaderEditor(true)} />
+      {/* global default dog */}
+      <DefaultDogSelector
+        breeds={breeds}
+        currentDefaultDogId={globalDefaultDog}
+        onSelect={handleDefaultDogChange}
+        isLoading={loading}
+        fetchError={Boolean(breedsError)}
+        saveError={saveError}
+        onRetry={() => refetchBreeds()}
+      />
 
-      <FilterChips chips={memberFilterChips} activeFilter={memberFilter} onFilterChange={(f) => setMemberFilter(f as MemberFilterType)} />
+      {/* leader / owner card (clowder's HubCoCreatorOverviewCard) */}
+      {leader && <LeaderOverviewCard leader={leader} onClick={() => setShowLeaderEditor(true)} />}
 
-      <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between shadow-sm">
-        <div>
-          <h4 className="text-xs font-bold text-slate-200">{t('members.globalDefault')}</h4>
-          <p className="text-[11px] text-slate-400 mt-0.5">{t('members.globalDefaultHint')}</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          {breedsError && (
-            <span className="text-[10px] text-amber-400 flex items-center gap-1">
-              {t('common.error')}
-              <button onClick={() => refetchBreeds()} className="underline hover:text-amber-300">{t('common.retry')}</button>
-            </span>
-          )}
-          {saveError && <span className="text-[10px] text-rose-400">{saveError}</span>}
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: breedColor }}></span>
-          <select
-            value={globalDefaultDog}
-            onChange={(e) => handleDefaultDogChange(e.target.value)}
-            className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-amber-500 font-medium"
-          >
-            {breeds.length === 0 && <option value="" disabled>{t('members.selectDefault')}</option>}
-            {breeds.map(b => (
-              <option key={b.id} value={b.id}>{b.name} · {b.display_name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      {/* drag error */}
+      {dragError && <SettingsStatusStrip tone="error">{dragError}</SettingsStatusStrip>}
 
-      {loading && <div className="text-center text-slate-500 text-xs py-8">{t('common.loading')}</div>}
-
-      {!loading && localMembers.length === 0 && (
-        <div className="text-center text-slate-500 text-xs py-12">{t('members.notFound')}</div>
-      )}
-
-      {showEnabled && enabledMembers.length > 0 && (
+      {/* enabled members */}
+      {showEnabled && (
         <div className="space-y-3">
-          <p className="text-[11px] text-slate-500">{t('members.dragHint')}</p>
-          {enabledMembers.map((m) => (
-            <MemberCard
+          {visibleEnabled.map((m) => (
+            <MemberOverviewCard
               key={m.id}
               member={m}
               onEdit={(mm) => setEditingMember(mm)}
@@ -240,11 +506,21 @@ export function MemberManagement() {
         </div>
       )}
 
+      {/* loading / empty states */}
+      {loading && <SettingsStatusStrip tone="muted">{t('common.loading')}</SettingsStatusStrip>}
+      {!loading && localMembers.length === 0 && (
+        <SettingsStatusStrip tone="muted">{t('members.notFound')}</SettingsStatusStrip>
+      )}
+
+      {/* drag hint */}
+      <SettingsStatusStrip tone="muted">{t('members.dragHint')}</SettingsStatusStrip>
+
+      {/* disabled members */}
       {showDisabled && disabledMembers.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2">{t('members.disabledSection')}</h4>
+          <SettingsStatusStrip tone="muted">{t('members.disabledSection')}</SettingsStatusStrip>
           {disabledMembers.map((m) => (
-            <MemberCard
+            <MemberOverviewCard
               key={m.id}
               member={m}
               onEdit={(mm) => setEditingMember(mm)}
@@ -256,60 +532,32 @@ export function MemberManagement() {
         </div>
       )}
 
+      {/* modals */}
       {showAddMemberModal && <HubBreedEditor onSave={handleSaveBreed} onClose={() => setShowAddMemberModal(false)} />}
       {editingMember && <HubBreedEditor breed={memberToBreed(editingMember)} onSave={handleSaveBreed} onClose={() => setEditingMember(null)} />}
       {showLeaderEditor && <HubLeaderEditor leader={leader} onSave={updateLeader} onClose={() => setShowLeaderEditor(false)} />}
 
+      {/* confirm disable (dependency check) */}
       {confirmDisable && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <h3 className="text-sm font-bold text-amber-300">{t('members.disableCheck')}</h3>
-            <p className="text-xs text-slate-400">{t('members.disableWarning').replace('{breed}', confirmDisable.breed)}</p>
-            <div className="flex justify-end space-x-2">
-              <button onClick={() => setConfirmDisable(null)} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">{t('common.cancel')}</button>
-              <button onClick={() => { toggleMemberEnabled(confirmDisable.id, false); setConfirmDisable(null); }} className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold">{t('members.confirmDisable')}</button>
+            <p className="mt-2 text-xs text-slate-400">{t('members.disableWarning').replace('{breed}', confirmDisable.breed)}</p>
+            <div className="mt-4 flex justify-end space-x-2">
+              <button onClick={() => setConfirmDisable(null)} className="rounded-xl bg-slate-800 px-4 py-2 text-xs text-slate-300 hover:bg-slate-700">{t('common.cancel')}</button>
+              <button
+                onClick={() => {
+                  toggleMemberEnabled(confirmDisable.id, false);
+                  setConfirmDisable(null);
+                }}
+                className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-500"
+              >
+                {t('members.confirmDisable')}
+              </button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function LeaderCard({ leader, onClick }: { leader: import('../../hooks/useLeaderConfig').LeaderConfig; onClick: () => void }) {
-  const { t } = useI18n();
-  const primary = leader.colorPrimary ?? '#6366f1';
-  const aliases = leader.aliases?.join(' · ') || 'Owner';
-  const mentions = leader.mentionPatterns?.join(' ') || '';
-  const initial = (leader.name?.[0] ?? 'Y').toUpperCase();
-
-  return (
-    <div
-      onClick={onClick}
-      className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-800/50 flex items-center justify-between shadow-sm cursor-pointer hover:border-indigo-700/60 transition group"
-    >
-      <div className="flex items-center space-x-3 min-w-0">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 shadow" style={{ backgroundColor: primary }}>
-          {leader.avatar && leader.avatar.length <= 2 ? leader.avatar : initial}
-        </div>
-        <div className="space-y-1 truncate">
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold text-slate-100">{leader.name || 'You'}</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold inline-flex items-center gap-1">
-              <i className="fa-solid fa-lock text-[8px]"></i>Owner
-            </span>
-          </div>
-          <div className="text-[11px] font-mono text-slate-400 truncate">
-            {t('members.aliases')} {aliases}
-          </div>
-          {mentions && (
-            <div className="text-[10px] font-mono text-purple-400 font-medium truncate">{mentions}</div>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center shrink-0 pl-3 border-l border-slate-800/80">
-        <i className="fa-solid fa-chevron-right text-xs text-slate-600 group-hover:text-slate-400 transition"></i>
-      </div>
     </div>
   );
 }

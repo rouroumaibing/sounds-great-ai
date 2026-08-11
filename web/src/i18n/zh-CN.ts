@@ -12,10 +12,10 @@ export const zhCN: Record<string, string> = {
 
   // PrimaryNav
   'nav.threads': '线程与对话',
-  'nav.agents': '狗狗特工队',
   'nav.tasks': '任务编排',
   'nav.memory': '共享记忆',
   'nav.settings': '系统配置',
+  'nav.about': '关于',
 
   // Settings sections
   'settings.members': '成员管理',
@@ -91,6 +91,10 @@ export const zhCN: Record<string, string> = {
   'personas.coverage': '启用覆盖率',
   'personas.dogs': '只狗狗',
   'personas.providers': '个模型供应商',
+  'personas.models': '个模型',
+  'personas.routingSignals': '路由信号',
+  'personas.peak': '擅长任务',
+  'personas.anti': '不建议派给',
   'personas.expandAll': '全部展开',
   'personas.collapseAll': '全部收起',
   'personas.empty': '暂无狗狗画像数据',
@@ -102,6 +106,18 @@ export const zhCN: Record<string, string> = {
   'personas.unknownModel': '未知模型',
   'personas.dogUnit': '只',
   'personas.enabledUnit': '启用',
+  'personas.title': '狗狗画像',
+  'personas.subtitle': '按模型分组的狗狗能力画像与路由信号',
+  'personas.groupByModel': '按模型分组',
+  'personas.groupByModelDesc': '画像描述的是模型认知能力，每只狗狗是模型的一个实例化引用。',
+  'personas.dogsWithProfile': '只狗狗有画像数据',
+  'breedEditor.dogId': 'Dog ID',
+  'breedEditor.variantLabel': '显示后缀',
+  'breedEditor.voice': '语音配置',
+  'breedEditor.voiceName': '语音名称',
+  'breedEditor.voiceLang': '语言代码',
+  'breedEditor.voiceSpeed': '语速',
+  'breedEditor.voiceRefAudio': '参考音频 URL',
 
   // Accounts
   'accounts.create': '新增账户认证',
@@ -138,6 +154,8 @@ export const zhCN: Record<string, string> = {
   'members.all': '全部',
   'members.enabled': '已启用',
   'members.disabled': '已停用',
+  'members.oauth': 'CLI（OAuth）',
+  'members.ownerNote': '只能编辑，不能新增或删除',
   'members.saved': '成员已保存',
   'members.saveFailed': '保存成员失败',
   'members.confirmDelete': '确认删除成员「{name}」？此操作不可撤销。',
@@ -267,6 +285,8 @@ export const zhCN: Record<string, string> = {
   'breedEditor.editDog': '编辑狗狗',
   'breedEditor.createDog': '创建狗狗',
   'breedEditor.memberTemplate': '成员模板',
+  'breedEditor.templateHint': '从内置成员模板开始，选择后自动填充身份、模型与运行时默认值。',
+  'breedEditor.createHint': '首次安装默认只启用一个品种；可在成员管理继续添加其他成员。',
   'breedEditor.custom': '自定义',
   'breedEditor.identityInfo': '身份信息',
   'breedEditor.accountBinding': '账户绑定',
@@ -413,6 +433,7 @@ export const zhCN: Record<string, string> = {
   'marketplace.title': '能力市场',
   'marketplace.desc': '搜索和安装 MCP 服务、Skill、Plugin 与狗狗配置。',
   'marketplace.installed': '已安装 ({count})',
+  'marketplace.installedShort': '已安装',
   'marketplace.searchPlaceholder': '搜索包名或描述...',
   'marketplace.installs': '次安装',
   'marketplace.alreadyInstalled': '已安装',
@@ -478,14 +499,10 @@ export const zhCN: Record<string, string> = {
   // Workspace - CommandBar
   'workspace.commandBar.connected': '已连接',
   'workspace.commandBar.disconnected': '未连接',
-  'workspace.commandBar.placeholder': '向狗狗特工队下发 CVO 指令... (Shift+Enter 换行, @ 唤起上下文)',
+  'workspace.commandBar.placeholder': '下发 CVO 指令... (Shift+Enter 换行, @ 唤起上下文)',
   'workspace.commandBar.connecting': '正在连接 WebSocket...',
   'workspace.commandBar.generating': '生成中',
   'workspace.commandBar.send': '发送',
-
-  // Agents - DogPackGrid
-  'agents.loading': '加载中...',
-  'agents.error': '加载失败',
 
   // Common - ContextMenu
   'contextMenu.fileOps': '文件操作菜单',

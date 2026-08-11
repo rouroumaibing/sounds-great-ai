@@ -12,10 +12,10 @@ export const en: Record<string, string> = {
 
   // PrimaryNav
   'nav.threads': 'Threads & Conversations',
-  'nav.agents': 'Dog Pack',
   'nav.tasks': 'Task Plans',
   'nav.memory': 'Shared Memory',
   'nav.settings': 'System Config',
+  'nav.about': 'About',
 
   // Settings sections
   'settings.members': 'Members',
@@ -91,6 +91,10 @@ export const en: Record<string, string> = {
   'personas.coverage': 'Enabled coverage',
   'personas.dogs': 'dogs',
   'personas.providers': 'model providers',
+  'personas.models': 'models',
+  'personas.routingSignals': 'Routing signals',
+  'personas.peak': 'Good at',
+  'personas.anti': 'Avoid assigning',
   'personas.expandAll': 'Expand all',
   'personas.collapseAll': 'Collapse all',
   'personas.empty': 'No dog profile data',
@@ -102,6 +106,18 @@ export const en: Record<string, string> = {
   'personas.unknownModel': 'Unknown model',
   'personas.dogUnit': '',
   'personas.enabledUnit': 'enabled',
+  'personas.title': 'Dog Profiles',
+  'personas.subtitle': 'Model-grouped dog capability profiles and routing signals',
+  'personas.groupByModel': 'Grouped by model',
+  'personas.groupByModelDesc': 'Profiles describe model capabilities; each dog is an instantiation reference of a model.',
+  'personas.dogsWithProfile': 'dogs have profile data',
+  'breedEditor.dogId': 'Dog ID',
+  'breedEditor.variantLabel': 'Display suffix',
+  'breedEditor.voice': 'Voice config',
+  'breedEditor.voiceName': 'Voice name',
+  'breedEditor.voiceLang': 'Language code',
+  'breedEditor.voiceSpeed': 'Speed',
+  'breedEditor.voiceRefAudio': 'Reference audio URL',
 
   // Accounts
   'accounts.create': 'Add Account',
@@ -138,6 +154,8 @@ export const en: Record<string, string> = {
   'members.all': 'All',
   'members.enabled': 'Enabled',
   'members.disabled': 'Disabled',
+  'members.oauth': 'CLI (OAuth)',
+  'members.ownerNote': 'Editable only — cannot be added or deleted',
   'members.saved': 'Member saved',
   'members.saveFailed': 'Failed to save member',
   'members.confirmDelete': 'Confirm delete member "{name}"? This cannot be undone.',
@@ -267,6 +285,8 @@ export const en: Record<string, string> = {
   'breedEditor.editDog': 'Edit Dog',
   'breedEditor.createDog': 'Create Dog',
   'breedEditor.memberTemplate': 'Member template',
+  'breedEditor.templateHint': 'Start from a built-in member template; selecting one auto-fills identity, model and runtime defaults.',
+  'breedEditor.createHint': 'A single breed is enabled by default on first install; add more members from member management.',
   'breedEditor.custom': 'Custom',
   'breedEditor.identityInfo': 'Identity info',
   'breedEditor.accountBinding': 'Account binding',
@@ -413,6 +433,7 @@ export const en: Record<string, string> = {
   'marketplace.title': 'Marketplace',
   'marketplace.desc': 'Search and install MCP services, Skills, Plugins and dog configs.',
   'marketplace.installed': 'Installed ({count})',
+  'marketplace.installedShort': 'Installed',
   'marketplace.searchPlaceholder': 'Search package name or description...',
   'marketplace.installs': 'installs',
   'marketplace.alreadyInstalled': 'Installed',
@@ -478,14 +499,10 @@ export const en: Record<string, string> = {
   // Workspace - CommandBar
   'workspace.commandBar.connected': 'Connected',
   'workspace.commandBar.disconnected': 'Disconnected',
-  'workspace.commandBar.placeholder': 'Send CVO directive to dog pack... (Shift+Enter for newline, @ for context)',
+  'workspace.commandBar.placeholder': 'Send CVO directive... (Shift+Enter for newline, @ for context)',
   'workspace.commandBar.connecting': 'Connecting WebSocket...',
   'workspace.commandBar.generating': 'Generating',
   'workspace.commandBar.send': 'Send',
-
-  // Agents - DogPackGrid
-  'agents.loading': 'Loading...',
-  'agents.error': 'Load failed',
 
   // Common - ContextMenu
   'contextMenu.fileOps': 'File operations menu',

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Group, Panel, Separator, usePanelRef } from 'react-resizable-panels';
 import { Header } from './components/layout/Header';
 import { PrimaryNav } from './components/layout/PrimaryNav';
@@ -9,6 +9,8 @@ import { ContextMenu } from './components/common/ContextMenu';
 import { ToastContainer } from './components/common/ToastContainer';
 import { StreamTimeline } from './components/workspace/StreamTimeline';
 import { SettingsContent } from './components/settings/SettingsContent';
+
+const AboutPanel = lazy(() => import('./components/settings/AboutPanel').then(m => ({ default: m.AboutPanel })));
 import { useAppStore } from './store/useAppStore';
 import { useChatStore } from './store/useChatStore';
 
@@ -69,10 +71,14 @@ function App() {
           <Panel panelRef={middlePanelRef} id="middle-panel" collapsible collapsedSize="0%" minSize="25%" defaultSize="35%" maxSize="50%" className="h-full">
             <div className="h-full flex flex-col min-h-0 overflow-hidden bg-slate-950">
               <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
-                {activeNav !== 'settings' ? (
-                  <StreamTimeline />
-                ) : (
+                {activeNav === 'settings' ? (
                   <SettingsContent activeSection={activeSettingsTab} />
+                ) : activeNav === 'about' ? (
+                  <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
+                    <AboutPanel />
+                  </Suspense>
+                ) : (
+                  <StreamTimeline />
                 )}
               </main>
             </div>

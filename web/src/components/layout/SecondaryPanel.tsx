@@ -1,7 +1,6 @@
 import { useAppStore } from '../../store/useAppStore';
 import { useThreads } from '../../hooks/useThreads';
 import { ThreadList } from '../threads/ThreadList';
-import { DogPackGrid } from '../agents/DogPackGrid';
 import { SettingsNav } from '../settings/SettingsNav';
 import { MemoryTab } from '../drawer/tabs/MemoryTab';
 
@@ -16,8 +15,6 @@ export function SecondaryPanel() {
   return (
     <div className="w-64 bg-slate-900/60 flex flex-col border-r border-slate-800/60 overflow-hidden">
       {activeNav === 'threads' && <ThreadList />}
-
-      {activeNav === 'agents' && <DogPackGrid />}
 
       {activeNav === 'tasks' && (
         <div className="flex-1 flex flex-col p-3 overflow-y-auto space-y-3">

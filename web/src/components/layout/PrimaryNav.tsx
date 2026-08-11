@@ -47,13 +47,13 @@ export function PrimaryNav() {
       {/* Top Navigation Icons */}
       <div className="flex flex-col items-center space-y-3 w-full px-2">
         <NavButton nav="threads" icon="fa-solid fa-comments" label={t('nav.threads')} activeNav={activeNav} onClick={() => setActiveNav('threads')} badge={hasUnreadEscalation} />
-        <NavButton nav="agents" icon="fa-solid fa-shield-dog" label={t('nav.agents')} activeNav={activeNav} onClick={() => setActiveNav('agents')} />
         <NavButton nav="tasks" icon="fa-solid fa-diagram-project" label={t('nav.tasks')} activeNav={activeNav} onClick={() => setActiveNav('tasks')} />
         <NavButton nav="memory" icon="fa-solid fa-database" label={t('nav.memory')} activeNav={activeNav} onClick={() => setActiveNav('memory')} />
       </div>
 
       {/* Bottom Nav Icons */}
       <div className="flex flex-col items-center space-y-3 w-full px-2">
+        <NavButton nav="about" icon="fa-solid fa-circle-info" label={t('nav.about')} activeNav={activeNav} onClick={() => setActiveNav('about')} />
         <NavButton nav="settings" icon="fa-solid fa-sliders" label={t('nav.settings')} activeNav={activeNav} onClick={() => setActiveNav('settings')} />
       </div>
     </nav>

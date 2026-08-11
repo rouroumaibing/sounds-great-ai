@@ -1,5 +1,5 @@
 // Navigation types
-export type PrimaryNavType = 'threads' | 'agents' | 'tasks' | 'memory' | 'settings';
+export type PrimaryNavType = 'threads' | 'tasks' | 'memory' | 'settings' | 'about';
 export type SettingsTabType = 'members' | 'accounts' | 'personas' | 'im' | 'skills' | 'mcp' | 'plugins' | 'market' | 'marketplace' | 'ball' | 'concierge' | 'voice' | 'config' | 'rules' | 'notifications' | 'ops' | 'eval' | 'about';
 export type DrawerTabType = 'plan' | 'mcp' | 'memory' | 'files' | 'session-chain';
 export type ThreadFilterType = 'all' | 'escalated' | 'active';

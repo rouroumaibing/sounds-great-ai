@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
-import type { BreedConfig, Variant, BreedColor } from '../../types/api';
+import type { BreedConfig, Variant, BreedColor, VoiceConfig } from '../../types/api';
 import type { SettingsAccount } from '../../types';
 import { CLIENT_IDS, providerFromClientId } from '../../constants/clientIds';
 import { settingsService } from '../../services/settingsService';
@@ -36,7 +36,6 @@ function emptyBreed(): BreedConfig {
 export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) {
   const { t } = useI18n();
   const [form, setForm] = useState<BreedConfig>(breed ?? emptyBreed());
-  const [expanded, setExpanded] = useState<number>(0);
   const [accounts, setAccounts] = useState<SettingsAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [templates, setTemplates] = useState<BreedTemplate[]>([]);
@@ -118,71 +117,93 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
 
   const filteredAccounts = accounts.filter(a => !variant.client_id || a.clientId === variant.client_id);
 
+  const title = isEdit ? (form.display_name || form.name || t('personas.editDog')) : t('members.add');
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <i className="fa-solid fa-dog text-amber-400"></i>
-            <span>{isEdit ? t('personas.editDog') : t('personas.create')}</span>
-          </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
-            <i className="fa-solid fa-xmark"></i>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm"
+      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+    >
+      <div
+        className="flex max-h-[88vh] w-full max-w-[720px] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="breed-editor-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between px-7 py-5">
+          <p id="breed-editor-title" className="text-base font-extrabold text-slate-100">{title}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-slate-800 text-lg leading-none text-slate-300 transition hover:bg-slate-700"
+            aria-label="关闭"
+          >
+            ×
           </button>
         </div>
 
-        {!isEdit && templates.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-slate-300">{t('breedEditor.memberTemplate')}</h4>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => handleTemplateSelect(null)} className={clsx('px-3 py-1.5 rounded-xl text-xs font-medium transition', selectedTemplateId === 'custom' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200')}>
-                {t('accounts.customTag')}
-              </button>
-              {templates.map(t => (
-                <button key={t.id} onClick={() => handleTemplateSelect(selectedTemplateId === t.id ? null : t)} className={clsx('px-3 py-1.5 rounded-xl text-xs font-medium transition', selectedTemplateId === t.id ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200')}>
-                  {t.name}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-7 py-5">
+          {!isEdit && (
+            <p className="rounded-[14px] bg-slate-800/60 px-4 py-3 text-xs font-semibold text-slate-300">{t('breedEditor.createHint')}</p>
+          )}
+          {!isEdit && templates.length > 0 && (
+            <SectionCard title={t('breedEditor.memberTemplate')}>
+              <p className="text-xs text-slate-400">{t('breedEditor.templateHint')}</p>
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleTemplateSelect(null)}
+                  className={clsx('h-8 rounded-2xl px-3.5 text-xs font-extrabold transition', selectedTemplateId === 'custom' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200')}
+                >
+                  {t('breedEditor.custom')}
                 </button>
-              ))}
-            </div>
-          </div>
-        )}
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => handleTemplateSelect(selectedTemplateId === tpl.id ? null : tpl)}
+                    className={clsx('h-8 rounded-2xl px-3.5 text-xs font-extrabold transition', selectedTemplateId === tpl.id ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200')}
+                >
+                  {tpl.name}
+                </button>
+                ))}
+              </div>
+            </SectionCard>
+          )}
 
-        <div className="space-y-2 text-xs">
-          <CollapsibleSection title={t('breedEditor.identityInfo')} isOpen={expanded === 0} onToggle={() => setExpanded(expanded === 0 ? -1 : 0)}>
-            <IdentitySection form={form} color={color} update={update} updateColor={updateColor} />
-          </CollapsibleSection>
-          <CollapsibleSection title={t('breedEditor.accountBinding')} isOpen={expanded === 1} onToggle={() => setExpanded(expanded === 1 ? -1 : 1)}>
+          <SectionCard title={t('breedEditor.identityInfo')}>
+            <IdentitySection form={form} color={color} update={update} updateColor={updateColor} updateVariant={updateVariant} dogId={form.id} />
+          </SectionCard>
+          <SectionCard title={t('breedEditor.accountBinding')}>
             <AccountSection variant={variant} updateVariant={updateVariant} accounts={filteredAccounts} loadingAccounts={loadingAccounts} onAccountChange={handleAccountChange} />
-          </CollapsibleSection>
-          <CollapsibleSection title={t('breedEditor.cliConfig')} isOpen={expanded === 2} onToggle={() => setExpanded(expanded === 2 ? -1 : 2)}>
+          </SectionCard>
+          <SectionCard title={t('breedEditor.cliConfig')}>
             <CliSection variant={variant} updateVariant={updateVariant} updateCli={updateCli} />
-          </CollapsibleSection>
-          <CollapsibleSection title={t('breedEditor.contextBudget')} isOpen={expanded === 3} onToggle={() => setExpanded(expanded === 3 ? -1 : 3)}>
+          </SectionCard>
+          <SectionCard title={t('breedEditor.contextBudget')}>
             <BudgetSection variant={variant} updateBudget={updateBudget} />
-          </CollapsibleSection>
-          <CollapsibleSection title={t('breedEditor.sessionStrategy')} isOpen={expanded === 4} onToggle={() => setExpanded(expanded === 4 ? -1 : 4)}>
+          </SectionCard>
+          <SectionCard title={t('breedEditor.sessionStrategy')}>
             <StrategySection form={form} variant={variant} update={update} updateVariant={updateVariant} />
-          </CollapsibleSection>
+          </SectionCard>
         </div>
 
-        <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">{t('common.cancel')}</button>
-          <button onClick={handleSave} className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-lg shadow-amber-600/20">{t('common.save')}</button>
+        <div className="flex items-center justify-end gap-2 px-7 pb-5 pt-4">
+          <button onClick={onClose} className="h-8 rounded-[10px] bg-slate-800 px-4 text-xs font-semibold text-slate-200 transition hover:bg-slate-700">{t('common.cancel')}</button>
+          <button onClick={handleSave} className="h-8 rounded-[10px] bg-amber-600 px-4 text-xs font-semibold text-white transition hover:bg-amber-500">{t('common.save')}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function CollapsibleSection({ title, isOpen, onToggle, children }: { title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-800 overflow-hidden">
-      <button onClick={onToggle} className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-950/60 hover:bg-slate-950 transition">
-        <span className="text-xs font-bold text-slate-200">{title}</span>
-        <i className={clsx('fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform', isOpen && 'rotate-180')}></i>
-      </button>
-      {isOpen && <div className="p-4 space-y-3">{children}</div>}
-    </div>
+    <section className="rounded-xl border border-slate-800 bg-slate-950/30 p-4 space-y-3">
+      <h4 className="text-sm font-bold text-slate-100">{title}</h4>
+      {children}
+    </section>
   );
 }
 
@@ -197,13 +218,23 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls = 'w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-amber-500';
 
-function IdentitySection({ form, color, update, updateColor }: {
+function IdentitySection({ form, color, update, updateColor, updateVariant, dogId }: {
   form: BreedConfig; color: BreedColor;
   update: (p: Partial<BreedConfig>) => void; updateColor: (p: Partial<BreedColor>) => void;
+  updateVariant: (p: Partial<Variant>) => void; dogId: string;
 }) {
   const { t } = useI18n();
+  const variant = form.variants[0];
+  const vc: VoiceConfig = variant?.voice_config ?? {};
+  const setVoice = (patch: Partial<VoiceConfig>) => updateVariant({ voice_config: { ...vc, ...patch } });
   return (
     <>
+      {/* read-only Dog ID — mirrors clowder "Cat ID" shown above name for existing members */}
+      {dogId && (
+        <Field label={t('breedEditor.dogId')}>
+          <code className="block w-full rounded-xl bg-slate-950 px-3 py-2 font-mono text-xs text-slate-400 select-all">{dogId}</code>
+        </Field>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('rules.name')}><input value={form.name} onChange={e => update({ name: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s1')} /></Field>
         <Field label={t('breedEditor.displayName')}><input value={form.display_name} onChange={e => update({ display_name: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s1')} /></Field>
@@ -212,11 +243,23 @@ function IdentitySection({ form, color, update, updateColor }: {
         <Field label={t('breedEditor.colorPrimary')}><input value={color.primary} onChange={e => updateColor({ primary: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s4')} /></Field>
         <Field label={t('breedEditor.colorSecondary')}><input value={color.secondary} onChange={e => updateColor({ secondary: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s5')} /></Field>
       </div>
+      <Field label={t('breedEditor.variantLabel')}><input value={variant?.variant_label ?? ''} onChange={e => updateVariant({ variant_label: e.target.value })} className={inputCls} placeholder={t('settings.hubbreededitor.s4')} /></Field>
       <Field label={t('breedEditor.mentionPatterns')}><TagEditor tags={form.mention_patterns} onChange={t => update({ mention_patterns: t })} placeholder={t('settings.hubbreededitor.s6')} /></Field>
       <Field label={t('breedEditor.roleDesc')}><textarea value={form.role_description ?? ''} onChange={e => update({ role_description: e.target.value })} className={inputCls} rows={2} placeholder={t('settings.hubbreededitor.s7')} /></Field>
       <Field label={t('breedEditor.personality')}><textarea value={form.personality} onChange={e => update({ personality: e.target.value })} className={inputCls} rows={2} placeholder={t('settings.hubbreededitor.s8')} /></Field>
       <Field label={t('breedEditor.strengths')}><TagEditor tags={(form.team_strengths ?? '').split(',').filter(Boolean)} onChange={t => update({ team_strengths: t.join(',') })} placeholder={t('settings.hubbreededitor.s9')} /></Field>
       <Field label={t('breedEditor.caution')}><textarea value={form.caution ?? ''} onChange={e => update({ caution: e.target.value })} className={inputCls} rows={2} placeholder={t('settings.hubbreededitor.s10')} /></Field>
+
+      {/* Voice config — mirrors clowder VoiceConfigSection */}
+      <div className="rounded-xl border border-slate-800 p-3 space-y-3">
+        <div className="text-[11px] font-bold text-slate-300">{t('breedEditor.voice')}</div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t('breedEditor.voiceName')}><input value={vc.voice ?? ''} onChange={e => setVoice({ voice: e.target.value })} className={inputCls} placeholder="zh-CN-Yunxi" /></Field>
+          <Field label={t('breedEditor.voiceLang')}><input value={vc.lang_code ?? ''} onChange={e => setVoice({ lang_code: e.target.value })} className={inputCls} placeholder="zh-CN" /></Field>
+          <Field label={t('breedEditor.voiceSpeed')}><input type="number" step="0.1" value={vc.speed ?? ''} onChange={e => setVoice({ speed: Number(e.target.value) || undefined })} className={inputCls} placeholder="1" /></Field>
+          <Field label={t('breedEditor.voiceRefAudio')}><input value={vc.ref_audio ?? ''} onChange={e => setVoice({ ref_audio: e.target.value })} className={inputCls} placeholder="https://..." /></Field>
+        </div>
+      </div>
     </>
   );
 }

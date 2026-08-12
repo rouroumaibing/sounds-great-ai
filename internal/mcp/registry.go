@@ -1,6 +1,8 @@
 package mcp
 
-import "sounds-great-ai/internal/config"
+import (
+	"sounds-great-ai/pkg/pack"
+)
 
 type MCPServerConfig struct {
 	Name    string
@@ -22,7 +24,7 @@ func (r *MCPRegistry) Register(name string, cfg *MCPServerConfig) {
 	r.servers[name] = cfg
 }
 
-func (r *MCPRegistry) ForBreed(breed *config.BreedConfig, task string) []*MCPServerConfig {
+func (r *MCPRegistry) ForBreed(breed *pack.BreedConfig, task string) []*MCPServerConfig {
 	var result []*MCPServerConfig
 	for _, s := range r.servers {
 		if !s.Enabled {

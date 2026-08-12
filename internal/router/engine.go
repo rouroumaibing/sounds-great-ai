@@ -2,7 +2,8 @@ package router
 
 import (
 	"context"
-	"sounds-great-ai/internal/config"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 type RoutingDecision struct {
@@ -19,14 +20,14 @@ type RoutingStep struct {
 	Role      string
 }
 
-type RoutingRule = config.RoutingRule
+type RoutingRule = pack.RoutingRule
 
 type RoutingEngine struct {
 	rules  []RoutingRule
-	roster map[string]*config.BreedConfig
+	roster map[string]*pack.BreedConfig
 }
 
-func NewEngine(rules []RoutingRule, roster map[string]*config.BreedConfig) *RoutingEngine {
+func NewEngine(rules []RoutingRule, roster map[string]*pack.BreedConfig) *RoutingEngine {
 	return &RoutingEngine{rules: rules, roster: roster}
 }
 

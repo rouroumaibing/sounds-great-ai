@@ -1,4 +1,4 @@
-## 训练营（对标 clowder-ai D16）
+## 训练营
 
 训练营模式：{{.BootcampActive}}
 

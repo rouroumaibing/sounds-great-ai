@@ -1,6 +1,6 @@
 # Sounds Great AI 协同全景
 
-> 对标 clowder-ai `collaboration-landscape.md`。人 & 犬 & 犬的协作是怎么发生的。
+> 人 & 犬 & 犬的协作是怎么发生的。
 
 ## 协作模式
 

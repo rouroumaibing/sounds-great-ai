@@ -1,4 +1,4 @@
-## 工作流触发点（对标 clowder-ai S6 workflow-triggers）
+## 工作流触发点
 
 完成某步后主动 @ 下一步狗狗的触发点列表。
 

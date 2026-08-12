@@ -28,7 +28,7 @@ function usePinnedSections() {
   return { pinned, toggle };
 }
 
-// NavItem mirrors clowder-ai's SettingsNav: rounded-lg (8px) items, h-9,
+// NavItem: rounded-lg (8px) items, h-9,
 // icon + label, active state tinted amber, with a hover-reveal pin button.
 function NavItem({
   section,
@@ -78,7 +78,7 @@ function NavItem({
   );
 }
 
-// clowder renders a flat, search-less list of sections (pinned state still
+// Renders a flat, search-less list of sections (pinned state still
 // tracked but not split into a separate group). Search lives elsewhere.
 export function SettingsNav() {
   const { t } = useI18n();

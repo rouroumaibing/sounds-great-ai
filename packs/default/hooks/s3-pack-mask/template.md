@@ -1,4 +1,4 @@
-## Pack 能力覆盖（对标 clowder-ai S3 pack-mask）
+## Pack 能力覆盖
 
 Pack 级别的能力遮罩声明。当 pack 配置中定义了能力覆盖（mask）时，此 hook 注入覆盖内容。
 

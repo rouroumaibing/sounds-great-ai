@@ -1,4 +1,4 @@
-## MCP 工具列表（对标 clowder-ai S13 mcp-tools）
+## MCP 工具列表
 
 以下 MCP 工具可通过 CLI agent 调用。工具由 Platform 层的 MCP Bridge (`internal/mcp/`) 管理。
 

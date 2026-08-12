@@ -2,36 +2,21 @@ package transport
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"time"
 
 	"sounds-great-ai/internal/config"
 	"sounds-great-ai/internal/settings"
+	"sounds-great-ai/pkg/pack"
 )
-
-// validClientIDs is the set of allowed CLI client identifiers.
-var validClientIDs = map[string]bool{
-	"claude":   true,
-	"codex":    true,
-	"gemini":   true,
-	"opencode": true,
-	"kimi":     true,
-}
-
-// validateClientID returns false if clientId is non-empty and not in the allowed set.
-func validateClientID(clientID string) bool {
-	if clientID == "" {
-		return true // optional field
-	}
-	return validClientIDs[clientID]
-}
 
 // SettingsHandler handles settings HTTP endpoints.
 type SettingsHandler struct {
-	store         settings.SettingsStore
-	credStore     settings.CredentialStore
-	eventBus      *config.ConfigEventBus
-	breedBindings map[string][]string
+	store     settings.SettingsStore
+	credStore settings.CredentialStore
+	eventBus  *config.ConfigEventBus
 }
 
 // NewSettingsHandler creates a new SettingsHandler.
@@ -50,89 +35,93 @@ func (h *SettingsHandler) SetEventBus(bus *config.ConfigEventBus) {
 	h.eventBus = bus
 }
 
-// SetBreedBindings sets the account-to-breed bindings used for referential
-// integrity checks on account deletion. The map key is an account ID and the
-// value is the list of breed IDs bound to that account.
-func (h *SettingsHandler) SetBreedBindings(bindings map[string][]string) {
-	h.breedBindings = bindings
-}
-
 // Routes returns the HTTP routes for settings.
 func (h *SettingsHandler) Routes() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/settings/members", h.ListMembers)
-	mux.HandleFunc("POST /api/settings/members", h.CreateMember)
-	mux.HandleFunc("PATCH /api/settings/members/{id}", h.UpdateMember)
-	mux.HandleFunc("DELETE /api/settings/members/{id}", h.DeleteMember)
 	mux.HandleFunc("GET /api/settings/accounts", h.ListAccounts)
 	mux.HandleFunc("POST /api/settings/accounts", h.CreateAccount)
 	mux.HandleFunc("PATCH /api/settings/accounts/{id}", h.UpdateAccount)
 	mux.HandleFunc("DELETE /api/settings/accounts/{id}", h.DeleteAccount)
+	mux.HandleFunc("GET /api/settings/roster", h.ListRoster)
+	mux.HandleFunc("GET /api/settings/roster/{id}", h.GetRosterEntry)
+	mux.HandleFunc("PATCH /api/settings/roster/{id}", h.UpdateRosterEntry)
+	mux.HandleFunc("GET /api/settings/review-policy", h.GetReviewPolicy)
+	mux.HandleFunc("PUT /api/settings/review-policy", h.SetReviewPolicy)
 	mux.HandleFunc("GET /api/settings/config", h.ListConfig)
 	mux.HandleFunc("PATCH /api/settings/config", h.UpdateConfig)
 	return mux
 }
 
-func (h *SettingsHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
-	members, err := h.store.ListMembers()
+func (h *SettingsHandler) ListRoster(w http.ResponseWriter, r *http.Request) {
+	roster, err := h.store.GetRoster()
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	respondJSON(w, http.StatusOK, members)
+	respondJSON(w, http.StatusOK, roster)
 }
 
-func (h *SettingsHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
-	var raw map[string]any
-	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
-		return
-	}
-	if clientID, ok := raw["client_id"].(string); ok && !validateClientID(clientID) {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid client_id; allowed: claude, codex, gemini, opencode, kimi"})
-		return
-	}
-	breedID, _ := raw["breed_id"].(string)
-	displayName, _ := raw["display_name"].(string)
-	role, _ := raw["role"].(string)
-	enabled, _ := raw["enabled"].(bool)
-	member, err := h.store.CreateMember(breedID, displayName, role, enabled)
-	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-	// Apply extended fields via update (skip basic fields already set).
-	for _, k := range []string{"breed_id", "display_name", "role", "enabled"} {
-		delete(raw, k)
-	}
-	if len(raw) > 0 {
-		_ = h.store.UpdateMember(member.ID, raw)
-	}
-	respondJSON(w, http.StatusCreated, member)
-}
-
-func (h *SettingsHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
+func (h *SettingsHandler) GetRosterEntry(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	var updates map[string]any
-	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+	roster, err := h.store.GetRoster()
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	entry, ok := roster[id]
+	if !ok {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "roster entry not found"})
+		return
+	}
+	respondJSON(w, http.StatusOK, entry)
+}
+
+func (h *SettingsHandler) UpdateRosterEntry(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-	if clientID, ok := updates["client_id"].(string); ok && !validateClientID(clientID) {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid client_id; allowed: claude, codex, gemini, opencode, kimi"})
+	// Start from the existing entry so unspecified fields are preserved (partial update).
+	entry := pack.RosterEntry{}
+	if existing, err := h.store.GetRoster(); err == nil {
+		if e, ok := existing[id]; ok {
+			entry = e
+		}
+	}
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-	if err := h.store.UpdateMember(id, updates); err != nil {
-		respondJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+	if err := h.store.UpdateRosterEntry(id, entry); err != nil {
+		if errors.Is(err, settings.ErrBreedNotFound) {
+			respondJSON(w, http.StatusNotFound, map[string]string{"error": "breed not found"})
+			return
+		}
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 	respondJSON(w, http.StatusOK, nil)
 }
 
-func (h *SettingsHandler) DeleteMember(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if err := h.store.DeleteMember(id); err != nil {
-		respondJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+func (h *SettingsHandler) GetReviewPolicy(w http.ResponseWriter, r *http.Request) {
+	policy, err := h.store.GetReviewPolicy()
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, http.StatusOK, policy)
+}
+
+func (h *SettingsHandler) SetReviewPolicy(w http.ResponseWriter, r *http.Request) {
+	var body pack.ReviewPolicy
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	if err := h.store.UpdateReviewPolicy(&body); err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 	respondJSON(w, http.StatusOK, nil)
@@ -153,7 +142,7 @@ func (h *SettingsHandler) CreateAccount(w http.ResponseWriter, r *http.Request) 
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-	if clientID, ok := raw["client_id"].(string); ok && !validateClientID(clientID) {
+	if clientID, ok := raw["client_id"].(string); ok && !settings.ValidateClientID(clientID) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid client_id; allowed: claude, codex, gemini, opencode, kimi"})
 		return
 	}
@@ -163,6 +152,19 @@ func (h *SettingsHandler) CreateAccount(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
+	}
+	// Persist the credential up-front so that creating an account with an
+	// api_key results in a usable account (the metadata store only stores a
+	// masked preview). If the credential cannot be persisted, roll back the
+	// account to avoid an orphaned entry.
+	if apiKey != "" && h.credStore != nil {
+		if err := h.credStore.Set(account.ID, apiKey); err != nil {
+			_ = h.store.DeleteAccount(account.ID) // best-effort rollback
+			respondJSON(w, http.StatusInternalServerError, map[string]string{
+				"error": "failed to persist credential: " + err.Error(),
+			})
+			return
+		}
 	}
 	// Apply extended fields via update (skip basic fields already set).
 	for _, k := range []string{"provider", "api_key"} {
@@ -181,7 +183,7 @@ func (h *SettingsHandler) UpdateAccount(w http.ResponseWriter, r *http.Request) 
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-	if clientID, ok := updates["client_id"].(string); ok && !validateClientID(clientID) {
+	if clientID, ok := updates["client_id"].(string); ok && !settings.ValidateClientID(clientID) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid client_id; allowed: claude, codex, gemini, opencode, kimi"})
 		return
 	}
@@ -190,10 +192,17 @@ func (h *SettingsHandler) UpdateAccount(w http.ResponseWriter, r *http.Request) 
 	// map so it is never passed to the metadata store.
 	if apiKey, ok := updates["api_key"]; ok {
 		if s, ok := apiKey.(string); ok && h.credStore != nil {
+			var cerr error
 			if s == "" {
-				_ = h.credStore.Delete(id)
+				cerr = h.credStore.Delete(id)
 			} else {
-				_ = h.credStore.Set(id, s)
+				cerr = h.credStore.Set(id, s)
+			}
+			if cerr != nil {
+				respondJSON(w, http.StatusInternalServerError, map[string]string{
+					"error": "failed to update credential: " + cerr.Error(),
+				})
+				return
 			}
 		}
 		delete(updates, "api_key")
@@ -208,15 +217,31 @@ func (h *SettingsHandler) UpdateAccount(w http.ResponseWriter, r *http.Request) 
 
 func (h *SettingsHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	// Referential integrity: refuse to delete an account that has breeds bound
-	// to it unless the caller passes force=true.
-	if boundBreedIDs, ok := h.breedBindings[id]; ok && len(boundBreedIDs) > 0 {
-		if r.URL.Query().Get("force") != "true" {
-			respondJSON(w, http.StatusConflict, map[string]any{
-				"error":           "account has bound breeds; pass force=true to override",
-				"bound_breed_ids": boundBreedIDs,
-			})
-			return
+	// Referential integrity: refuse to delete an account
+	// that is referenced by one or more members via account_ref, unless the
+	// caller passes force=true.
+	if r.URL.Query().Get("force") != "true" {
+		breeds, err := h.store.ListBreeds()
+		if err == nil {
+			var bound []string
+			for _, b := range breeds {
+				if b == nil {
+					continue
+				}
+				for _, v := range b.Variants {
+					if v.AccountRef == id {
+						bound = append(bound, b.ID)
+						break
+					}
+				}
+			}
+			if len(bound) > 0 {
+				respondJSON(w, http.StatusConflict, map[string]any{
+					"error":           "account has bound breeds; pass force=true to override",
+					"bound_member_ids": bound,
+				})
+				return
+			}
 		}
 	}
 	if err := h.store.DeleteAccount(id); err != nil {

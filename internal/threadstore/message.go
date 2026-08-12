@@ -3,7 +3,7 @@ package threadstore
 import "time"
 
 // Message represents a single chat message in a conversation thread.
-// Mirrors clowder-ai's StoredMessage (simplified — no idempotency, no delivery status).
+// Simplified message record (no idempotency, no delivery status).
 type Message struct {
 	ID        string    // unique message ID (auto-generated)
 	ThreadID  string    // conversation thread key (uses sessionID)
@@ -14,7 +14,7 @@ type Message struct {
 }
 
 // MessageStore is the port interface for chat message persistence.
-// Simplified from clowder-ai's IMessageStore (40+ methods → 3 methods).
+// Simplified port interface (40+ methods reduced to 3).
 type MessageStore interface {
 	Append(msg *Message) error
 	GetByThread(threadID string, limit int) ([]*Message, error)

@@ -13,7 +13,7 @@ interface VirtualListProps<T> {
 /**
  * VirtualList — self-implemented windowing for long lists.
  * Only renders visible items + overscan. No external dependency.
- * Uses scroll position calculation (like clowder-ai VirtualThreadList).
+ * Uses scroll position calculation for windowed rendering.
  */
 export function VirtualList<T>({
   items,

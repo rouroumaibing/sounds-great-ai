@@ -1,4 +1,4 @@
-## SOP 阶段（对标 clowder-ai D14）
+## SOP 阶段
 
 当前 SOP stage：{{.SOPStage}}
 

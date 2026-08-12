@@ -1,4 +1,4 @@
-package config
+package pack
 
 import (
 	"encoding/json"
@@ -8,14 +8,11 @@ import (
 	"strings"
 )
 
-const (
-	LoadPolicyFailFast    = 0
-	LoadPolicySkipInvalid = 1
-)
-
-// Loader loads breed configs from disk.
+// Loader loads breed configs from disk into a map. It is a standalone helper
+// used for breed-existence checks and consolidated-template reads; it does NOT
+// mutate the Pack registry (unlike Pack.LoadFromDir / Pack.LoadFromFile).
 type Loader struct {
-	Policy int
+	Policy LoadPolicy
 }
 
 // NewLoader creates a Loader with FailFast policy.
@@ -23,7 +20,8 @@ func NewLoader() *Loader {
 	return &Loader{Policy: LoadPolicyFailFast}
 }
 
-// LoadFromDir reads all *.json files from a directory and parses them as BreedConfigs.
+// LoadFromDir reads all *.json files from a directory and parses them as
+// BreedConfigs, returning a map keyed by breed ID.
 func (l *Loader) LoadFromDir(dir string) (map[string]*BreedConfig, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -34,10 +32,8 @@ func (l *Loader) LoadFromDir(dir string) (map[string]*BreedConfig, error) {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		// Skip non-breed artifacts that live alongside breed configs, e.g.
-		// dog-template.json (a roster/avatar template read separately by
-		// packapi). These are valid JSON but not BreedConfig objects, so they
-		// must be excluded regardless of load policy.
+		// Skip non-breed artifacts (e.g. dog-template.json) that live alongside
+		// breed configs. These are valid JSON but not BreedConfig objects.
 		if strings.Contains(strings.TrimSuffix(entry.Name(), ".json"), "template") {
 			continue
 		}
@@ -60,10 +56,9 @@ func (l *Loader) LoadFromDir(dir string) (map[string]*BreedConfig, error) {
 	return breeds, nil
 }
 
-// LoadFromFile reads a single consolidated template file (dog-template.json) and
-// returns every breed found in its "breeds" array. A missing file is treated as
-// an empty pack (nil error), mirroring LoadFromDir's lenient contract for an
-// empty directory.
+// LoadFromFile reads a single consolidated template file (dog-template.json)
+// and returns every breed found in its "breeds" array. A missing file is
+// treated as an empty pack (nil error).
 func (l *Loader) LoadFromFile(path string) (map[string]*BreedConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

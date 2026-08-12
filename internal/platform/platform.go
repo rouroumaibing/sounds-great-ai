@@ -6,13 +6,12 @@ import (
 	"path/filepath"
 
 	"github.com/cloudwego/eino/components/embedding"
+	"sounds-great-ai/internal/a2a"
 	"sounds-great-ai/internal/adapter/claude"
 	"sounds-great-ai/internal/adapter/codex"
 	"sounds-great-ai/internal/adapter/gemini"
 	"sounds-great-ai/internal/adapter/opencode"
 	"sounds-great-ai/internal/adapter/unified"
-	"sounds-great-ai/internal/a2a"
-	"sounds-great-ai/internal/config"
 	"sounds-great-ai/internal/hooks"
 	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/memory"
@@ -23,6 +22,8 @@ import (
 	"sounds-great-ai/internal/skills"
 	"sounds-great-ai/internal/sop"
 	"sounds-great-ai/internal/threadstore"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 // Platform wires together all platform-layer components.
@@ -34,21 +35,21 @@ type Platform struct {
 	Adapters       map[string]unified.AgentExecutor // keyed by CLI name
 
 	// Config
-	Breeds  map[string]*config.BreedConfig
-	Loader  *config.Loader
-	Leader  *config.LeaderConfig
+	Breeds map[string]*pack.BreedConfig
+	Loader *pack.Loader
+	Leader *pack.Leader
 
 	// Platform Services
-	Skills   *skills.SkillManager
-	MCP      *mcp.MCPRegistry
-	Router   *router.RoutingEngine
-	A2AHub   *a2a.A2AHub
-	SOP      *sop.SOPGuardian
-	Memory   *memory.MemoryStore
+	Skills *skills.SkillManager
+	MCP    *mcp.MCPRegistry
+	Router *router.RoutingEngine
+	A2AHub *a2a.A2AHub
+	SOP    *sop.SOPGuardian
+	Memory *memory.MemoryStore
 
 	// Prompt Hooks
-	HookRegistry  *hooks.Registry
-	HookPipeline  *hooks.Pipeline
+	HookRegistry   *hooks.Registry
+	HookPipeline   *hooks.Pipeline
 	HookTraceStore *hooks.TraceStore
 
 	// Compressor for A2A handoffs
@@ -96,11 +97,27 @@ func New(cfg Config) (*Platform, error) {
 		"opencode": opencode.New(pm),
 	}
 
-	// Load breed configs
-	loader := &config.Loader{Policy: config.LoadPolicySkipInvalid}
+	// Initialize stores (port/factory pattern) — created before the breed
+	// merge so the runtime catalog can be seeded/merged into the registry.
+	settingsStore := settings.NewFileSettingsStore(
+		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), settings.AccountsFileName),
+		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), settings.CatalogFileName),
+		true,
+	)
+
+	// Load breed configs (template seeds), then merge the runtime catalog.
+	loader := &pack.Loader{Policy: pack.LoadPolicySkipInvalid}
 	breeds, err := loader.LoadFromFile(filepath.Join(cfg.BreedsDir, "dog-template.json"))
 	if err != nil {
 		return nil, fmt.Errorf("load breeds: %w", err)
+	}
+	// Catalog is the single runtime truth; the template is a seed (copied into
+	// the catalog on first init). Merged breeds drive routing, prompts, and the
+	// platform registry. See plan 1.2 / decision D2.
+	if merged, merr := MergedBreeds(breeds, settingsStore); merr != nil {
+		log.Printf("Warning: breed catalog merge failed: %v", merr)
+	} else {
+		breeds = merged
 	}
 
 	// Initialize platform services
@@ -109,7 +126,7 @@ func New(cfg Config) (*Platform, error) {
 
 	mcpReg := mcp.NewRegistry()
 
-	routingRules := []config.RoutingRule{} // loaded from pack config
+	routingRules := []pack.RoutingRule{} // loaded from pack config
 	routingEngine := router.NewEngine(routingRules, breeds)
 
 	a2aHub := a2a.NewHub(nil)
@@ -131,7 +148,6 @@ func New(cfg Config) (*Platform, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create thread store: %w", err)
 	}
-	settingsStore := settings.NewSettingsStore()
 	evidenceStore := memory.NewEvidenceStore()
 
 	promptBuilder := prompt.NewBuilder(breeds, skillMgr)
@@ -161,8 +177,11 @@ func New(cfg Config) (*Platform, error) {
 	}
 	router := NewRouter(breeds)
 
-	// Initialize leader config with defaults
-	leaderCfg := config.DefaultLeaderConfig()
+	// Initialize leader config, loading any persisted value from the catalog.
+	leaderCfg := pack.DefaultLeaderConfig()
+	if stored, err := settingsStore.GetLeader(); err == nil && stored != nil {
+		leaderCfg = *stored
+	}
 
 	return &Platform{
 		ProcessManager: pm,
@@ -187,8 +206,8 @@ func New(cfg Config) (*Platform, error) {
 		PromptBuilder:    promptBuilder,
 		ContextAssembler: contextAssembler,
 
-		HookRegistry:  hookReg,
-		HookPipeline:  hookPipeline,
+		HookRegistry:   hookReg,
+		HookPipeline:   hookPipeline,
 		HookTraceStore: hookTraceStore,
 
 		MessageStore: messageStore,
@@ -207,7 +226,7 @@ func (p *Platform) GetAdapter(cliName string) (unified.AgentExecutor, error) {
 }
 
 // GetBreed returns a breed config by ID.
-func (p *Platform) GetBreed(id string) *config.BreedConfig {
+func (p *Platform) GetBreed(id string) *pack.BreedConfig {
 	return p.Breeds[id]
 }
 

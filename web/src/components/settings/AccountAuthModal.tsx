@@ -6,7 +6,7 @@ import { TagEditor } from './TagEditor';
 
 type ClientId = (typeof CLIENT_IDS)[number]['id'];
 
-/** Client dropdown options — derived from SG's CLIENT_IDS (adapted from clowder's builtin clients). */
+/** Client dropdown options — derived from SG's CLIENT_IDS. */
 const CLIENT_OPTIONS: ClientId[] = CLIENT_IDS.map((c) => c.id);
 
 /** Suggested models per client — kept in sync with dog-template.json clientDefaults. */
@@ -27,6 +27,10 @@ function clientLabel(id?: ClientId | string): string {
   const found = CLIENT_IDS.find((c) => c.id === id);
   return found?.label ?? (typeof id === 'string' ? id : 'Builtin');
 }
+
+/** System-reserved env var prefix — user-defined env injection must not
+ *  clobber runtime variables (mirrors the backend filter in file_store.go). */
+const RESERVED_ENV_PREFIX = 'SOUNDS_GREAT_AI_';
 
 export interface UnifiedAuthEditData {
   id: string;
@@ -91,11 +95,12 @@ export function AccountAuthModal({ open, onClose, onCreated, editProfile, initia
 
   const isOAuth = authMode === 'oauth';
 
-  /** POSIX env var key: must start with uppercase or _, rest alphanumeric + _. */
+  /** POSIX env var key: must start with uppercase or _, rest alphanumeric + _.
+   *  System-reserved prefix is rejected to avoid clobbering runtime vars. */
   const ENV_KEY_RE = /^[A-Z_][A-Za-z0-9_]*$/;
-  const isValidEnvKey = (k: string) => ENV_KEY_RE.test(k);
+  const isValidEnvKey = (k: string) => ENV_KEY_RE.test(k) && !k.startsWith(RESERVED_ENV_PREFIX);
 
-  /** Build envVars Record from entries, filtering empty/invalid keys. */
+  /** Build envVars Record from entries, filtering empty/invalid/reserved keys. */
   const buildEnvVars = (): Record<string, string> | undefined => {
     const vars: Record<string, string> = {};
     for (const { key, value } of envEntries) {
@@ -380,6 +385,7 @@ export function AccountAuthModal({ open, onClose, onCreated, editProfile, initia
                               ? `${formInputClass} !border-rose-500 !bg-rose-950/40 !text-rose-300`
                               : formInputClass
                           }`}
+                          title="变量名须以大写字母或下划线开头，仅含 A-Z、0-9、_，且不能以 SOUNDS_GREAT_AI_ 开头"
                         />
                       </div>
                       <span className="text-[11px] text-slate-500">=</span>
@@ -407,7 +413,7 @@ export function AccountAuthModal({ open, onClose, onCreated, editProfile, initia
                   ))}
                   {envEntries.some((e) => e.key.trim() && !isValidEnvKey(e.key.trim())) && (
                     <p className="text-[11px] text-rose-400">
-                      变量名须以大写字母或下划线开头，仅含 A-Z、0-9、_
+                      变量名须以大写字母或下划线开头，仅含 A-Z、0-9、_，且不能以 SOUNDS_GREAT_AI_ 开头
                     </p>
                   )}
                 </div>

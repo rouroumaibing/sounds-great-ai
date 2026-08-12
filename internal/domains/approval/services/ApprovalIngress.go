@@ -12,7 +12,7 @@ import (
 
 // ApprovalIngress manages the approval queue: submitting items, resolving decisions,
 // and registering per-feature adapters. Replaces the synchronous blocking
-// RequestApproval() with an async queue pattern aligned with clowder-ai.
+// RequestApproval() with an async queue pattern.
 type ApprovalIngress struct {
 	store    approvalPorts.IApprovalStore
 	adapters map[string]approvalPorts.IApprovalAdapter

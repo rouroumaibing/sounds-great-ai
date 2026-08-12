@@ -1,7 +1,6 @@
 # Sounds Great AI 记忆系统全景
 
 > **本文的位置**：overview（系统全景是什么）→ 哲学纲领在 `memory-philosophy.md`（为什么这样设计）。
-> 对标 clowder-ai `memory-system-overview.md`，将"猫"替换为"犬"。
 
 ## 六器官
 
@@ -47,7 +46,7 @@
 
 ## 记忆分道
 
-| 道 | 内容 | 对应 clowder-ai |
+| 道 | 内容 | 对应模块 |
 |----|------|----------------|
 | project | feature specs、决策、教训 | docs/ |
 | thread | 对话历史 | threadstore |

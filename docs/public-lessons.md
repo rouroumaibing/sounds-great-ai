@@ -17,15 +17,15 @@
 | 08-01 | LLM Code Search | code_search capability | **保留** |
 | 08-03 | Jinmao RAG | 向量存储 + embedding + 迁移 | **保留** |
 | 08-03 | Multi-breed Coordination | 9 capabilities + dispatch executor | **全部废弃** |
-| 08-04 | Clowder-AI Restructuring | CLI adapter + 动态路由 + SOP + skills | 当前 |
+| 08-04 | 架构重构（参考实现） | CLI adapter + 动态路由 + SOP + skills | 当前 |
 
 ## 2. 偏离根因
 
 ### 2.1 参考架构反转
 
-起始：*"借鉴 clowder-ai 的安全概念"* → 终局：*"完全对齐 clowder-ai 架构"*
+起始：*"借鉴参考项目的安全概念"* → 终局：*"完全对齐参考架构"*
 
-从"借模式"变成"抄架构"，参考关系反转。所有不符合 clowder-ai 模式的设计被判定为需重构。
+从"借模式"变成"抄架构"，参考关系反转。所有不符合参考模式的设计被判定为需重构。
 
 ### 2.2 架构决策被直接推翻
 
@@ -133,7 +133,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 
 ### 6.1 Skill 框架升级
 
-**问题**：原 skill 解析器只支持 `id/name/description/trigger` 单值格式，无法加载 clowder-ai 的 `triggers` 数组和多行 `description`。
+**问题**：原 skill 解析器只支持 `id/name/description/trigger` 单值格式，无法加载参考实现的 `triggers` 数组和多行 `description`。
 
 **解决**：用 `yaml.v3` 替换手写解析器，支持两种格式（扁平 .md + 目录 SKILL.md），`id` 缺失时从 `name` 回退。
 
@@ -149,7 +149,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 
 ### 6.3 参考代码引入
 
-**问题**：clowder-ai 的 skill 内容深度绑定其专有概念（cats/breeds/operator/MCP 工具名/F 编号/端口）。
+**问题**：参考项目的 skill 内容深度绑定其专有概念（cats/breeds/operator/MCP 工具名/F 编号/端口）。
 
 **解决**：全量适配——保留核心方法论，去掉专有引用，用通用概念替换。
 
@@ -157,7 +157,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 
 ## 7. 教训条目（LL-XXX 格式）
 
-> 对标 clowder-ai `docs/public-lessons.md`。格式：`LL-XXX`（三位数字，递增），已发布 ID 不重排、不复用。
+> 格式：`LL-XXX`（三位数字，递增），已发布 ID 不重排、不复用。
 > 状态：`draft | validated | archived`
 > 质量门槛：有来源锚点、有可执行防护、有时效性验证。
 
@@ -230,7 +230,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 状态：validated
 - 更新时间：2026-08-04
 
-- 坑：原 skill 解析器只支持单值格式，无法加载 clowder-ai 的 `triggers` 数组和多行 `description`。
+- 坑：原 skill 解析器只支持单值格式，无法加载参考实现的 `triggers` 数组和多行 `description`。
 - 根因：手写 YAML 解析器覆盖不了外部生态的格式变体。
 - 触发条件：需要兼容外部 YAML 格式时。
 - 修复：用 `yaml.v3` 替换手写解析器。
@@ -256,7 +256,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 状态：validated
 - 更新时间：2026-08-04
 
-- 坑：clowder-ai 的 skill 内容深度绑定其专有概念（cats/breeds/operator/MCP 工具名/F 编号/端口），直接迁移不可用。
+- 坑：参考项目的 skill 内容深度绑定其专有概念（cats/breeds/operator/MCP 工具名/F 编号/端口），直接迁移不可用。
 - 根因：未区分"方法论"（可复用）和"实现细节"（不可复用）。
 - 触发条件：引入外部参考代码/文档时。
 - 修复：全量适配——保留核心方法论，去掉专有引用，用通用概念替换。
@@ -269,12 +269,12 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 状态：validated
 - 更新时间：2026-08-07
 
-- 坑：README v2 列了 17 个"差距"模块，其中 10 个经 clowder-ai 架构调研后评估为不需要（clowder-ai 也不做，或过度工程）。
-- 根因：Gap Analysis 基于名称对比而非架构理解——看到 clowder-ai 有 `Invocation/Queue` 就列为差距，没有评估 clowder-ai 为何有它、我们是否需要。
+- 坑：README v2 列了 17 个"差距"模块，其中 10 个经参考架构调研后评估为不需要（参考架构也不做，或过度工程）。
+- 根因：Gap Analysis 基于名称对比而非架构理解——看到参考架构有 `Invocation/Queue` 就列为差距，没有评估参考架构为何有它、我们是否需要。
 - 触发条件：基于参考项目的模块名/目录名做 Gap Analysis，而非理解其架构决策。
-- 修复：每项差距必须回答：clowder-ai 为何有这个？我们是否需要同样的设计？不需要则不纳入路线图。
+- 修复：每项差距必须回答：参考架构为何有这个？我们是否需要同样的设计？不需要则不纳入路线图。
 - 防护：路线图项纳入前必须通过"参考架构验证"——确认参考项目确实做了这件事 + 我们确实需要。
-- 来源锚点：`README.md` v2 段 + clowder-ai 架构调研
+- 来源锚点：`README.md` v2 段 + 参考架构调研
 
 - 关联：P1 Vision-First, P5 Spec Compatibility Check
 
@@ -282,7 +282,7 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 状态：validated
 - 更新时间：2026-08-07
 
-- 坑：RAG 设计中反复把 `search_knowledge` 能力绑定到 jinmao 狗狗（硬编码 breedID、roles 判断、Gemini 降级时"建议 @jinmao"）。用户三次纠正后才完全对齐 clowder-ai 的"共享服务"模式。**第 5 次复发（Phase 7 Polish）**：给每个 breed 硬编码 `cautions`（"不直接写业务代码"、"不做RAG检索"...），本质是把 AGENTS.md 共享治理规则拆碎到 breed config 中。用户再次纠正。
+- 坑：RAG 设计中反复把 `search_knowledge` 能力绑定到 jinmao 狗狗（硬编码 breedID、roles 判断、Gemini 降级时"建议 @jinmao"）。用户三次纠正后才完全对齐参考项目的"共享服务"模式。**第 5 次复发（Phase 7 Polish）**：给每个 breed 硬编码 `cautions`（"不直接写业务代码"、"不做RAG检索"...），本质是把 AGENTS.md 共享治理规则拆碎到 breed config 中。用户再次纠正。
 - 根因：**心智模型惯性** — 从"某狗狗负责某事"开始思考，遇到设计需求就 fallback 到"按狗狗分配"，而非"共享治理"。breed config 中 `roles` 字段潜意识强化了"某能力是某狗狗的 job"。`cautions` 是同一枚硬币的反面：定义"不能做"和定义"能做"一样是 breed-binding。
 - 触发条件：设计共享能力或治理规则时，把它们放到 breed config 而非平台层（hooks/AGENTS.md）。
 - 修复：共享能力（RAG、MCP tools）和治理规则（限制、铁律）都是平台层服务，不绑定狗狗。技术限制是 CLI 工具的限制，不是狗狗角色分配。治理规则在 AGENTS.md + hooks S2 中，不在 breed config 中重复。

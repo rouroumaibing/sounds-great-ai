@@ -1,4 +1,4 @@
-## 引导候选（对标 clowder-ai D17）
+## 引导候选
 
 匹配的 guide：{{.MatchedGuide}}
 Guide 状态：{{.GuideStatus}}

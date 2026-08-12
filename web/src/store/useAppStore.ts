@@ -30,7 +30,6 @@ interface AppStore {
 
   // Settings UI state (filters only — data in useSettings hook)
   memberFilter: MemberFilterType;
-  globalDefaultDog: string;
 
   // Interaction state
   userPromptInput: string;
@@ -70,7 +69,6 @@ interface AppStore {
 
   // Actions — Settings UI
   setMemberFilter: (filter: MemberFilterType) => void;
-  setGlobalDefaultDog: (dog: string) => void;
 
   // Actions — Interaction
   setUserPromptInput: (input: string) => void;
@@ -119,7 +117,6 @@ export const useAppStore = create<AppStore>()(
       threadFilter: 'all',
 
       memberFilter: 'all',
-      globalDefaultDog: '',
 
       userPromptInput: '',
       contextMenu: { show: false, x: 0, y: 0, file: null },
@@ -160,7 +157,6 @@ export const useAppStore = create<AppStore>()(
       setThreadFilter: (filter) => set({ threadFilter: filter }),
 
       setMemberFilter: (filter) => set({ memberFilter: filter }),
-      setGlobalDefaultDog: (dog) => set({ globalDefaultDog: dog }),
 
       setUserPromptInput: (input) => set({ userPromptInput: input }),
 

@@ -3,11 +3,12 @@ package router
 import (
 	"context"
 	"testing"
-	"sounds-great-ai/internal/config"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 func TestMatchRulesCodeReview(t *testing.T) {
-	rules := []config.RoutingRule{
+	rules := []pack.RoutingRule{
 		{TaskType: "code_review", AssignRoles: []string{"reviewer"}, RequireCrossBreed: true, Skills: []string{"code-review"}},
 	}
 	engine := NewEngine(rules, nil)
@@ -24,7 +25,7 @@ func TestMatchRulesCodeReview(t *testing.T) {
 }
 
 func TestMatchRulesNoMatch(t *testing.T) {
-	rules := []config.RoutingRule{
+	rules := []pack.RoutingRule{
 		{TaskType: "code_review", AssignRoles: []string{"reviewer"}},
 	}
 	engine := NewEngine(rules, nil)

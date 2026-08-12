@@ -12,7 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// ClosureState represents the lifecycle state of a verdict (对标 clowder-ai 10 状态机).
+// ClosureState represents the lifecycle state of a verdict (10-state machine).
 type ClosureState string
 
 const (
@@ -60,7 +60,7 @@ func NewClosureService(rdb *redis.Client) ClosureService {
 
 // --- RedisClosureService ---
 
-// closureLuaScript is the atomic Lua script for idempotent event append (对标 clowder-ai).
+// closureLuaScript is the atomic Lua script for idempotent event append.
 const closureLuaScript = `
 local already = redis.call('SISMEMBER', KEYS[2], ARGV[1])
 if already == 1 then

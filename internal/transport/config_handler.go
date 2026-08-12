@@ -7,25 +7,26 @@ import (
 	"path/filepath"
 	"strings"
 
-	"sounds-great-ai/internal/config"
 	"sounds-great-ai/internal/settings"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 // ConfigHandler handles advanced config management HTTP endpoints.
 type ConfigHandler struct {
-	breedLoader   *config.Loader
+	breedLoader   *pack.Loader
 	breedsDir     string
 	settingsStore settings.SettingsStore
 	envPath       string
-	leader        *config.LeaderConfig
+	leader        *pack.Leader
 }
 
-func NewConfigHandler(loader *config.Loader, breedsDir string, store settings.SettingsStore, envPath string) *ConfigHandler {
+func NewConfigHandler(loader *pack.Loader, breedsDir string, store settings.SettingsStore, envPath string) *ConfigHandler {
 	return &ConfigHandler{breedLoader: loader, breedsDir: breedsDir, settingsStore: store, envPath: envPath}
 }
 
 // SetLeader wires the platform's LeaderConfig pointer for GET/PATCH /api/config/leader.
-func (h *ConfigHandler) SetLeader(l *config.LeaderConfig) {
+func (h *ConfigHandler) SetLeader(l *pack.Leader) {
 	h.leader = l
 }
 
@@ -66,30 +67,59 @@ func (h *ConfigHandler) SetDefaultBreed(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if body.BreedID != "" {
-		breeds, _ := h.breedLoader.LoadFromFile(filepath.Join(h.breedsDir, "dog-template.json"))
-		if _, ok := breeds[body.BreedID]; !ok {
+		known, _ := h.knownBreedIDs()
+		if !known[body.BreedID] {
 			respondJSON(w, http.StatusNotFound, map[string]string{"error": "breed not found"})
 			return
 		}
 	}
-	os.Setenv("DEFAULT_BREED_ID", body.BreedID)
+	// Persist to the settings store. A deploy-time DEFAULT_BREED_ID env override
+	// still wins on read (see GetDefaultBreed).
+	if err := h.settingsStore.UpdateConfig("default_breed", body.BreedID); err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
 	respondJSON(w, http.StatusOK, map[string]string{"breed_id": body.BreedID})
 }
 
-func (h *ConfigHandler) GetBreedOrder(w http.ResponseWriter, r *http.Request) {
-	configs, _ := h.settingsStore.ListConfig()
-	for _, c := range configs {
-		if c.Key == "breed_order" && c.Value != "" {
-			var order []string
-			if json.Unmarshal([]byte(c.Value), &order) == nil {
-				respondJSON(w, http.StatusOK, map[string][]string{"order": order})
-				return
+// knownBreedIDs returns the set of valid breed IDs as the union of the template
+// seeds and the runtime catalog (clowder-homologous merged registry). New
+// members created at runtime must be selectable as the default breed, so the
+// catalog breeds are included in the validation set.
+func (h *ConfigHandler) knownBreedIDs() (map[string]bool, error) {
+	known := make(map[string]bool)
+	if tmpl, err := h.breedLoader.LoadFromFile(filepath.Join(h.breedsDir, "dog-template.json")); err == nil {
+		for id := range tmpl {
+			known[id] = true
+		}
+	}
+	if catalog, err := h.settingsStore.ListBreeds(); err == nil {
+		for _, b := range catalog {
+			if b != nil && b.ID != "" {
+				known[b.ID] = true
 			}
 		}
 	}
-	breeds, _ := h.breedLoader.LoadFromFile(filepath.Join(h.breedsDir, "dog-template.json"))
-	order := make([]string, 0, len(breeds))
-	for id := range breeds {
+	return known, nil
+}
+
+func (h *ConfigHandler) GetBreedOrder(w http.ResponseWriter, r *http.Request) {
+	// The catalog breeds[] order is the sort truth (clowder-homologous).
+	breeds, _ := h.settingsStore.ListBreeds()
+	if len(breeds) > 0 {
+		order := make([]string, 0, len(breeds))
+		for _, b := range breeds {
+			if b != nil && b.ID != "" {
+				order = append(order, b.ID)
+			}
+		}
+		respondJSON(w, http.StatusOK, map[string][]string{"order": order})
+		return
+	}
+	// Fallback to template order before any catalog exists.
+	tmpl, _ := h.breedLoader.LoadFromFile(filepath.Join(h.breedsDir, "dog-template.json"))
+	order := make([]string, 0, len(tmpl))
+	for id := range tmpl {
 		order = append(order, id)
 	}
 	respondJSON(w, http.StatusOK, map[string][]string{"order": order})
@@ -103,10 +133,10 @@ func (h *ConfigHandler) SetBreedOrder(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-	breeds, _ := h.breedLoader.LoadFromFile(filepath.Join(h.breedsDir, "dog-template.json"))
+	known, _ := h.knownBreedIDs()
 	var missing []string
 	for _, id := range body.Order {
-		if _, ok := breeds[id]; !ok {
+		if !known[id] {
 			missing = append(missing, id)
 		}
 	}
@@ -114,8 +144,11 @@ func (h *ConfigHandler) SetBreedOrder(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown breed IDs", "missing": missing})
 		return
 	}
-	orderJSON, _ := json.Marshal(body.Order)
-	h.settingsStore.UpdateConfig("breed_order", string(orderJSON))
+	// Reorder the persisted catalog breeds[] (clowder-homologous sort truth).
+	if err := h.settingsStore.ReorderBreeds(body.Order); err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
 	respondJSON(w, http.StatusOK, map[string][]string{"order": body.Order})
 }
 
@@ -174,16 +207,18 @@ func (h *ConfigHandler) UpdateEnv(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ConfigHandler) GetLeader(w http.ResponseWriter, r *http.Request) {
-	if h.leader == nil {
-		defaultCfg := config.DefaultLeaderConfig()
+	// Persisted leader lives in dog-catalog.json (via the settings store).
+	l, err := h.settingsStore.GetLeader()
+	if err != nil || l == nil {
+		defaultCfg := pack.DefaultLeaderConfig()
 		respondJSON(w, http.StatusOK, defaultCfg)
 		return
 	}
-	respondJSON(w, http.StatusOK, h.leader)
+	respondJSON(w, http.StatusOK, l)
 }
 
 func (h *ConfigHandler) UpdateLeader(w http.ResponseWriter, r *http.Request) {
-	var body config.LeaderConfig
+	var body pack.Leader
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
@@ -192,18 +227,16 @@ func (h *ConfigHandler) UpdateLeader(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	if h.leader == nil {
-		h.leader = &body
-	} else {
-		h.leader.Name = body.Name
-		h.leader.Aliases = body.Aliases
-		h.leader.MentionPatterns = body.MentionPatterns
-		h.leader.TimeZone = body.TimeZone
-		h.leader.Avatar = body.Avatar
-		h.leader.ColorPrimary = body.ColorPrimary
-		h.leader.ColorSecondary = body.ColorSecondary
+	// Persist to dog-catalog.json.
+	if err := h.settingsStore.UpdateLeader(&body); err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
 	}
-	respondJSON(w, http.StatusOK, h.leader)
+	// Keep the platform's in-memory leader in sync for runtime use.
+	if h.leader != nil {
+		*h.leader = body
+	}
+	respondJSON(w, http.StatusOK, &body)
 }
 
 func isSensitiveEnv(key string) bool {

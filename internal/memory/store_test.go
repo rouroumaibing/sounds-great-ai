@@ -13,9 +13,9 @@ func TestEvidenceStore(t *testing.T) {
 
 func TestDecisionStore(t *testing.T) {
 	store := NewMemoryStore()
-	d := Decision{ID: "dec1", Topic: "use-clowder-ai-architecture", Decision: "Full alignment with clowder-ai", Reason: "Hard Rails, Soft Power is better"}
+	d := Decision{ID: "dec1", Topic: "use-reference-architecture", Decision: "Full alignment with reference design", Reason: "Hard Rails, Soft Power is better"}
 	store.AddDecision(d)
 	got := store.GetDecision("dec1")
 	if got == nil { t.Fatal("expected decision dec1") }
-	if got.Topic != "use-clowder-ai-architecture" { t.Errorf("topic = %s", got.Topic) }
+	if got.Topic != "use-reference-architecture" { t.Errorf("topic = %s", got.Topic) }
 }

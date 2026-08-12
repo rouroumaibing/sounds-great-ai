@@ -1,4 +1,4 @@
-## 技能唤醒（对标 clowder-ai L6）
+## 技能唤醒
 
 非 SOP 默认链。"坏直觉 → 该用的"。不熟用 tool_search 搜 skill 名：
 

@@ -1,4 +1,4 @@
-## MCP 回调（对标 clowder-ai C1）
+## MCP 回调
 
 MCP 服务可用时注入的回调提示。
 

@@ -17,8 +17,8 @@ interface RawSection {
 // (Other sections removed at the user's request — keep the settings app focused.
 //  'about' was promoted to a top-level PrimaryNav item at the user's request.)
 const RAW_SECTIONS: RawSection[] = [
-  { id: 'members', label: '成员管理', desc: '狗狗名册、默认协作对象与编排顺序。', icon: 'fa-solid fa-users-gear', color: 'indigo' },
   { id: 'accounts', label: '账户与密钥', desc: '模型账户、凭据和执行身份的归属关系。', icon: 'fa-solid fa-key', color: 'indigo' },
+  { id: 'members', label: '成员管理', desc: '狗狗名册、默认协作对象与编排顺序。', icon: 'fa-solid fa-users-gear', color: 'indigo' },
 ];
 
 export const DEFAULT_SECTION = 'members';

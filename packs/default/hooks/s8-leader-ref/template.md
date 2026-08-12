@@ -1,4 +1,4 @@
-## Leader 参考（对标 clowder-ai S8）
+## Leader 参考
 
 Leader（operator）：{{.LeaderName}}。重要决策由 Leader 拍板。需要关注时行首写 {{.LeaderFirstMention}}。
 

@@ -35,7 +35,7 @@ func TestMemoryCredentialStore_CRUD(t *testing.T) {
 func TestFileCredentialStore_CRUD(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "credentials.json")
-	cs := NewFileCredentialStore(path)
+	cs := NewFileCredentialStore(path, false)
 
 	cs.Set("anthropic", "sk-ant-xxx")
 	cs.Set("openai", "sk-oai-yyy")
@@ -50,7 +50,7 @@ func TestFileCredentialStore_CRUD(t *testing.T) {
 		t.Fatalf("Get: got %q, %v; want sk-ant-xxx", val, err)
 	}
 
-	cs2 := NewFileCredentialStore(path)
+	cs2 := NewFileCredentialStore(path, false)
 	val2, _ := cs2.Get("openai")
 	if val2 != "sk-oai-yyy" {
 		t.Fatalf("lazy load: got %q, want sk-oai-yyy", val2)

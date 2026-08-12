@@ -1,4 +1,4 @@
-## 技能触发（对标 clowder-ai D11）
+## 技能触发
 
 当前匹配的 skill：{{.MatchedSkill}}
 触发原因：{{.TriggerReason}}

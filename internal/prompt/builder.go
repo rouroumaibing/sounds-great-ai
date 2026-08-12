@@ -4,20 +4,21 @@ import (
 	"fmt"
 	"strings"
 
-	"sounds-great-ai/internal/config"
 	"sounds-great-ai/internal/skills"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 // Builder constructs system prompts for CLI adapter invocations.
 // It assembles breed identity, teammate roster, safety rules, and skill prompts
 // into a single system prompt string injected into the CLI agent.
 type Builder struct {
-	breeds map[string]*config.BreedConfig
+	breeds map[string]*pack.BreedConfig
 	skills *skills.SkillManager
 }
 
 // NewBuilder creates a prompt builder from breed configs and skills.
-func NewBuilder(breeds map[string]*config.BreedConfig, skillMgr *skills.SkillManager) *Builder {
+func NewBuilder(breeds map[string]*pack.BreedConfig, skillMgr *skills.SkillManager) *Builder {
 	return &Builder{
 		breeds: breeds,
 		skills: skillMgr,
@@ -26,10 +27,10 @@ func NewBuilder(breeds map[string]*config.BreedConfig, skillMgr *skills.SkillMan
 
 // BuildRequest specifies what to include in the system prompt.
 type BuildRequest struct {
-	BreedID   string   // target breed
-	VariantID string   // specific variant (empty = default)
-	SkillIDs  []string // skill prompt IDs to inject
-	RAGContext string  // retrieved knowledge context (empty = no RAG)
+	BreedID    string   // target breed
+	VariantID  string   // specific variant (empty = default)
+	SkillIDs   []string // skill prompt IDs to inject
+	RAGContext string   // retrieved knowledge context (empty = no RAG)
 }
 
 // Build constructs the full system prompt for a CLI adapter invocation.
@@ -120,7 +121,7 @@ func (b *Builder) buildSkillRoster() string {
 }
 
 // buildIdentity constructs the breed's static identity section.
-func (b *Builder) buildIdentity(breed *config.BreedConfig) string {
+func (b *Builder) buildIdentity(breed *pack.BreedConfig) string {
 	var sb strings.Builder
 
 	sb.WriteString("# 身份\n\n")

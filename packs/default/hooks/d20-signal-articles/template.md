@@ -1,4 +1,4 @@
-## 信号文章（对标 clowder-ai D20）
+## 信号文章
 
 未读信号：{{.UnreadSignals}}
 信号 tier：{{.SignalTier}}

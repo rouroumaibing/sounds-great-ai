@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"sounds-great-ai/internal/config"
 	"sounds-great-ai/internal/skills"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 // TestIntegrationPromptBuilderWithRealBreeds loads actual breed configs
@@ -22,7 +23,7 @@ func TestIntegrationPromptBuilderWithRealBreeds(t *testing.T) {
 	}
 
 	// Load real breed configs from the single consolidated template file.
-	loader := config.NewLoader()
+	loader := pack.NewLoader()
 	breeds, err := loader.LoadFromFile(filepath.Join(breedsDir, "dog-template.json"))
 	if err != nil {
 		t.Fatalf("failed to load breeds: %v", err)
@@ -103,7 +104,7 @@ func TestIntegrationPromptBuilderRosterContent(t *testing.T) {
 		t.Skipf("breeds dir not found: %v", err)
 	}
 
-	loader := config.NewLoader()
+	loader := pack.NewLoader()
 	breeds, err := loader.LoadFromFile(filepath.Join(breedsDir, "dog-template.json"))
 	if err != nil {
 		t.Fatalf("failed to load breeds: %v", err)

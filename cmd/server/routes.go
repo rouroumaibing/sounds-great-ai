@@ -58,16 +58,28 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	})
 	mux.HandleFunc("GET /ws", wsHandler.HandleWS)
 
+	settingsDir := settings.ConfigRoot(workspaceDir)
+	var settingsStore settings.SettingsStore
+	if pl != nil {
+		settingsStore = pl.SettingsStore
+	} else {
+		settingsStore = settings.NewFileSettingsStore(
+			filepath.Join(settingsDir, settings.AccountsFileName),
+			filepath.Join(settingsDir, settings.CatalogFileName),
+			true,
+		)
+	}
+
 	eventBus := config.NewEventBus()
 	breedsDir := os.Getenv("BREEDS_DIR")
 	if breedsDir == "" {
 		breedsDir = "packs/default/breeds"
 	}
 
-	packAPI := packapi.NewHandler(p, breedsDir)
+	packAPI := packapi.NewHandler(p, breedsDir, settingsStore)
 	packAPI.SetEventBus(eventBus)
-	mux.Handle("/api/breeds", packAPI.Routes())
-	mux.Handle("/api/breeds/", packAPI.Routes())
+	mux.Handle("/api/breeds", auth.Wrap(packAPI.Routes()))
+	mux.Handle("/api/breeds/", auth.Wrap(packAPI.Routes()))
 
 	if registry != nil && embedder != nil {
 		ragHandler := transport.NewRAGHandler(registry, embedder, workspaceDir)
@@ -99,23 +111,17 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	mux.Handle("/api/threads/", threadHandler.Routes())
 	mux.Handle("/api/sessions/", threadHandler.Routes())
 
-	var settingsStore settings.SettingsStore
-	if pl != nil {
-		settingsStore = pl.SettingsStore
-	} else {
-		settingsStore = settings.NewSettingsStore()
-	}
-	credStore := settings.NewMemoryCredentialStore()
+	credStore := settings.NewFileCredentialStore(filepath.Join(settingsDir, settings.CredentialsFileName), true)
 	settingsHandler := transport.NewSettingsHandlerWithCredentials(settingsStore, credStore, eventBus)
-	mux.Handle("/api/settings/", settingsHandler.Routes())
+	mux.Handle("/api/settings/", auth.Wrap(settingsHandler.Routes()))
 
-	breedLoader := config.NewLoader()
+	breedLoader := pack.NewLoader()
 	envPath := filepath.Join(workspaceDir, ".env")
 	configHandler := transport.NewConfigHandler(breedLoader, breedsDir, settingsStore, envPath)
 	if pl != nil && pl.Leader != nil {
 		configHandler.SetLeader(pl.Leader)
 	}
-	mux.Handle("/api/config/", configHandler.Routes())
+	mux.Handle("/api/config/", auth.Wrap(configHandler.Routes()))
 
 	var hookReg *hooks.Registry
 	if pl != nil {

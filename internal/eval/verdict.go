@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// VerdictType is the judgment category (对标 clowder-ai verdict-handoff.ts).
+// VerdictType is the judgment category.
 type VerdictType string
 
 const (

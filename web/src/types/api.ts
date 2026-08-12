@@ -77,6 +77,33 @@ export interface BreedConfig {
   caution?: string;
 }
 
+// Roster entry (runtime membership meta). Keyed by breed id in the roster map.
+export interface RosterEntry {
+  family: string;
+  roles?: string[];
+  lead?: boolean;
+  available?: boolean;
+  evaluation?: string;
+}
+
+// Pack-level review policy.
+export interface ReviewPolicy {
+  require_different_breed?: boolean;
+  prefer_active_in_thread?: boolean;
+  exclude_unavailable?: boolean;
+  preferred_roles?: string[];
+}
+
+// Default-breed / breed-order config payloads.
+export interface DefaultBreedResponse {
+  breed_id: string;
+  is_override: boolean;
+}
+
+export interface BreedOrderResponse {
+  order: string[];
+}
+
 // --- TaskInput (Go struct WITHOUT json tags → PascalCase) ---
 export interface ExecutionContext {
   user_id: string;

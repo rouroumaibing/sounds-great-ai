@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"sounds-great-ai/internal/settings"
 	"sounds-great-ai/pkg/pack"
 )
 
@@ -38,6 +39,30 @@ func newTestPack(t *testing.T) *pack.Pack {
 	return p
 }
 
+// newTestStore returns a fresh, isolated file-backed SettingsStore rooted in a
+// temp dir. Each call gets its own accounts.json + dog-catalog.json so tests
+// never collide on disk.
+func newTestStore(t *testing.T) settings.SettingsStore {
+	t.Helper()
+	dir := t.TempDir()
+	return settings.NewFileSettingsStore(
+		filepath.Join(dir, "accounts.json"),
+		filepath.Join(dir, "dog-catalog.json"),
+		false,
+	)
+}
+
+// failingCreateStore wraps a real SettingsStore but makes CreateBreed always
+// fail, so we can exercise the rollback path in CreateBreed (persist failure
+// must not leave the breed registered in the in-memory pack).
+type failingCreateStore struct {
+	settings.SettingsStore
+}
+
+func (f *failingCreateStore) CreateBreed(*pack.BreedConfig) error {
+	return fmt.Errorf("simulated persist failure")
+}
+
 func newValidBreed() pack.BreedConfig {
 	return pack.BreedConfig{
 		ID:               "user-breed",
@@ -46,7 +71,7 @@ func newValidBreed() pack.BreedConfig {
 		DefaultVariantID: "v1",
 		Variants: []pack.Variant{{
 			ID:           "v1",
-			ClientID:     "test",
+			ClientID:     "claude",
 			DefaultModel: "test-model",
 		}},
 		Source: pack.BreedSourceUser,
@@ -56,7 +81,7 @@ func newValidBreed() pack.BreedConfig {
 func TestCreateBreedSuccess(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	cfg := newValidBreed()
 	body, _ := json.Marshal(cfg)
@@ -84,11 +109,11 @@ func TestListBreeds(t *testing.T) {
 	p.Register(&pack.BreedConfig{
 		ID:               "breed1",
 		DefaultVariantID: "v1",
-		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
 		Source:           pack.BreedSourceUser,
 	})
 
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 	req := httptest.NewRequest(http.MethodGet, "/api/breeds", nil)
 	w := httptest.NewRecorder()
 	h.ListBreeds(w, req)
@@ -110,11 +135,11 @@ func TestDeleteUserBreedSuccess(t *testing.T) {
 	p.Register(&pack.BreedConfig{
 		ID:               "user-breed",
 		DefaultVariantID: "v1",
-		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
 		Source:           pack.BreedSourceUser,
 	})
 
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 	req := httptest.NewRequest(http.MethodDelete, "/api/breeds/user-breed", nil)
 	req.SetPathValue("id", "user-breed")
 	w := httptest.NewRecorder()
@@ -135,11 +160,11 @@ func TestDeleteSystemBreedForbidden(t *testing.T) {
 	p.Register(&pack.BreedConfig{
 		ID:               "sys-breed",
 		DefaultVariantID: "v1",
-		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
 		Source:           pack.BreedSourceSystem,
 	})
 
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 	req := httptest.NewRequest(http.MethodDelete, "/api/breeds/sys-breed", nil)
 	req.SetPathValue("id", "sys-breed")
 	w := httptest.NewRecorder()
@@ -151,10 +176,11 @@ func TestDeleteSystemBreedForbidden(t *testing.T) {
 }
 
 func TestCreateBreedRollbackOnPersistFailure(t *testing.T) {
+	dir := t.TempDir()
 	p := newTestPack(t)
 
-	// Use a breedsDir that doesn't exist — saveBreedFile will fail
-	h := NewHandler(p, "/nonexistent/path/that/does/not/exist")
+	// Persist always fails → CreateBreed must roll back the in-memory registration.
+	h := NewHandler(p, dir, &failingCreateStore{newTestStore(t)})
 
 	cfg := newValidBreed()
 	body, _ := json.Marshal(cfg)
@@ -177,14 +203,14 @@ func TestCreateBreedRollbackOnPersistFailure(t *testing.T) {
 func TestCreateBreedDefaultSourceUser(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	// Omit source — should default to user
 	cfg := pack.BreedConfig{
 		ID:               "no-source-breed",
 		Name:             "test",
 		DefaultVariantID: "v1",
-		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
 	}
 	body, _ := json.Marshal(cfg)
 	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(body))
@@ -204,13 +230,13 @@ func TestCreateBreedDefaultSourceUser(t *testing.T) {
 func TestBarkBreedSuccess(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	// Register a breed with the test capability
 	p.Register(&pack.BreedConfig{
 		ID:               "test-bark-breed",
 		DefaultVariantID: "v1",
-		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
 		Source:           pack.BreedSourceSystem,
 	})
 
@@ -228,7 +254,7 @@ func TestBarkBreedSuccess(t *testing.T) {
 func TestBarkBreedNotFound(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	body, _ := json.Marshal(map[string]string{"query": "test"})
 	req := httptest.NewRequest(http.MethodPost, "/api/breeds/nonexistent/bark", bytes.NewReader(body))
@@ -245,7 +271,7 @@ func setupTestPackHandler(t *testing.T) (*Handler, string) {
 	t.Helper()
 	dir := t.TempDir()
 	p := pack.New("test")
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 	return h, dir
 }
 
@@ -298,7 +324,7 @@ func TestUpdateBreed(t *testing.T) {
 		Name:        "Test",
 		DisplayName: "Test Breed",
 		Source:      pack.BreedSourceUser,
-		Variants:    []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
+		Variants:    []pack.Variant{{ID: "default", ClientID: "claude", DefaultModel: "claude-opus-4-6"}},
 	}
 	h.pack.Register(&cfg)
 	h.persistBreed(&cfg)
@@ -347,7 +373,7 @@ func TestGetBreedStatus(t *testing.T) {
 func TestCreateBreedInvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader([]byte("not json")))
 	w := httptest.NewRecorder()
@@ -361,7 +387,7 @@ func TestCreateBreedInvalidJSON(t *testing.T) {
 func TestCreateBreedEmptyBody(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(nil))
 	w := httptest.NewRecorder()
@@ -380,18 +406,18 @@ func TestCreateBreedOverwriteSystemBreed(t *testing.T) {
 	p.Register(&pack.BreedConfig{
 		ID:               "sys-breed",
 		DefaultVariantID: "v1",
-		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
 		Source:           pack.BreedSourceSystem,
 	})
 
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	// Try to overwrite as user source
 	cfg := pack.BreedConfig{
 		ID:               "sys-breed",
 		Name:             "overwritten",
 		DefaultVariantID: "v1",
-		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
 		Source:           pack.BreedSourceUser,
 	}
 	body, _ := json.Marshal(cfg)
@@ -407,7 +433,7 @@ func TestCreateBreedOverwriteSystemBreed(t *testing.T) {
 func TestListBreedsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/breeds", nil)
 	w := httptest.NewRecorder()
@@ -431,12 +457,12 @@ func TestListBreedsMultiple(t *testing.T) {
 		p.Register(&pack.BreedConfig{
 			ID:               fmt.Sprintf("breed-%d", i),
 			DefaultVariantID: "v1",
-			Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+			Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
 			Source:           pack.BreedSourceUser,
 		})
 	}
 
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 	req := httptest.NewRequest(http.MethodGet, "/api/breeds", nil)
 	w := httptest.NewRecorder()
 	h.ListBreeds(w, req)
@@ -454,7 +480,7 @@ func TestListBreedsMultiple(t *testing.T) {
 func TestDeleteBreedNotFound(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/breeds/nonexistent", nil)
 	req.SetPathValue("id", "nonexistent")
@@ -466,31 +492,37 @@ func TestDeleteBreedNotFound(t *testing.T) {
 	}
 }
 
-func TestDeleteBreedRemovesFile(t *testing.T) {
+func TestDeleteBreedRemovesFromCatalog(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
+	store := newTestStore(t)
 
 	cfg := pack.BreedConfig{
 		ID:               "file-breed",
 		DefaultVariantID: "v1",
-		Variants:         []pack.Variant{{ID: "v1", ClientID: "test", DefaultModel: "m"}},
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
 		Source:           pack.BreedSourceUser,
 	}
 	p.Register(&cfg)
-	h := NewHandler(p, dir)
-	h.persistBreed(&cfg)
+	h := NewHandler(p, dir, store)
+	if err := h.persistBreed(&cfg); err != nil {
+		t.Fatalf("persistBreed: %v", err)
+	}
 
-	// Verify the consolidated template file exists with the breed in it.
-	filePath := filepath.Join(dir, "dog-template.json")
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		t.Fatalf("template file should exist before delete")
-	}
-	tmpl, err := h.loadDogTemplate()
+	// Before delete: the runtime catalog must hold the breed plus a roster entry.
+	breeds, err := store.ListBreeds()
 	if err != nil {
-		t.Fatalf("loadDogTemplate: %v", err)
+		t.Fatalf("ListBreeds: %v", err)
 	}
-	if len(tmpl.Breeds) != 1 || tmpl.Breeds[0].ID != "file-breed" {
-		t.Fatalf("expected file-breed in template before delete, got %v", tmpl.Breeds)
+	if len(breeds) != 1 || breeds[0].ID != "file-breed" {
+		t.Fatalf("expected file-breed in catalog before delete, got %v", breeds)
+	}
+	roster, err := store.GetRoster()
+	if err != nil {
+		t.Fatalf("GetRoster: %v", err)
+	}
+	if _, ok := roster["file-breed"]; !ok {
+		t.Fatalf("expected roster entry for file-breed before delete")
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/breeds/file-breed", nil)
@@ -499,23 +531,127 @@ func TestDeleteBreedRemovesFile(t *testing.T) {
 	h.DeleteBreed(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+		t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusOK, w.Body.String())
 	}
-	tmpl, err = h.loadDogTemplate()
-	if err != nil {
-		t.Fatalf("loadDogTemplate after delete: %v", err)
-	}
-	for _, b := range tmpl.Breeds {
+
+	breeds, _ = store.ListBreeds()
+	for _, b := range breeds {
 		if b.ID == "file-breed" {
-			t.Errorf("breed file-breed should be removed from template, got %v", tmpl.Breeds)
+			t.Errorf("breed file-breed should be removed from catalog, got %v", breeds)
 		}
+	}
+	roster, _ = store.GetRoster()
+	if _, ok := roster["file-breed"]; ok {
+		t.Errorf("roster entry for file-breed should be removed")
+	}
+}
+
+// TestCreateBreedDuplicateAlias verifies that two breeds cannot share a
+// mention pattern (alias) — the handler must return 400 on conflict.
+func TestCreateBreedDuplicateAlias(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+
+	// An existing breed owns the alias "@alpha".
+	p.Register(&pack.BreedConfig{
+		ID:               "existing",
+		DefaultVariantID: "v1",
+		MentionPatterns:  []string{"@alpha"},
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
+		Source:           pack.BreedSourceUser,
+	})
+
+	h := NewHandler(p, dir, newTestStore(t))
+
+	cfg := pack.BreedConfig{
+		ID:               "new-breed",
+		DefaultVariantID: "v1",
+		MentionPatterns:  []string{"@ALPHA"}, // case-insensitive collision
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", DefaultModel: "m"}},
+		Source:           pack.BreedSourceUser,
+	}
+	body, _ := json.Marshal(cfg)
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateBreed(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (duplicate alias), body=%s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+}
+
+// TestCreateBreedInvalidClientID verifies the client_id whitelist guard (D5).
+func TestCreateBreedInvalidClientID(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir, newTestStore(t))
+
+	cfg := pack.BreedConfig{
+		ID:               "bad-client-breed",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "badclient", DefaultModel: "m"}},
+		Source:           pack.BreedSourceUser,
+	}
+	body, _ := json.Marshal(cfg)
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateBreed(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (invalid client_id), body=%s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+}
+
+// TestCreateBreedAccountRefNotFound verifies a non-existent account_ref is
+// rejected. Empty refs and built-in OAuth refs (claude/codex/...) are allowed.
+func TestCreateBreedAccountRefNotFound(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir, newTestStore(t))
+
+	cfg := pack.BreedConfig{
+		ID:               "missing-account-breed",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "claude", AccountRef: "does-not-exist", DefaultModel: "m"}},
+		Source:           pack.BreedSourceUser,
+	}
+	body, _ := json.Marshal(cfg)
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateBreed(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (account_ref not found), body=%s", w.Code, http.StatusBadRequest, w.Body.String())
+	}
+}
+
+// TestCreateBreedEmptyClientIDAllowed verifies that an empty client_id
+// (generic api_key account, per decision D5) is accepted.
+func TestCreateBreedEmptyClientIDAllowed(t *testing.T) {
+	dir := t.TempDir()
+	p := newTestPack(t)
+	h := NewHandler(p, dir, newTestStore(t))
+
+	cfg := pack.BreedConfig{
+		ID:               "generic-breed",
+		DefaultVariantID: "v1",
+		Variants:         []pack.Variant{{ID: "v1", ClientID: "", DefaultModel: "m"}},
+		Source:           pack.BreedSourceUser,
+	}
+	body, _ := json.Marshal(cfg)
+	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateBreed(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d (empty client_id allowed), body=%s", w.Code, http.StatusOK, w.Body.String())
 	}
 }
 
 func TestBarkBreedInvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/breeds/some/bark", bytes.NewReader([]byte("not json")))
 	req.SetPathValue("id", "some")
@@ -530,7 +666,7 @@ func TestBarkBreedInvalidJSON(t *testing.T) {
 func TestBarkBreedEmptyBody(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/breeds/some/bark", bytes.NewReader(nil))
 	req.SetPathValue("id", "some")
@@ -564,7 +700,7 @@ func TestUpdateBreedSystemBreedForbidden(t *testing.T) {
 		Name:        "System",
 		DisplayName: "System Breed",
 		Source:      pack.BreedSourceSystem,
-		Variants:    []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
+		Variants:    []pack.Variant{{ID: "default", ClientID: "claude", DefaultModel: "claude-opus-4-6"}},
 	}
 	h.pack.Register(&cfg)
 
@@ -587,7 +723,7 @@ func TestUpdateBreedInvalidJSON(t *testing.T) {
 		Name:        "Test",
 		DisplayName: "Test Breed",
 		Source:      pack.BreedSourceUser,
-		Variants:    []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
+		Variants:    []pack.Variant{{ID: "default", ClientID: "claude", DefaultModel: "claude-opus-4-6"}},
 	}
 	h.pack.Register(&cfg)
 
@@ -611,7 +747,7 @@ func TestUpdateBreedMultipleFields(t *testing.T) {
 		Personality:     "calm",
 		RoleDescription: "analyzer",
 		Source:          pack.BreedSourceUser,
-		Variants:        []pack.Variant{{ID: "default", ClientID: "anthropic", DefaultModel: "claude-opus-4-6"}},
+		Variants:        []pack.Variant{{ID: "default", ClientID: "claude", DefaultModel: "claude-opus-4-6"}},
 	}
 	h.pack.Register(&cfg)
 	h.persistBreed(&cfg)
@@ -658,7 +794,7 @@ func TestGetBreedStatusNotFound(t *testing.T) {
 func TestErrorResponseFormat(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/breeds", bytes.NewReader([]byte("bad")))
 	w := httptest.NewRecorder()
@@ -676,7 +812,7 @@ func TestErrorResponseFormat(t *testing.T) {
 func TestCreateBreedContentTypeJSON(t *testing.T) {
 	dir := t.TempDir()
 	p := newTestPack(t)
-	h := NewHandler(p, dir)
+	h := NewHandler(p, dir, newTestStore(t))
 
 	cfg := newValidBreed()
 	body, _ := json.Marshal(cfg)

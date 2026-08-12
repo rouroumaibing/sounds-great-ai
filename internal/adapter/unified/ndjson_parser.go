@@ -13,7 +13,7 @@ type ParseError struct {
 	Error string
 }
 
-// IsParseError type guard (mirrors clowder-ai's isParseError).
+// IsParseError type guard.
 func IsParseError(v any) bool {
 	_, ok := v.(ParseError)
 	return ok

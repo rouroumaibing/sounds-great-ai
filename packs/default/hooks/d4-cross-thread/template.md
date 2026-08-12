@@ -1,4 +1,4 @@
-## 跨 thread 协同（对标 clowder-ai D4）
+## 跨 thread 协同
 
 跨 thread 通知和责任处置。**ACTION/BLOCKING 不转移球权。**
 

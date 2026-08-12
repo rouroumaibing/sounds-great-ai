@@ -9,7 +9,7 @@ import (
 	"sounds-great-ai/internal/eval"
 )
 
-// EvalHandler handles eval HTTP endpoints (对标 clowder-ai eval-hub.ts).
+// EvalHandler handles eval HTTP endpoints.
 type EvalHandler struct {
 	runner    *eval.EvalRunner
 	store     *eval.ResultStore

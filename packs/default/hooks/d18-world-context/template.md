@@ -1,4 +1,4 @@
-## 世界上下文（对标 clowder-ai D18）
+## 世界上下文
 
 项目路径：{{.ProjectPath}}
 Worktree：{{.WorktreePath}}

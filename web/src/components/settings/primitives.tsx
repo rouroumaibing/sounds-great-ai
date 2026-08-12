@@ -2,14 +2,11 @@ import type { CSSProperties, DragEvent, ElementType, KeyboardEvent, MouseEvent, 
 import clsx from 'clsx';
 
 // ---------------------------------------------------------------------------
-// Dark-themed equivalents of clowder-ai's settings primitives.
+// 深色主题的设置页基础组件。
 //
-// clowder ships a warm "cafe / console" token system (e.g. var(--cafe-accent),
-// var(--console-card-bg)). The dog platform is a dark slate + amber app, so we
-// map those tokens onto the existing slate/amber palette. This keeps the
-// settings area visually consistent with the rest of the app while reproducing
-// clowder's component vocabulary (page header, sections, collapsible cards,
-// badges, coverage bar, empty state).
+// 犬平台是深 slate + amber 风格的应用，这里将设计令牌映射到既有的 slate/amber
+// 调色板，使设置区与全站视觉保持一致，并复刻常用的组件词汇（page header、
+// sections、collapsible cards、badges、coverage bar、empty state）。
 // ---------------------------------------------------------------------------
 
 type BadgeTone = 'emerald' | 'amber' | 'slate' | 'red' | 'purple' | 'blue';
@@ -192,12 +189,11 @@ export function SettingsEmptyState({
 }
 
 // ---------------------------------------------------------------------------
-// The primitives below mirror clowder-ai's settings/primitives vocabulary
-// (SettingsRow, SettingsPrimaryButton, SettingsStatusStrip, SettingsFilterTabs,
-// SettingsText, SettingsIconButton, SettingsToggleSwitch) on the dog platform's
-// dark slate + amber palette. They let the member management page reproduce
-// clowder's exact layout (toolbar → default selector → leader card → member
-// rows → disabled section) without pulling in clowder's cafe/console tokens.
+// 以下基础组件复刻常用设置页组件词汇（SettingsRow、SettingsPrimaryButton、
+// SettingsStatusStrip、SettingsFilterTabs、SettingsText、SettingsIconButton、
+// SettingsToggleSwitch），运行在犬平台深 slate + amber 调色板上，供成员管理页
+// 复现布局（toolbar → default selector → leader card → member rows →
+// disabled section）。
 // ---------------------------------------------------------------------------
 
 type RowTone = 'default' | 'active' | 'inactive';

@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { AccountAuthModal, type UnifiedAuthEditData } from './AccountAuthModal';
 import { SettingsBadge, SettingsEmptyState, SettingsIconButton, SettingsPrimaryButton, SettingsRow, SettingsStatusStrip } from './primitives';
 import type { SettingsAccount } from '../../types';
+import { ApiError } from '../../services/http';
 
 // --- helpers ---
 
@@ -70,8 +71,21 @@ export function AccountKeys() {
       await deleteAccount(id);
       dispatchAccountsChanged();
       showToast({ message: t('accounts.deleted'), type: 'success' });
-    } catch {
-      // error handled in hook
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        // Account is referenced by a member — confirm a forced delete.
+        if (window.confirm(t('accounts.confirmDeleteBound'))) {
+          try {
+            await deleteAccount(id, true);
+            dispatchAccountsChanged();
+            showToast({ message: t('accounts.deleted'), type: 'success' });
+          } catch {
+            showToast({ message: t('accounts.deleteFailed'), type: 'error' });
+          }
+        }
+      } else {
+        showToast({ message: t('accounts.deleteFailed'), type: 'error' });
+      }
     }
   };
 
@@ -84,7 +98,7 @@ export function AccountKeys() {
 
   return (
     <div className="space-y-4">
-      {/* clowder: 右上角新增账户认证 */}
+      {/* 右上角新增账户认证 */}
       <div className="flex items-center justify-end">
         <SettingsPrimaryButton onClick={openCreate}>
           <i className="fa-solid fa-plus mr-1" />
@@ -102,7 +116,7 @@ export function AccountKeys() {
         />
       )}
 
-      {/* clowder: 内置账户组 + 自定义账户组，资源行卡片 */}
+      {/* 内置账户组 + 自定义账户组，资源行卡片 */}
       {!loading && builtinAccounts.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
@@ -186,7 +200,7 @@ export function AccountKeys() {
         </SettingsStatusStrip>
       )}
 
-      {/* clowder: 新增/编辑账户认证弹窗 */}
+      {/* 新增/编辑账户认证弹窗 */}
       <AccountAuthModal
         open={authModalOpen}
         onClose={() => {

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"sounds-great-ai/internal/config"
+	"sounds-great-ai/pkg/pack"
 )
 
 // RoutingDecision is the result of parsing @mentions from a user message.
@@ -16,7 +16,7 @@ type RoutingDecision struct {
 }
 
 // Router parses @mentions from user messages using breed config mention_patterns.
-// Mirrors clowder-ai's AgentRouter.parseAllMentions() — simplified.
+// Simplified, self-contained implementation.
 type Router struct {
 	// patterns sorted by length descending (longest-first)
 	patterns []mentionPattern
@@ -28,7 +28,7 @@ type mentionPattern struct {
 }
 
 // NewRouter creates a Router from breed configs.
-func NewRouter(breeds map[string]*config.BreedConfig) *Router {
+func NewRouter(breeds map[string]*pack.BreedConfig) *Router {
 	var patterns []mentionPattern
 	for breedID, breed := range breeds {
 		for _, p := range breed.MentionPatterns {

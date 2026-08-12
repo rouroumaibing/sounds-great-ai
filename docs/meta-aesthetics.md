@@ -1,6 +1,6 @@
 # 元美学
 
-> 对标 clowder-ai meta-aesthetics.md。第一性原理 magic word 的详细展开。
+> 第一性原理 magic word 的详细展开。
 
 ## 核心命题
 

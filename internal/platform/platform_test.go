@@ -21,7 +21,7 @@ func TestPlatformNew(t *testing.T) {
 	}`
 	os.WriteFile(filepath.Join(breedsDir, "dog-template.json"), []byte(`{"version":2,"breeds":[`+breedJSON+`]}`), 0644)
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, MaxA2ADepth: 3})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir(), MaxA2ADepth: 3})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestPlatformGetAdapterUnknown(t *testing.T) {
 	breedsDir := t.TempDir()
 	skillsDir := t.TempDir()
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestPlatformReadyWithBreeds(t *testing.T) {
 	breedJSON := `{"id":"bianmu","name":"边牧","display_name":"边牧","default_variant_id":"v1","variants":[{"id":"v1","client_id":"anthropic","default_model":"claude-opus-4-6","cli":{"command":"claude","output_format":"stream-json"}}]}`
 	os.WriteFile(filepath.Join(breedsDir, "dog-template.json"), []byte(`{"version":2,"breeds":[`+breedJSON+`]}`), 0644)
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestPlatformReadyNoBreeds(t *testing.T) {
 	breedsDir := t.TempDir()
 	skillsDir := t.TempDir()
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestPlatformGetBreedNotFound(t *testing.T) {
 	breedsDir := t.TempDir()
 	skillsDir := t.TempDir()
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestPlatformGetAdapterTableDriven(t *testing.T) {
 	breedsDir := t.TempDir()
 	skillsDir := t.TempDir()
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestPlatformClose(t *testing.T) {
 	breedsDir := t.TempDir()
 	skillsDir := t.TempDir()
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestPlatformBuildMCPConfigEmpty(t *testing.T) {
 	breedsDir := t.TempDir()
 	skillsDir := t.TempDir()
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestPlatformNewDefaultMaxA2ADepth(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, MaxA2ADepth: tc.depth})
+			p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir(), MaxA2ADepth: tc.depth})
 			if err != nil {
 				t.Fatalf("New: %v", err)
 			}
@@ -229,7 +229,7 @@ func TestPlatformAdaptersCount(t *testing.T) {
 	breedsDir := t.TempDir()
 	skillsDir := t.TempDir()
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

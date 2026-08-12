@@ -10,6 +10,12 @@ export default {
         sans: ['Inter', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
+      fontSize: {
+        // SG 原无这些档位，移植页依赖它们
+        micro: ['10px', { lineHeight: '14px' }],
+        label: ['11px', { lineHeight: '16px' }],
+        compact: ['13px', { lineHeight: '20px' }],
+      },
       colors: {
         breed: {
           bianmu: '#4A90D9',

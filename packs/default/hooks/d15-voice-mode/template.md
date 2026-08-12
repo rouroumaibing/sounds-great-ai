@@ -1,4 +1,4 @@
-## 语音模式（对标 clowder-ai D15）
+## 语音模式
 
 Voice Mode：{{.VoiceMode}}
 

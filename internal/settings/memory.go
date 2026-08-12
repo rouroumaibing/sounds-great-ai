@@ -6,219 +6,228 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 // InMemorySettingsStore implements SettingsStore with in-memory data structures.
+// It mirrors FileSettingsStore: breeds + roster + review_policy are the source
+// of truth (clowder-homologous); the deprecated Member methods are projected
+// onto that structure via the shared helpers breedToMember/applyBreedUpdates.
 type InMemorySettingsStore struct {
-	mu       sync.RWMutex
-	members  map[string]*Member
-	accounts map[string]*Account
-	configs  []*SystemConfig
+	mu           sync.RWMutex
+	breeds       map[string]*pack.BreedConfig
+	breedOrder   []string
+	roster       map[string]pack.RosterEntry
+	reviewPolicy *pack.ReviewPolicy
+	accounts     map[string]*Account
+	configs      []*SystemConfig
+	leader       *pack.Leader
 }
 
 // NewInMemorySettingsStore creates a new in-memory settings store.
 func NewInMemorySettingsStore() *InMemorySettingsStore {
+	l := pack.DefaultLeaderConfig()
 	return &InMemorySettingsStore{
-		members:  make(map[string]*Member),
+		breeds:   make(map[string]*pack.BreedConfig),
+		roster:   make(map[string]pack.RosterEntry),
 		accounts: make(map[string]*Account),
 		configs:  defaultConfig(),
+		leader:   &l,
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Breeds (runtime member catalog)
+// ---------------------------------------------------------------------------
+
+func (s *InMemorySettingsStore) ListBreeds() ([]*pack.BreedConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*pack.BreedConfig, 0, len(s.breeds))
+	seen := make(map[string]bool, len(s.breedOrder))
+	for _, id := range s.breedOrder {
+		if b, ok := s.breeds[id]; ok {
+			out = append(out, b)
+			seen[id] = true
+		}
+	}
+	for id, b := range s.breeds {
+		if !seen[id] {
+			out = append(out, b)
+		}
+	}
+	return out, nil
+}
+
+func (s *InMemorySettingsStore) CreateBreed(b *pack.BreedConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if b.ID == "" {
+		b.ID = uuid.NewString()
+	}
+	if b.DefaultVariantID == "" && len(b.Variants) > 0 {
+		b.DefaultVariantID = b.Variants[0].ID
+	}
+	s.breeds[b.ID] = b
+	s.breedOrder = append(s.breedOrder, b.ID)
+	if _, ok := s.roster[b.ID]; !ok {
+		s.roster[b.ID] = pack.RosterEntry{Available: b.Enabled}
+	}
+	return nil
+}
+
+func (s *InMemorySettingsStore) UpdateBreed(id string, b *pack.BreedConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.breeds[id]; !ok {
+		return fmt.Errorf("breed %q not found", id)
+	}
+	b.ID = id
+	s.breeds[id] = b
+	if _, ok := s.roster[id]; !ok {
+		s.roster[id] = pack.RosterEntry{Available: b.Enabled}
+	}
+	return nil
+}
+
+func (s *InMemorySettingsStore) DeleteBreed(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.breeds[id]; !ok {
+		return fmt.Errorf("breed %q: %w", id, ErrBreedNotFound)
+	}
+	delete(s.breeds, id)
+	delete(s.roster, id)
+	for i, oid := range s.breedOrder {
+		if oid == id {
+			s.breedOrder = append(s.breedOrder[:i], s.breedOrder[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+
+func (s *InMemorySettingsStore) ReorderBreeds(order []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	newOrder := make([]string, 0, len(s.breeds))
+	seen := make(map[string]bool)
+	for _, id := range order {
+		if _, ok := s.breeds[id]; ok && !seen[id] {
+			newOrder = append(newOrder, id)
+			seen[id] = true
+		}
+	}
+	for _, id := range s.breedOrder {
+		if !seen[id] {
+			newOrder = append(newOrder, id)
+			seen[id] = true
+		}
+	}
+	s.breedOrder = newOrder
+	return nil
+}
+
+func (s *InMemorySettingsStore) GetRoster() (map[string]pack.RosterEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make(map[string]pack.RosterEntry, len(s.roster))
+	for k, v := range s.roster {
+		out[k] = v
+	}
+	return out, nil
+}
+
+func (s *InMemorySettingsStore) UpdateRosterEntry(id string, e pack.RosterEntry) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.breeds[id]; !ok {
+		return fmt.Errorf("breed %q: %w", id, ErrBreedNotFound)
+	}
+	s.roster[id] = e
+	return nil
+}
+
+func (s *InMemorySettingsStore) DeleteRosterEntry(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.roster, id)
+	return nil
+}
+
+func (s *InMemorySettingsStore) GetReviewPolicy() (*pack.ReviewPolicy, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.reviewPolicy == nil {
+		return &pack.ReviewPolicy{}, nil
+	}
+	return s.reviewPolicy, nil
+}
+
+func (s *InMemorySettingsStore) UpdateReviewPolicy(p *pack.ReviewPolicy) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reviewPolicy = p
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Members (deprecated; projected onto breeds for the legacy endpoint)
+// ---------------------------------------------------------------------------
 
 func (s *InMemorySettingsStore) ListMembers() ([]*Member, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	result := make([]*Member, 0, len(s.members))
-	for _, m := range s.members {
-		result = append(result, m)
+	out := make([]*Member, 0, len(s.breeds))
+	for _, b := range s.breeds {
+		out = append(out, breedToMember(b, s.roster[b.ID]))
 	}
-	return result, nil
+	return out, nil
 }
 
 func (s *InMemorySettingsStore) CreateMember(breedID, displayName, role string, enabled bool) (*Member, error) {
-	m := &Member{
-		ID:          uuid.NewString(),
-		BreedID:     breedID,
-		DisplayName: displayName,
-		Role:        role,
-		Enabled:     enabled,
-		CreatedAt:   time.Now().UnixMilli(),
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.members[m.ID] = m
-	return m, nil
+	// Breed key (breedID) -> BreedConfig.Name; human label (displayName) ->
+	// BreedConfig.DisplayName; legacy role -> roster family assignment.
+	b := &pack.BreedConfig{
+		ID:               uuid.NewString(),
+		Name:             breedID,
+		DisplayName:      displayName,
+		DefaultVariantID: "default",
+		Variants: []pack.Variant{
+			{ID: "default", ClientID: breedID, MCPSupport: true},
+		},
+		Source:  pack.BreedSourceUser,
+		Enabled: enabled,
+	}
+	s.breeds[b.ID] = b
+	s.roster[b.ID] = pack.RosterEntry{Family: role, Available: enabled}
+	return breedToMember(b, s.roster[b.ID]), nil
 }
 
 func (s *InMemorySettingsStore) UpdateMember(id string, updates map[string]any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	m, ok := s.members[id]
+	b, ok := s.breeds[id]
 	if !ok {
 		return fmt.Errorf("member %q not found", id)
 	}
-	applyMemberUpdates(m, updates)
+	applyBreedUpdates(b, updates)
+	if _, ok := s.roster[id]; !ok {
+		s.roster[id] = pack.RosterEntry{Available: b.Enabled}
+	}
 	return nil
-}
-
-// applyMemberUpdates mutates a Member in place from a loose-typed updates map.
-func applyMemberUpdates(m *Member, updates map[string]any) {
-	if v, ok := updates["display_name"]; ok {
-		if s, ok := v.(string); ok {
-			m.DisplayName = s
-		}
-	}
-	if v, ok := updates["role"]; ok {
-		if s, ok := v.(string); ok {
-			m.Role = s
-		}
-	}
-	if v, ok := updates["enabled"]; ok {
-		if b, ok := v.(bool); ok {
-			m.Enabled = b
-		}
-	}
-	if v, ok := updates["breed_id"]; ok {
-		if s, ok := v.(string); ok {
-			m.BreedID = s
-		}
-	}
-	// Account binding
-	if v, ok := updates["client_id"]; ok {
-		if s, ok := v.(string); ok {
-			m.ClientID = s
-		}
-	}
-	if v, ok := updates["account_ref"]; ok {
-		if s, ok := v.(string); ok {
-			m.AccountRef = s
-		}
-	}
-	if v, ok := updates["default_model"]; ok {
-		if s, ok := v.(string); ok {
-			m.DefaultModel = s
-		}
-	}
-	if v, ok := updates["provider"]; ok {
-		if s, ok := v.(string); ok {
-			m.Provider = s
-		}
-	}
-	// Identity
-	if v, ok := updates["nickname"]; ok {
-		if s, ok := v.(string); ok {
-			m.Nickname = s
-		}
-	}
-	if v, ok := updates["avatar"]; ok {
-		if s, ok := v.(string); ok {
-			m.Avatar = s
-		}
-	}
-	if v, ok := updates["color_primary"]; ok {
-		if s, ok := v.(string); ok {
-			m.ColorPrimary = s
-		}
-	}
-	if v, ok := updates["color_secondary"]; ok {
-		if s, ok := v.(string); ok {
-			m.ColorSecondary = s
-		}
-	}
-	if v, ok := updates["mention_patterns"]; ok {
-		if ss, ok := v.([]string); ok {
-			m.MentionPatterns = ss
-		}
-	}
-	if v, ok := updates["personality"]; ok {
-		if s, ok := v.(string); ok {
-			m.Personality = s
-		}
-	}
-	if v, ok := updates["role_description"]; ok {
-		if s, ok := v.(string); ok {
-			m.RoleDescription = s
-		}
-	}
-	if v, ok := updates["team_strengths"]; ok {
-		if ss, ok := v.([]string); ok {
-			m.TeamStrengths = ss
-		}
-	}
-	if v, ok := updates["caution"]; ok {
-		if s, ok := v.(string); ok {
-			m.Caution = s
-		}
-	}
-	// CLI config
-	if v, ok := updates["cli_command"]; ok {
-		if s, ok := v.(string); ok {
-			m.CLICommand = s
-		}
-	}
-	if v, ok := updates["output_format"]; ok {
-		if s, ok := v.(string); ok {
-			m.OutputFormat = s
-		}
-	}
-	if v, ok := updates["default_args"]; ok {
-		if s, ok := v.(string); ok {
-			m.DefaultArgs = s
-		}
-	}
-	if v, ok := updates["effort"]; ok {
-		if s, ok := v.(string); ok {
-			m.Effort = s
-		}
-	}
-	if v, ok := updates["context_window"]; ok {
-		if n, ok := toInt(v); ok {
-			m.ContextWindow = n
-		}
-	}
-	// Context budget
-	if v, ok := updates["max_prompt_tokens"]; ok {
-		if n, ok := toInt(v); ok {
-			m.MaxPromptTokens = n
-		}
-	}
-	if v, ok := updates["max_context_tokens"]; ok {
-		if n, ok := toInt(v); ok {
-			m.MaxContextTokens = n
-		}
-	}
-	if v, ok := updates["max_messages"]; ok {
-		if n, ok := toInt(v); ok {
-			m.MaxMessages = n
-		}
-	}
-	// Session strategy
-	if v, ok := updates["mcp_support"]; ok {
-		if b, ok := v.(bool); ok {
-			m.MCPSupport = b
-		}
-	}
-	if v, ok := updates["session_chain"]; ok {
-		if b, ok := v.(bool); ok {
-			m.SessionChain = b
-		}
-	}
-	if v, ok := updates["strategy"]; ok {
-		if s, ok := v.(string); ok {
-			m.Strategy = s
-		}
-	}
 }
 
 func (s *InMemorySettingsStore) DeleteMember(id string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.members[id]; !ok {
-		return fmt.Errorf("member %q not found", id)
-	}
-	delete(s.members, id)
-	return nil
+	return s.DeleteBreed(id)
 }
+
+// ---------------------------------------------------------------------------
+// Accounts & Config (unchanged)
+// ---------------------------------------------------------------------------
 
 func (s *InMemorySettingsStore) ListAccounts() ([]*Account, error) {
 	s.mu.RLock()
@@ -345,6 +354,24 @@ func (s *InMemorySettingsStore) UpdateConfig(key, value string) error {
 		}
 	}
 	return fmt.Errorf("config key %q not found", key)
+}
+
+func (s *InMemorySettingsStore) GetLeader() (*pack.Leader, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.leader == nil {
+		l := pack.DefaultLeaderConfig()
+		return &l, nil
+	}
+	l := *s.leader
+	return &l, nil
+}
+
+func (s *InMemorySettingsStore) UpdateLeader(l *pack.Leader) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.leader = l
+	return nil
 }
 
 func maskKey(key string) string {

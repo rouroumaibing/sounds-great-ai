@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Scorer parses breed output into a VerdictHandoffPacket (对标 clowder-ai verdict generators).
+// Scorer parses breed output into a VerdictHandoffPacket.
 type Scorer struct{}
 
 // ParseVerdict extracts the JSON verdict block from breed output and validates it.

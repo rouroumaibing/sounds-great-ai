@@ -3,12 +3,12 @@ package platform
 import (
 	"testing"
 
-	"sounds-great-ai/internal/config"
+	"sounds-great-ai/pkg/pack"
 )
 
 func TestRouterSingleMention(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {
 			ID: "bianmu", MentionPatterns: []string{"@边牧", "@bianmu"},
 		},
@@ -32,7 +32,7 @@ func TestRouterSingleMention(t *testing.T) {
 
 func TestRouterMultipleMentions(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 		"xigou":  {ID: "xigou", MentionPatterns: []string{"@细狗"}},
 	}
@@ -55,7 +55,7 @@ func TestRouterMultipleMentions(t *testing.T) {
 
 func TestRouterNoMention(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 	}
 	r := NewRouter(breeds)
@@ -74,7 +74,7 @@ func TestRouterNoMention(t *testing.T) {
 
 func TestRouterChinesePattern(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 	}
 	r := NewRouter(breeds)
@@ -90,7 +90,7 @@ func TestRouterChinesePattern(t *testing.T) {
 
 func TestRouterDeduplication(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧", "@bianmu"}},
 	}
 	r := NewRouter(breeds)
@@ -103,7 +103,7 @@ func TestRouterDeduplication(t *testing.T) {
 
 func TestRouterLongestFirstMatching(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 	}
 	// If "@边" were a pattern for another breed, it should NOT match before "@边牧"
@@ -117,7 +117,7 @@ func TestRouterLongestFirstMatching(t *testing.T) {
 
 func TestRouterCaseInsensitive(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@BianMu"}},
 	}
 	r := NewRouter(breeds)
@@ -130,7 +130,7 @@ func TestRouterCaseInsensitive(t *testing.T) {
 
 func TestRouterEmptyPatterns(t *testing.T) {
 	t.Parallel()
-	r := NewRouter(map[string]*config.BreedConfig{})
+	r := NewRouter(map[string]*pack.BreedConfig{})
 	decision := r.Route("@边牧 分析")
 
 	if decision.TargetBreeds[0] != "bianmu" {
@@ -144,7 +144,7 @@ func TestRouterEmptyPatterns(t *testing.T) {
 
 func TestRouterEmptyMessage(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 	}
 	r := NewRouter(breeds)
@@ -173,7 +173,7 @@ func TestRouterNilReceiver(t *testing.T) {
 
 func TestRouterWhitespaceOnlyMessage(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 	}
 	r := NewRouter(breeds)
@@ -189,7 +189,7 @@ func TestRouterWhitespaceOnlyMessage(t *testing.T) {
 
 func TestRouterSpecialCharacters(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 	}
 	r := NewRouter(breeds)
@@ -205,7 +205,7 @@ func TestRouterSpecialCharacters(t *testing.T) {
 
 func TestRouterUnicodeEmoji(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 	}
 	r := NewRouter(breeds)
@@ -221,7 +221,7 @@ func TestRouterUnicodeEmoji(t *testing.T) {
 
 func TestRouterMentionAtEnd(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 		"xigou":  {ID: "xigou", MentionPatterns: []string{"@细狗"}},
 	}
@@ -241,7 +241,7 @@ func TestRouterMentionAtEnd(t *testing.T) {
 
 func TestRouterMentionOnlyMessage(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 	}
 	r := NewRouter(breeds)
@@ -257,7 +257,7 @@ func TestRouterMentionOnlyMessage(t *testing.T) {
 
 func TestRouterBreedsWithNoPatterns(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: nil},
 		"xigou":  {ID: "xigou", MentionPatterns: []string{}},
 	}
@@ -274,7 +274,7 @@ func TestRouterBreedsWithNoPatterns(t *testing.T) {
 
 func TestRouterOverlappingPrefixPatterns(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu":       {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
 		"bianmu_short": {ID: "bianmu_short", MentionPatterns: []string{"@边"}},
 	}
@@ -293,7 +293,7 @@ func TestRouterOverlappingPrefixPatterns(t *testing.T) {
 
 func TestRouterTableDriven(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧", "@bianmu"}},
 		"xigou":  {ID: "xigou", MentionPatterns: []string{"@细狗", "@xigou"}},
 		"jinmao": {ID: "jinmao", MentionPatterns: []string{"@金毛", "@jinmao"}},
@@ -301,9 +301,9 @@ func TestRouterTableDriven(t *testing.T) {
 	r := NewRouter(breeds)
 
 	tests := []struct {
-		name        string
-		message     string
-		wantTargets []string
+		name         string
+		message      string
+		wantTargets  []string
 		wantStrategy string
 		wantMentions bool
 	}{

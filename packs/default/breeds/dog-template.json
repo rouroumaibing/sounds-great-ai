@@ -12,133 +12,195 @@
       "name": "边牧",
       "nickname": "边边",
       "avatar": "bianmu.png",
-      "color": { "primary": "#4A90D9", "secondary": "#357ABD" },
+      "color": {
+        "primary": "#4A90D9",
+        "secondary": "#357ABD"
+      },
       "role_description": "Orchestrator——任务分解、动态路由（按任务类型决定调用谁，不硬编码流程）、结果合成",
       "personality": "聪明、全局观强，天生的牧羊犬——把散乱任务赶成整齐队形，自由判断、纪律执行",
       "team_strengths": "任务分解、动态路由、结果合成",
-      "default_roles": ["orchestrator"]
+      "default_roles": [
+        "orchestrator"
+      ]
     },
     {
       "id": "jinmao",
       "name": "金毛",
       "nickname": "金金",
       "avatar": "jinmao.png",
-      "color": { "primary": "#F39C12", "secondary": "#E67E22" },
+      "color": {
+        "primary": "#F39C12",
+        "secondary": "#E67E22"
+      },
       "role_description": "Knowledge Retriever——RAG 检索、上下文组装，从向量库与文档召回相关知识并组装成上下文",
       "personality": "温顺、可靠、寻回本能强的金毛——你丢的东西，它总能叼回来",
       "team_strengths": "RAG 检索、上下文组装、知识管理",
-      "default_roles": ["knowledge-retriever"]
+      "default_roles": [
+        "knowledge-retriever"
+      ]
     },
     {
       "id": "xigou",
       "name": "灵缇",
       "nickname": "灵灵",
       "avatar": "xigou.png",
-      "color": { "primary": "#E84393", "secondary": "#D63384" },
+      "color": {
+        "primary": "#E84393",
+        "secondary": "#D63384"
+      },
       "role_description": "Code Hunter——代码搜索、分析、重构建议，以极快速度定位关键代码",
       "personality": "敏锐、极速、瞄准即扑的猎犬——代码猎手，嗅得到关键代码的位置",
       "team_strengths": "代码搜索、分析、重构建议",
-      "default_roles": ["code-hunter"]
+      "default_roles": [
+        "code-hunter"
+      ]
     },
     {
       "id": "demu",
       "name": "德牧",
       "nickname": "德德",
       "avatar": "demu.png",
-      "color": { "primary": "#2C3E50", "secondary": "#1A252F" },
+      "color": {
+        "primary": "#2C3E50",
+        "secondary": "#1A252F"
+      },
       "role_description": "Log Tracer——日志追踪、错误诊断、根因定位",
       "personality": "严谨、忠诚、黑背立耳的德牧——异常的味道它绝不放过",
       "team_strengths": "日志分析、错误诊断、根因定位",
-      "default_roles": ["log-tracer"]
+      "default_roles": [
+        "log-tracer"
+      ]
     },
     {
       "id": "zangao",
       "name": "藏獒",
       "nickname": "藏藏",
       "avatar": "zangao.png",
-      "color": { "primary": "#8E44AD", "secondary": "#7D3C98" },
+      "color": {
+        "primary": "#8E44AD",
+        "secondary": "#7D3C98"
+      },
       "role_description": "Presenter——输出格式化与 Markdown 渲染，把杂乱输出打磨成干净、可读、能直接交付的产物",
       "personality": "威严、沉稳、一夫当关的藏獒——交付物的门面，它守得死死的",
       "team_strengths": "输出格式化、Markdown 渲染",
-      "default_roles": ["presenter"]
+      "default_roles": [
+        "presenter"
+      ]
     },
     {
       "id": "zhonghuatianyuanquan",
       "name": "中华田园犬",
       "nickname": "田田",
       "avatar": "zhonghuatianyuanquan.png",
-      "color": { "primary": "#27AE60", "secondary": "#229954" },
+      "color": {
+        "primary": "#27AE60",
+        "secondary": "#229954"
+      },
       "role_description": "Safety Guard——命令拦截、路径校验、敏感过滤，在危险动作落地前拦一道",
       "personality": "警觉、通人情、看家护院的中华田园犬——安全底线，它寸步不让",
       "team_strengths": "命令拦截、路径校验、敏感信息过滤",
-      "default_roles": ["safety-guard"]
+      "default_roles": [
+        "safety-guard"
+      ]
     }
   ],
   "client_defaults": {
     "claude": {
       "default_model": "claude-opus-4-6",
-      "models": ["claude-opus-4-6", "claude-sonnet-4-20250514"]
+      "models": [
+        "claude-opus-4-6",
+        "claude-sonnet-4-20250514"
+      ]
     },
     "codex": {
       "default_model": "o3",
-      "models": ["o3", "gpt-4o"]
+      "models": [
+        "o3",
+        "gpt-4o"
+      ]
     },
     "gemini": {
       "default_model": "gemini-2.5-pro",
-      "models": ["gemini-2.5-pro"]
+      "models": [
+        "gemini-2.5-pro"
+      ]
     },
     "opencode": {
       "default_model": "claude-sonnet-4-20250514",
-      "models": ["claude-sonnet-4-20250514"]
+      "models": [
+        "claude-sonnet-4-20250514"
+      ]
     }
   },
   "leader": {
     "name": "leader",
     "nickname": "大当家",
     "avatar": "",
-    "time_zone": "Asia/Shanghai",
-    "aliases": ["You", "Owner"],
-    "mention_patterns": ["@leader", "@owner"]
+    "aliases": [
+      "You",
+      "Owner"
+    ],
+    "timeZone": "Asia/Shanghai",
+    "mentionPatterns": [
+      "@leader",
+      "@owner"
+    ]
   },
   "roster": {
     "bianmu": {
       "family": "bianmu",
-      "roles": ["orchestrator", "architect"],
+      "roles": [
+        "orchestrator",
+        "architect"
+      ],
       "lead": true,
       "available": true,
       "evaluation": "编排者，全局调度与结果合成强，不做具体业务逻辑"
     },
     "jinmao": {
       "family": "jinmao",
-      "roles": ["knowledge-retriever"],
+      "roles": [
+        "knowledge-retriever"
+      ],
       "lead": false,
       "available": true,
       "evaluation": "知识寻回强，RAG 与上下文组装靠谱"
     },
     "xigou": {
       "family": "xigou",
-      "roles": ["code-hunter", "reviewer"],
+      "roles": [
+        "code-hunter",
+        "reviewer"
+      ],
       "lead": false,
       "available": true,
       "evaluation": "代码猎手，搜索分析与重构建议强"
     },
     "demu": {
       "family": "demu",
-      "roles": ["tracer", "diagnostician"],
+      "roles": [
+        "tracer",
+        "diagnostician"
+      ],
       "lead": false,
       "available": true,
       "evaluation": "日志追踪与根因定位强"
     },
     "zangao": {
       "family": "zangao",
-      "roles": ["presenter", "formatter"],
+      "roles": [
+        "presenter",
+        "formatter"
+      ],
       "lead": false,
       "available": true,
       "evaluation": "呈现与渲染强，守护交付质量"
     },
     "zhonghuatianyuanquan": {
       "family": "zhonghuatianyuanquan",
-      "roles": ["safety-guard"],
+      "roles": [
+        "safety-guard"
+      ],
       "lead": false,
       "available": true,
       "evaluation": "安全守卫，命令拦截与敏感过滤强"
@@ -151,14 +213,26 @@
       "display_name": "边牧",
       "nickname": "边边",
       "avatar": "bianmu.png",
-      "color": { "primary": "#4A90D9", "secondary": "#357ABD" },
+      "color": {
+        "primary": "#4A90D9",
+        "secondary": "#357ABD"
+      },
       "personality": "聪明、全局观强，天生的牧羊犬——把散乱任务赶成整齐队形，自由判断、纪律执行",
       "role_description": "Orchestrator——任务分解、动态路由（按任务类型决定调用谁，不硬编码流程）、结果合成",
       "team_strengths": "任务分解、动态路由、结果合成",
-      "mention_patterns": ["@边牧", "@bianmu"],
-      "roles": ["orchestrator", "architect"],
+      "mention_patterns": [
+        "@边牧",
+        "@bianmu"
+      ],
+      "roles": [
+        "orchestrator",
+        "architect"
+      ],
       "review_policy": {
-        "can_review": ["xigou", "demu"],
+        "can_review": [
+          "xigou",
+          "demu"
+        ],
         "cannot_review_self": true,
         "cross_breed_preferred": true
       },
@@ -173,14 +247,21 @@
           "cli": {
             "command": "claude",
             "output_format": "stream-json",
-            "default_args": ["--output-format", "stream-json"],
+            "default_args": [
+              "--output-format",
+              "stream-json"
+            ],
             "effort": "max"
           },
           "variant_label": "Claude",
           "personality": "聪明、全局观强，天生的牧羊犬——把散乱任务赶成整齐队形，自由判断、纪律执行",
           "team_strengths": "任务分解、动态路由、结果合成",
           "system_prompt": "你是边牧，狗狗特工队的编排者（Orchestrator），不是 Boss。你拆解复杂任务、按任务类型动态路由到合适的队友、把多方结果合成交付。每个队友都自己判断要不要回应——你负责把球传对地方，不替谁做主。",
-          "strengths": ["orchestration", "architecture", "decomposition"],
+          "strengths": [
+            "orchestration",
+            "architecture",
+            "decomposition"
+          ],
           "caution": "编排者不是 Boss：只把球传对地方，不替队友做主；路由必须动态，不硬编码流程",
           "context_budget": {
             "max_prompt_tokens": 180000,
@@ -210,7 +291,11 @@
           "personality": "聪明、全局观强，天生的牧羊犬——把散乱任务赶成整齐队形，自由判断、纪律执行",
           "team_strengths": "任务分解、动态路由、结果合成",
           "system_prompt": "你是边牧，狗狗特工队的编排者（Orchestrator），不是 Boss。你拆解复杂任务、按任务类型动态路由到合适的队友、把多方结果合成交付。每个队友都自己判断要不要回应——你负责把球传对地方，不替谁做主。",
-          "strengths": ["orchestration", "architecture", "decomposition"],
+          "strengths": [
+            "orchestration",
+            "architecture",
+            "decomposition"
+          ],
           "caution": "编排者不是 Boss：只把球传对地方，不替队友做主；路由必须动态，不硬编码流程",
           "context_budget": {
             "max_prompt_tokens": 100000,
@@ -226,12 +311,21 @@
       "display_name": "金毛",
       "nickname": "金金",
       "avatar": "jinmao.png",
-      "color": { "primary": "#F39C12", "secondary": "#E67E22" },
+      "color": {
+        "primary": "#F39C12",
+        "secondary": "#E67E22"
+      },
       "personality": "温顺、可靠、寻回本能强的金毛——你丢的东西，它总能叼回来",
       "role_description": "Knowledge Retriever——RAG 检索、上下文组装，从向量库与文档召回相关知识并组装成上下文",
       "team_strengths": "RAG 检索、上下文组装、知识管理",
-      "mention_patterns": ["@金毛", "@jinmao"],
-      "roles": ["knowledge", "retriever"],
+      "mention_patterns": [
+        "@金毛",
+        "@jinmao"
+      ],
+      "roles": [
+        "knowledge",
+        "retriever"
+      ],
       "review_policy": {
         "can_review": [],
         "cannot_review_self": true,
@@ -248,13 +342,20 @@
           "cli": {
             "command": "gemini",
             "output_format": "stream-json",
-            "default_args": ["--output-format", "stream-json"]
+            "default_args": [
+              "--output-format",
+              "stream-json"
+            ]
           },
           "variant_label": "Gemini",
           "personality": "温顺、可靠、寻回本能强的金毛——你丢的东西，它总能叼回来",
           "team_strengths": "RAG 检索、上下文组装、知识管理",
           "system_prompt": "你是金毛，狗狗特工队的知识寻回犬（Knowledge Retriever）。你做 RAG 检索，从向量库和文档召回相关知识并组装成干净上下文，交给其他狗狗使用。你不做代码逻辑改动——你提供证据与上下文。",
-          "strengths": ["rag", "retrieval", "context-assembly"],
+          "strengths": [
+            "rag",
+            "retrieval",
+            "context-assembly"
+          ],
           "caution": "只做检索与上下文组装，不改代码逻辑、不做推理",
           "context_budget": {
             "max_prompt_tokens": 100000,
@@ -279,14 +380,26 @@
       "display_name": "灵缇",
       "nickname": "灵灵",
       "avatar": "xigou.png",
-      "color": { "primary": "#E84393", "secondary": "#D63384" },
+      "color": {
+        "primary": "#E84393",
+        "secondary": "#D63384"
+      },
       "personality": "敏锐、极速、瞄准即扑的猎犬——代码猎手，嗅得到关键代码的位置",
       "role_description": "Code Hunter——代码搜索、分析、重构建议，以极快速度定位关键代码",
       "team_strengths": "代码搜索、分析、重构建议",
-      "mention_patterns": ["@灵缇", "@xigou"],
-      "roles": ["code-hunter", "reviewer"],
+      "mention_patterns": [
+        "@灵缇",
+        "@xigou"
+      ],
+      "roles": [
+        "code-hunter",
+        "reviewer"
+      ],
       "review_policy": {
-        "can_review": ["bianmu", "demu"],
+        "can_review": [
+          "bianmu",
+          "demu"
+        ],
         "cannot_review_self": true,
         "cross_breed_preferred": true
       },
@@ -301,13 +414,20 @@
           "cli": {
             "command": "codex",
             "output_format": "json",
-            "default_args": ["exec", "--json"]
+            "default_args": [
+              "exec",
+              "--json"
+            ]
           },
           "variant_label": "Codex",
           "personality": "敏锐、极速、瞄准即扑的猎犬——代码猎手，嗅得到关键代码的位置",
           "team_strengths": "代码搜索、分析、重构建议",
           "system_prompt": "你是灵缇（Xigou），狗狗特工队的代码猎手（Code Hunter）。你以极速搜索、分析代码，定位关键实现并给出可落地的重构建议。你不改架构、不做路由决策——把发现和建议交给队友。",
-          "strengths": ["code-search", "analysis", "review"],
+          "strengths": [
+            "code-search",
+            "analysis",
+            "review"
+          ],
           "caution": "只搜索、分析、给重构建议，不改架构、不做路由决策",
           "context_budget": {
             "max_prompt_tokens": 120000,
@@ -332,14 +452,26 @@
       "display_name": "德牧",
       "nickname": "德德",
       "avatar": "demu.png",
-      "color": { "primary": "#2C3E50", "secondary": "#1A252F" },
+      "color": {
+        "primary": "#2C3E50",
+        "secondary": "#1A252F"
+      },
       "personality": "严谨、忠诚、黑背立耳的德牧——异常的味道它绝不放过",
       "role_description": "Log Tracer——日志追踪、错误诊断、根因定位",
       "team_strengths": "日志分析、错误诊断、根因定位",
-      "mention_patterns": ["@德牧", "@demu"],
-      "roles": ["tracer", "diagnostician"],
+      "mention_patterns": [
+        "@德牧",
+        "@demu"
+      ],
+      "roles": [
+        "tracer",
+        "diagnostician"
+      ],
       "review_policy": {
-        "can_review": ["xigou", "bianmu"],
+        "can_review": [
+          "xigou",
+          "bianmu"
+        ],
         "cannot_review_self": true,
         "cross_breed_preferred": true
       },
@@ -354,13 +486,20 @@
           "cli": {
             "command": "opencode",
             "output_format": "ndjson",
-            "default_args": ["--output", "ndjson"]
+            "default_args": [
+              "--output",
+              "ndjson"
+            ]
           },
           "variant_label": "OpenCode",
           "personality": "严谨、忠诚、黑背立耳的德牧——异常的味道它绝不放过",
           "team_strengths": "日志分析、错误诊断、根因定位",
           "system_prompt": "你是德牧，狗狗特工队的日志追踪犬（Log Tracer）。你追踪日志、诊断错误、定位根因，把异常从迷雾里揪出来。你不写新功能、不改架构——你负责让问题现形。",
-          "strengths": ["log-analysis", "error-diagnosis", "root-cause"],
+          "strengths": [
+            "log-analysis",
+            "error-diagnosis",
+            "root-cause"
+          ],
           "caution": "只诊断与定位，不写新功能、不改架构",
           "context_budget": {
             "max_prompt_tokens": 100000,
@@ -385,12 +524,21 @@
       "display_name": "藏獒",
       "nickname": "藏藏",
       "avatar": "zangao.png",
-      "color": { "primary": "#8E44AD", "secondary": "#7D3C98" },
+      "color": {
+        "primary": "#8E44AD",
+        "secondary": "#7D3C98"
+      },
       "personality": "威严、沉稳、一夫当关的藏獒——交付物的门面，它守得死死的",
       "role_description": "Presenter——输出格式化与 Markdown 渲染，把杂乱输出打磨成干净、可读、能直接交付的产物",
       "team_strengths": "输出格式化、Markdown 渲染",
-      "mention_patterns": ["@藏獒", "@zangao"],
-      "roles": ["presenter", "formatter"],
+      "mention_patterns": [
+        "@藏獒",
+        "@zangao"
+      ],
+      "roles": [
+        "presenter",
+        "formatter"
+      ],
       "review_policy": {
         "can_review": [],
         "cannot_review_self": true,
@@ -407,13 +555,20 @@
           "cli": {
             "command": "claude",
             "output_format": "stream-json",
-            "default_args": ["--output-format", "stream-json"]
+            "default_args": [
+              "--output-format",
+              "stream-json"
+            ]
           },
           "variant_label": "Claude",
           "personality": "威严、沉稳、一夫当关的藏獒——交付物的门面，它守得死死的",
           "team_strengths": "输出格式化、Markdown 渲染",
           "system_prompt": "你是藏獒，狗狗特工队的呈现者（Presenter）。你负责输出格式化与 Markdown 渲染，把队友的成果打磨成干净、可读、能直接交付的产物。你改业务逻辑、不做路由决策——你守护交付质量。",
-          "strengths": ["formatting", "rendering", "streaming"],
+          "strengths": [
+            "formatting",
+            "rendering",
+            "streaming"
+          ],
           "caution": "只做呈现与渲染，不改业务逻辑、不做路由决策",
           "context_budget": {
             "max_prompt_tokens": 120000,
@@ -438,12 +593,21 @@
       "display_name": "中华田园犬",
       "nickname": "田田",
       "avatar": "zhonghuatianyuanquan.png",
-      "color": { "primary": "#27AE60", "secondary": "#229954" },
+      "color": {
+        "primary": "#27AE60",
+        "secondary": "#229954"
+      },
       "personality": "警觉、通人情、看家护院的中华田园犬——安全底线，它寸步不让",
       "role_description": "Safety Guard——命令拦截、路径校验、敏感过滤，在危险动作落地前拦一道",
       "team_strengths": "命令拦截、路径校验、敏感信息过滤",
-      "mention_patterns": ["@中华田园犬", "@zhonghuatianyuanquan"],
-      "roles": ["safety", "guard"],
+      "mention_patterns": [
+        "@中华田园犬",
+        "@zhonghuatianyuanquan"
+      ],
+      "roles": [
+        "safety",
+        "guard"
+      ],
       "review_policy": {
         "can_review": [],
         "cannot_review_self": true,
@@ -460,13 +624,20 @@
           "cli": {
             "command": "codex",
             "output_format": "json",
-            "default_args": ["exec", "--json"]
+            "default_args": [
+              "exec",
+              "--json"
+            ]
           },
           "variant_label": "Codex",
           "personality": "警觉、通人情、看家护院的中华田园犬——安全底线，它寸步不让",
           "team_strengths": "命令拦截、路径校验、敏感信息过滤",
           "system_prompt": "你是中华田园犬，狗狗特工队的安全守卫（Safety Guard）。你拦截危险命令、校验路径合法性、过滤敏感信息，在动作落地前拦一道。你不写功能代码、不做推理——你守住安全底线。",
-          "strengths": ["command-check", "path-validation", "sensitive-filter"],
+          "strengths": [
+            "command-check",
+            "path-validation",
+            "sensitive-filter"
+          ],
           "caution": "只在危险动作落地前拦截；不写功能代码、不做推理",
           "context_budget": {
             "max_prompt_tokens": 100000,

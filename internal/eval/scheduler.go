@@ -10,7 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Scheduler runs eval domains on a daily/N-day schedule (对标 clowder-ai eval-domain-daily/nday).
+// Scheduler runs eval domains on a daily/N-day schedule.
 type Scheduler struct {
 	runner  *EvalRunner
 	domains []EvalDomain

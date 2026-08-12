@@ -6,11 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"sounds-great-ai/internal/config"
+	"sounds-great-ai/pkg/pack"
 )
 
 func TestRulesHandler_GetRules(t *testing.T) {
-	loader := config.NewLoader()
+	loader := pack.NewLoader()
 	h := NewRulesHandler(nil, loader, "", "")
 	mux := h.Routes()
 
@@ -40,7 +40,7 @@ func TestRulesHandler_GetRules(t *testing.T) {
 }
 
 func TestRulesHandler_GetHookManifest_NilRegistry(t *testing.T) {
-	loader := config.NewLoader()
+	loader := pack.NewLoader()
 	h := NewRulesHandler(nil, loader, "", "")
 	mux := h.Routes()
 
@@ -66,7 +66,7 @@ func TestRulesHandler_GetHookManifest_NilRegistry(t *testing.T) {
 }
 
 func TestRulesHandler_CompilePreview(t *testing.T) {
-	loader := config.NewLoader()
+	loader := pack.NewLoader()
 	h := NewRulesHandler(nil, loader, "", "")
 	mux := h.Routes()
 

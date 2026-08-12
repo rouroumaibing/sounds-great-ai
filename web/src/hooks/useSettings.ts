@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { settingsService } from '../services/settingsService';
 import { useAppStore } from '../store/useAppStore';
-import type { SettingsMember, SettingsAccount, SystemConfigGroup } from '../types';
+import type { SettingsAccount, SystemConfigGroup } from '../types';
+import type { RosterEntry as RosterEntryType } from '../types/api';
 import { useI18n } from '../store/useI18n';
 
 export function useSettings() {
-  const [members, setMembers] = useState<SettingsMember[]>([]);
+  const [roster, setRoster] = useState<Record<string, RosterEntryType>>({});
   const [accounts, setAccounts] = useState<SettingsAccount[]>([]);
   const [config, setConfig] = useState<SystemConfigGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,12 +18,12 @@ export function useSettings() {
     setLoading(true);
     setError(null);
     try {
-      const [m, a, c] = await Promise.all([
-        settingsService.getMembers(),
+      const [r, a, c] = await Promise.all([
+        settingsService.getRoster(),
         settingsService.getAccounts(),
         settingsService.getSystemConfig(),
       ]);
-      setMembers(m);
+      setRoster(r);
       setAccounts(a);
       setConfig(c);
     } catch (e) {
@@ -36,31 +37,14 @@ export function useSettings() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const addMember = useCallback(async (member: Omit<SettingsMember, 'id'>) => {
+  const updateRosterEntry = useCallback(async (id: string, patch: Partial<RosterEntryType>) => {
     try {
-      const newMember = await settingsService.addMember(member);
-      setMembers((prev) => [...prev, newMember]);
+      await settingsService.updateRosterEntry(id, patch);
+      setRoster((prev) => ({ ...prev, [id]: { ...(prev[id] ?? {}), ...patch } as RosterEntryType }));
     } catch (e) {
-      showToast({ message: t('hooks.usesettings.s2'), type: 'error' });
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast({ message: t('hooks.usesettings.s3').replace('{msg}', msg), type: 'error' });
       throw e;
-    }
-  }, [showToast]);
-
-  const toggleMemberEnabled = useCallback(async (id: string, enabled: boolean) => {
-    try {
-      await settingsService.updateMember(id, { enabled });
-      setMembers((prev) => prev.map((m) => m.id === id ? { ...m, enabled } : m));
-    } catch (e) {
-      showToast({ message: t('hooks.usesettings.s3'), type: 'error' });
-    }
-  }, [showToast]);
-
-  const deleteMember = useCallback(async (id: string) => {
-    try {
-      await settingsService.deleteMember(id);
-      setMembers((prev) => prev.filter((m) => m.id !== id));
-    } catch (e) {
-      showToast({ message: t('hooks.usesettings.s4'), type: 'error' });
     }
   }, [showToast]);
 
@@ -74,18 +58,19 @@ export function useSettings() {
     }
   }, [showToast]);
 
-  const deleteAccount = useCallback(async (id: string) => {
+  const deleteAccount = useCallback(async (id: string, force = false) => {
     try {
-      await settingsService.deleteAccount(id);
+      await settingsService.deleteAccount(id, force ? { force: true } : undefined);
       setAccounts((prev) => prev.filter((a) => a.id !== id));
     } catch (e) {
-      showToast({ message: t('hooks.usesettings.s6'), type: 'error' });
+      // Re-throw so callers can handle specific cases (e.g. 409 conflict).
+      throw e;
     }
-  }, [showToast]);
+  }, []);
 
   return {
-    members, accounts, config, loading, error,
-    addMember, toggleMemberEnabled, deleteMember,
+    roster, accounts, config, loading, error,
+    updateRosterEntry,
     addAccount, deleteAccount, refetch: fetchAll,
   };
 }

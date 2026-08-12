@@ -1,4 +1,4 @@
-## 活跃参与者（对标 clowder-ai D12）
+## 活跃参与者
 
 当前 thread 中的活跃狗狗：{{.ActiveParticipants}}
 

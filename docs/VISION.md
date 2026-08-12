@@ -59,7 +59,7 @@ Sounds Great AI 不是替你完成梦想，而是让你终于有机会带着自�
 
 ### 1.4 犬队 vs 猫咖
 
-我们借鉴 clowder-ai 的 "cat families" 概念，但用狗狗替代猫种。原因：
+我们用「犬队」隐喻组织工具型 agent 家族，而非沿用「猫咖」设定。原因：
 - 犬有**工作本能**（herding, retrieving, guarding）——更贴合"工具型 agent"
 - 犬有**团队意识**（pack）——多犬协作是天性
 - 犬有**服从性**——纪律执行更可靠
@@ -137,7 +137,7 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 
 1. **CLI adapter 架构** — 平台 spawn 外部 CLI 进程，通过 stdin/stdout pipe 通信，解析各自输出格式。不内置 agent reasoning。
 2. **动态路由，非固定 DAG** — 平台根据任务类型动态决定调用哪些 agent。不硬编码工作流。
-3. **Dog personas 保留** — 6 个狗狗映射到 clowder-ai 的 "cat families" 概念：personality + role + CLI binding。
+3. **Dog personas 保留** — 6 个狗狗各自承载 personality + role + CLI binding。
 4. **Go + Eino 平台语言** — 平台层用 Go + Eino。平台自身需要的 LLM 调用（路由、分解、合成）走 Eino。
 
 ## 5. Dog Pack — 狗狗角色
@@ -175,6 +175,8 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 | Ops Monitor | 运维监控、日志缓冲、健康状态 | `internal/ops/` |
 | Telemetry | OpenTelemetry 可观测性：traces ring buffer + metrics + Prometheus exporter + 30s 快照 + HMAC 伪匿名化。Graceful degradation：init 失败不 crash。Phase 7 扩展 | `internal/telemetry/` |
 
+> **运行时成员数据统一（2026-08-12）**：成员/狗狗身份数据统一持久化于 `.sounds-great-ai/dog-catalog.json`，结构为 clowder 同构的 `{version, breeds[], roster{}, review_policy, leader, configs[]}`（类型定义见 `pkg/pack`）。`packs/default/breeds/dog-template.json` 降级为只读种子（`role_templates` / `client_defaults` 仍供模板 UI；`breeds/roster/leader/review_policy` 仅首启复制进 catalog）。breed 相关类型已从 `internal/config` 剥离至 `pkg/pack`；`internal/config` 现仅承载事件总线（`event_bus.go`）。本变更未引入新的 `internal/` 顶层目录，未推翻不可逆决策（VISION §4/§7）。详见 `sg-member-catalog-plan.md`。
+
 ## 7. 路线图
 
 | Phase | 目标 | 状态 |
@@ -182,7 +184,7 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 | **1. Platform Infra** | CLI adapter + config + router + SOP + skills + memory + MCP + hooks | **完成** |
 | **2. RAG Integration** | 向量存储接入平台、context_assemble、FTS5 混合检索 | **完成** |
 | **3. A2A Coordination** | 多 agent 动态协作、@mention 路由 | **完成** |
-| **4. Skills System** | skill 加载、注入、clowder-ai skill 吸收 | **完成** |
+| **4. Skills System** | skill 加载、注入、外部 skill 吸收 | **完成** |
 | **5. SOP Gates** | 质量门禁、review 流程、安全策略 | **完成** |
 | **6. Transport** | WebSocket + HTTP API + 前端 | **完成** |
 | **7. Polish** | 文档、示例、性能优化、45 hook、Memory System + Cue Plane + ACP Pool + PWA | **主体完成，剩余子项** |
@@ -232,21 +234,21 @@ Spec 必须包含 `## VISION Compatibility` 段，回答以下 7 个问题：
 | Spec 模板 + §8.1 检查清单 | agent 走 spec 流程 | 待建立模板 |
 | Prompt hooks（per-turn 注入） | 每轮自动注入身份 + 铁律 + 护栏 | **已实现**（§8.4） |
 
-**clowder-ai 的经验**：最有效的机制是 hooks（`disableable: false`, `governanceTier: immutable`）——系统注入，agent 无法绕过。我们当前靠 AGENTS.md 自觉，未来应建立 hook 系统实现结构化强制。
+**已有经验**：最有效的机制是 hooks（`disableable: false`, `governanceTier: immutable`）——系统注入，agent 无法绕过。我们当前靠 AGENTS.md 自觉，未来应建立 hook 系统实现结构化强制。
 
 ### 8.4 Prompt Hooks 系统设计（已实现）
 
-> 实现路径：`internal/hooks/` + `packs/default/hooks/`。对标 clowder-ai `assets/prompt-hooks/`。
+> 实现路径：`internal/hooks/` + `packs/default/hooks/`。
 
 **目标**：在 CLI adapter spawn 时，通过 stdin 注入结构化 prompt 片段，实现 agent 无法绕过的身份 + 铁律 + 护栏注入。
 
 **注入时机**：
-- `session-init`：会话启动时注入身份、铁律、限制声明（对标 clowder-ai S1/S2/S4）
-- `per-turn`：每轮注入红旗模式、Phase 约束（对标 clowder-ai S10/D1）
+- `session-init`：会话启动时注入身份、铁律、限制声明
+- `per-turn`：每轮注入红旗模式、Phase 约束
 
 **hook 清单（设计）**：
 
-| hook id | 时机 | 内容 | 对标 clowder-ai |
+| hook id | 时机 | 内容 | 参考实现 |
 |---------|------|------|----------------|
 | `identity` | session-init | 狗狗身份 + 职责 | S1 |
 | `restrictions` | session-init | 限制声明表 | S2 |

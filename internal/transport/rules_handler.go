@@ -7,19 +7,20 @@ import (
 	"path/filepath"
 	"strings"
 
-	"sounds-great-ai/internal/config"
 	"sounds-great-ai/internal/hooks"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 // RulesHandler serves rules data and prompt injection manifest.
 type RulesHandler struct {
 	hookRegistry *hooks.Registry
-	breedLoader  *config.Loader
+	breedLoader  *pack.Loader
 	breedsDir    string
 	agentsPath   string
 }
 
-func NewRulesHandler(hookReg *hooks.Registry, loader *config.Loader, breedsDir, agentsPath string) *RulesHandler {
+func NewRulesHandler(hookReg *hooks.Registry, loader *pack.Loader, breedsDir, agentsPath string) *RulesHandler {
 	return &RulesHandler{hookRegistry: hookReg, breedLoader: loader, breedsDir: breedsDir, agentsPath: agentsPath}
 }
 
@@ -52,11 +53,11 @@ func (h *RulesHandler) GetRules(w http.ResponseWriter, r *http.Request) {
 	agentsContent := h.readAgentsFile()
 
 	respondJSON(w, http.StatusOK, map[string]any{
-		"iron_laws":         ironLaws,
-		"red_flags":         redFlags,
+		"iron_laws":          ironLaws,
+		"red_flags":          redFlags,
 		"breed_restrictions": breedRestrictions,
-		"model_guides":      modelGuides,
-		"agents_content":    agentsContent,
+		"model_guides":       modelGuides,
+		"agents_content":     agentsContent,
 	})
 }
 

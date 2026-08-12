@@ -9,7 +9,7 @@ import (
 )
 
 // CustodyService manages ball custody leases for concurrent operation protection.
-// Aligned with clowder-ai's ball-custody domain — prevents concurrent
+// Prevents concurrent
 // execution conflicts via compare-and-swap lease generations.
 type CustodyService struct {
 	store custodyPorts.ICustodyStore

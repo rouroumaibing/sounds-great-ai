@@ -1,5 +1,16 @@
 package settings
 
+import (
+	"errors"
+
+	"sounds-great-ai/pkg/pack"
+)
+
+// ErrBreedNotFound is returned by DeleteBreed when the breed is absent from the
+// catalog. The pack-api handler tolerates this on a delete that already
+// succeeded against the in-memory pack (idempotent removal).
+var ErrBreedNotFound = errors.New("breed not found")
+
 // Member represents a team member (breed assigned to the pack).
 type Member struct {
 	ID          string `json:"id"`
@@ -16,27 +27,27 @@ type Member struct {
 	Provider     string `json:"provider,omitempty"`
 
 	// Identity
-	Nickname       string   `json:"nickname,omitempty"`
-	Avatar         string   `json:"avatar,omitempty"`
-	ColorPrimary   string   `json:"color_primary,omitempty"`
-	ColorSecondary string   `json:"color_secondary,omitempty"`
+	Nickname        string   `json:"nickname,omitempty"`
+	Avatar          string   `json:"avatar,omitempty"`
+	ColorPrimary    string   `json:"color_primary,omitempty"`
+	ColorSecondary  string   `json:"color_secondary,omitempty"`
 	MentionPatterns []string `json:"mention_patterns,omitempty"`
-	Personality    string   `json:"personality,omitempty"`
-	RoleDescription string  `json:"role_description,omitempty"`
-	TeamStrengths  []string `json:"team_strengths,omitempty"`
-	Caution        string   `json:"caution,omitempty"`
+	Personality     string   `json:"personality,omitempty"`
+	RoleDescription string   `json:"role_description,omitempty"`
+	TeamStrengths   []string `json:"team_strengths,omitempty"`
+	Caution         string   `json:"caution,omitempty"`
 
 	// CLI config
-	CLICommand   string `json:"cli_command,omitempty"`
-	OutputFormat string `json:"output_format,omitempty"`
-	DefaultArgs  string `json:"default_args,omitempty"`
-	Effort       string `json:"effort,omitempty"`
-	ContextWindow int   `json:"context_window,omitempty"`
+	CLICommand    string `json:"cli_command,omitempty"`
+	OutputFormat  string `json:"output_format,omitempty"`
+	DefaultArgs   string `json:"default_args,omitempty"`
+	Effort        string `json:"effort,omitempty"`
+	ContextWindow int    `json:"context_window,omitempty"`
 
 	// Context budget
-	MaxPromptTokens int `json:"max_prompt_tokens,omitempty"`
+	MaxPromptTokens  int `json:"max_prompt_tokens,omitempty"`
 	MaxContextTokens int `json:"max_context_tokens,omitempty"`
-	MaxMessages     int `json:"max_messages,omitempty"`
+	MaxMessages      int `json:"max_messages,omitempty"`
 
 	// Session strategy
 	MCPSupport   bool   `json:"mcp_support,omitempty"`
@@ -74,10 +85,33 @@ type SystemConfig struct {
 
 // SettingsStore is the port interface for settings storage.
 type SettingsStore interface {
+	// Deprecated: members are stored as breeds (clowder-homologous). These
+	// methods remain only to keep the legacy /api/settings/members endpoint
+	// working until it is removed in favor of /api/breeds.
 	ListMembers() ([]*Member, error)
 	CreateMember(breedID, displayName, role string, enabled bool) (*Member, error)
 	UpdateMember(id string, updates map[string]any) error
 	DeleteMember(id string) error
+
+	// Breeds (runtime member catalog; clowder-homologous structure).
+	ListBreeds() ([]*pack.BreedConfig, error)
+	CreateBreed(b *pack.BreedConfig) error
+	UpdateBreed(id string, b *pack.BreedConfig) error
+	DeleteBreed(id string) error
+	// ReorderBreeds reorders the persisted catalog breeds[] array to match the
+	// given order (clowder-homologous: the array order is the sort truth).
+	// IDs not present in the catalog are ignored; catalog breeds missing from
+	// order keep their previous relative position appended at the end.
+	ReorderBreeds(order []string) error
+
+	// Roster: per-breed runtime assignment (available/roles/lead/family/evaluation).
+	GetRoster() (map[string]pack.RosterEntry, error)
+	UpdateRosterEntry(id string, e pack.RosterEntry) error
+	DeleteRosterEntry(id string) error
+
+	// ReviewPolicy: pack-level review configuration.
+	GetReviewPolicy() (*pack.ReviewPolicy, error)
+	UpdateReviewPolicy(p *pack.ReviewPolicy) error
 
 	ListAccounts() ([]*Account, error)
 	CreateAccount(provider, apiKey string) (*Account, error)
@@ -87,4 +121,8 @@ type SettingsStore interface {
 
 	UpdateAccount(id string, updates map[string]any) error
 	UpdateConfig(key, value string) error
+
+	// Leader (operator) config, persisted in dog-catalog.json.
+	GetLeader() (*pack.Leader, error)
+	UpdateLeader(l *pack.Leader) error
 }

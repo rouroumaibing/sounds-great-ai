@@ -9,8 +9,7 @@ import (
 )
 
 // ContextAssembler formats conversation history for CLI adapter invocations.
-// It applies token budget control, message formatting, and truncation strategy
-// based on clowder-ai's ContextAssembler pattern.
+// It applies token budget control, message formatting, and truncation strategy.
 type ContextAssembler struct {
 	maxMessages   int
 	maxTokens     int

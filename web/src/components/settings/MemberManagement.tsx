@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DragEvent as ReactDragEvent } from 'react';
-import type { BreedConfig } from '../../types/api';
-import type { MemberFilterType } from '../../types';
+import type { BreedConfig, RosterEntry } from '../../types/api';
+import type { MemberFilterType, SettingsMember } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { useI18n } from '../../store/useI18n';
 import { useSettings } from '../../hooks/useSettings';
@@ -10,7 +10,6 @@ import { useLeaderConfig } from '../../hooks/useLeaderConfig';
 import { settingsService } from '../../services/settingsService';
 import { HubBreedEditor } from './HubBreedEditor';
 import { HubLeaderEditor } from './HubLeaderEditor';
-import type { SettingsMember } from '../../types';
 import {
   SettingsBadge,
   SettingsRow,
@@ -23,12 +22,13 @@ import {
 } from './primitives';
 
 // ---------------------------------------------------------------------------
-// Mirrors clowder-ai's member management page (config-viewer-tabs.tsx →
-// CatOverviewTab + HubMemberOverviewCard / HubCoCreatorOverviewCard /
-// DefaultCatSelector / HubOverviewToolbar). The layout is reproduced 1:1:
+// 成员管理页布局：
 //   toolbar (filter tabs + add) → global default dog → leader card →
 //   draggable member rows → disabled section.
-// The data source is the dog platform's own member/breed/leader stores.
+// 数据源：犬平台自身的 breeds（合并后成员）+ roster（运行时名册元信息）。
+//   - 列表 = breeds（合并 template + catalog）按 roster 投影 enabled。
+//   - 启用/停用写 roster.available（唯一开关）。
+//   - 默认犬 / 排序走 default-breed / breed-order 端点，落盘持久化。
 // ---------------------------------------------------------------------------
 
 const RUNTIME_LABELS: Record<string, string> = {
@@ -70,41 +70,45 @@ function formatMentionPreview(patterns?: string[], max = 3): string {
   return rest > 0 ? `${visible.join(' ')}  +${rest}` : visible.join(' ');
 }
 
-// --- breed <-> member mapping (kept from the previous implementation) -------
-
-function memberToBreed(m: SettingsMember): BreedConfig {
+// BreedConfig（合并后成员）+ roster 投影 → UI 模型 SettingsMember。
+// roster.available 为启用唯一真相；缺省回退 breed.enabled。
+function breedToSettingsMember(b: BreedConfig, r?: RosterEntry): SettingsMember {
+  const variant = b.variants?.find((v) => v.id === b.default_variant_id) ?? b.variants?.[0];
+  const available = r?.available ?? b.enabled;
+  const ref = (variant?.account_ref ?? '').trim().toLowerCase();
   return {
-    id: m.id, name: m.name, display_name: m.breed, avatar: m.avatar ?? '',
-    color: { primary: m.colorPrimary ?? m.color, secondary: m.colorSecondary ?? '' },
-    personality: m.personality ?? '', role_description: m.roleDescription,
-    team_strengths: m.teamStrengths?.join(','), mention_patterns: m.mentionPatterns ?? [],
-    roles: [], default_variant_id: 'default',
-    nickname: m.nickname, caution: m.caution,
-    variants: [{
-      id: 'default', client_id: m.clientId ?? '', default_model: m.defaultModel ?? m.model,
-      mcp_support: m.mcpSupport ?? false, account_ref: m.accountRef, provider: m.provider,
-      session_chain: m.sessionChain, strategy: m.strategy,
-      cli: { command: m.cliCommand ?? '', output_format: m.outputFormat ?? '', default_args: m.defaultArgs?.split(' '), effort: m.effort },
-      context_budget: { max_prompt_tokens: m.maxPromptTokens, max_context_tokens: m.maxContextTokens, max_messages: m.maxMessages },
-    }],
-    source: 'user', enabled: m.enabled,
-  };
-}
-
-function breedToMemberUpdates(b: BreedConfig): Partial<SettingsMember> {
-  const v = b.variants[0];
-  return {
-    name: b.name, breed: b.display_name, color: b.color?.primary ?? '',
-    model: v?.default_model ?? '', provider: v?.provider ?? '',
-    sessionChain: v?.session_chain ?? false, enabled: b.enabled,
-    clientId: v?.client_id, accountRef: v?.account_ref, defaultModel: v?.default_model,
-    nickname: b.nickname, avatar: b.avatar, colorPrimary: b.color?.primary, colorSecondary: b.color?.secondary,
-    mentionPatterns: b.mention_patterns, personality: b.personality, roleDescription: b.role_description,
-    teamStrengths: b.team_strengths?.split(',').filter(Boolean), caution: b.caution,
-    cliCommand: v?.cli.command, outputFormat: v?.cli.output_format, defaultArgs: v?.cli.default_args?.join(' '),
-    effort: v?.cli.effort, maxPromptTokens: v?.context_budget?.max_prompt_tokens,
-    maxContextTokens: v?.context_budget?.max_context_tokens, maxMessages: v?.context_budget?.max_messages,
-    mcpSupport: v?.mcp_support, strategy: v?.strategy,
+    id: b.id,
+    name: b.name,
+    breed: b.display_name,
+    color: b.color?.primary ?? '#4A90D9',
+    icon: 'fa-solid fa-dog',
+    model: variant?.default_model ?? '',
+    handle: `@${b.id}`,
+    sessionChain: Boolean(variant?.session_chain),
+    enabled: available,
+    provider: variant?.provider ?? '',
+    type: OAUTH_REFS.has(ref) ? 'CLI (OAuth)' : 'CLI (config)',
+    clientId: variant?.client_id,
+    accountRef: variant?.account_ref,
+    defaultModel: variant?.default_model,
+    nickname: b.nickname,
+    avatar: b.avatar,
+    colorPrimary: b.color?.primary,
+    colorSecondary: b.color?.secondary,
+    mentionPatterns: b.mention_patterns,
+    personality: b.personality,
+    roleDescription: b.role_description,
+    teamStrengths: b.team_strengths ? b.team_strengths.split(',').filter(Boolean) : [],
+    caution: b.caution,
+    cliCommand: variant?.cli?.command,
+    outputFormat: variant?.cli?.output_format,
+    defaultArgs: variant?.cli?.default_args?.join(' '),
+    effort: variant?.cli?.effort,
+    maxPromptTokens: variant?.context_budget?.max_prompt_tokens,
+    maxContextTokens: variant?.context_budget?.max_context_tokens,
+    maxMessages: variant?.context_budget?.max_messages,
+    mcpSupport: variant?.mcp_support,
+    strategy: variant?.strategy,
   };
 }
 
@@ -117,7 +121,7 @@ const MEMBER_FILTER_TABS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Sub-components (mirror clowder's Hub*OverviewCard family)
+// Sub-components (overview cards)
 // ---------------------------------------------------------------------------
 
 function LeaderOverviewCard({ leader, onClick }: { leader: import('../../hooks/useLeaderConfig').LeaderConfig; onClick: () => void }) {
@@ -342,49 +346,58 @@ export function MemberManagement() {
   const { t } = useI18n();
   const memberFilter = useAppStore((s) => s.memberFilter);
   const setMemberFilter = useAppStore((s) => s.setMemberFilter);
-  const globalDefaultDog = useAppStore((s) => s.globalDefaultDog);
-  const setGlobalDefaultDog = useAppStore((s) => s.setGlobalDefaultDog);
   const showAddMemberModal = useAppStore((s) => s.showAddMemberModal);
   const setShowAddMemberModal = useAppStore((s) => s.setShowAddMemberModal);
   const showToast = useAppStore((s) => s.showToast);
 
-  const { members, loading, addMember, toggleMemberEnabled, deleteMember, refetch } = useSettings();
-  const { breeds, error: breedsError, refetch: refetchBreeds } = useBreeds();
+  const { roster, loading: rosterLoading, updateRosterEntry, refetch: refetchSettings } = useSettings();
+  const {
+    breeds,
+    loading: breedsLoading,
+    error: breedsError,
+    refetch: refetchBreeds,
+    deleteBreed,
+    createBreed,
+    updateBreed,
+  } = useBreeds();
   const { leader, updateLeader } = useLeaderConfig();
 
-  const [editingMember, setEditingMember] = useState<SettingsMember | null>(null);
-  const [confirmDisable, setConfirmDisable] = useState<SettingsMember | null>(null);
+  const members = useMemo<SettingsMember[]>(
+    () => breeds.map((b) => breedToSettingsMember(b, roster[b.id])),
+    [breeds, roster],
+  );
+
+  const [editingBreed, setEditingBreed] = useState<BreedConfig | null>(null);
   const [showLeaderEditor, setShowLeaderEditor] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [localMembers, setLocalMembers] = useState<SettingsMember[]>(members);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragError, setDragError] = useState<string | null>(null);
+  const [defaultBreedId, setDefaultBreedId] = useState('');
 
   useEffect(() => { setLocalMembers(members); }, [members]);
 
   useEffect(() => {
-    if (!globalDefaultDog && breeds.length > 0) {
-      setGlobalDefaultDog(breeds[0].id);
-    }
-  }, [globalDefaultDog, breeds, setGlobalDefaultDog]);
+    settingsService
+      .getDefaultBreed()
+      .then((d) => setDefaultBreedId(d.breed_id))
+      .catch(() => {});
+  }, []);
 
   const enabledMembers = localMembers.filter((m) => m.enabled);
   const disabledMembers = localMembers.filter((m) => !m.enabled);
 
   const handleSaveBreed = async (breed: BreedConfig) => {
     try {
-      const updates = breedToMemberUpdates(breed);
-      if (editingMember) {
-        await settingsService.updateMember(editingMember.id, updates);
+      if (editingBreed) {
+        await updateBreed(breed.id, breed);
       } else {
-        await addMember({
-          ...updates, icon: 'fa-solid fa-dog', handle: `@${breed.name}`, type: 'CLI (OAuth)',
-        } as Omit<SettingsMember, 'id'>);
+        await createBreed(breed);
       }
-      await refetch();
+      await Promise.all([refetchBreeds(), refetchSettings()]);
       setShowAddMemberModal(false);
-      setEditingMember(null);
+      setEditingBreed(null);
       showToast({ message: t('members.saved'), type: 'success' });
     } catch {
       showToast({ message: t('members.saveFailed'), type: 'error' });
@@ -392,29 +405,34 @@ export function MemberManagement() {
   };
 
   const handleToggleEnabled = async (m: SettingsMember) => {
-    if (m.enabled) {
-      const dependents = members.filter((x) => x.id !== m.id && x.breed === m.breed && x.enabled);
-      if (dependents.length > 0) {
-        setConfirmDisable(m);
-        return;
-      }
-    }
     setTogglingId(m.id);
-    await toggleMemberEnabled(m.id, !m.enabled);
-    setTogglingId(null);
+    try {
+      await updateRosterEntry(m.id, { available: !m.enabled });
+      await Promise.all([refetchBreeds(), refetchSettings()]);
+    } catch {
+      // 错误 toast 已由 updateRosterEntry 提示
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const handleDelete = (m: SettingsMember) => {
     if (!window.confirm(t('members.confirmDelete').replace('{name}', m.name))) return;
-    deleteMember(m.id);
+    deleteBreed(m.id)
+      .then(() => Promise.all([refetchBreeds(), refetchSettings()]))
+      .catch(() => {});
   };
 
   const handleDefaultDogChange = async (id: string) => {
     setSaveError(null);
-    const target = members.find((x) => x.id === id);
     try {
-      if (target && !target.enabled) await toggleMemberEnabled(id, true);
-      setGlobalDefaultDog(id);
+      const breed = breeds.find((b) => b.id === id);
+      const isAvailable = roster[id]?.available ?? breed?.enabled ?? false;
+      if (!isAvailable) {
+        await updateRosterEntry(id, { available: true });
+      }
+      await settingsService.setDefaultBreed(id);
+      setDefaultBreedId(id);
     } catch {
       setSaveError(t('members.saveDefaultFailed'));
     }
@@ -433,14 +451,24 @@ export function MemberManagement() {
     const srcId = draggedId ?? e.dataTransfer.getData('text/plain') ?? '';
     setDraggedId(null);
     if (!srcId || srcId === target.id) return;
+    const currentIds = localMembers.filter((m) => m.enabled).map((m) => m.id);
+    const next = reorderIds(currentIds, srcId, target.id);
+    if (next.length === 0) return;
+    // 乐观更新：启用段按拖拽重排，停用段保持原位。
     setLocalMembers((prev) => {
-      const currentIds = prev.filter((m) => m.enabled).map((m) => m.id);
-      const next = reorderIds(currentIds, srcId, target.id);
-      if (next.length === 0) return prev;
       const reorderedEnabled = next.map((id) => prev.find((m) => m.id === id)!).filter(Boolean);
       const disabled = prev.filter((m) => !m.enabled);
       return [...reorderedEnabled, ...disabled];
     });
+    const disabledIds = localMembers.filter((m) => !m.enabled).map((m) => m.id);
+    const newOrder = [...next, ...disabledIds];
+    settingsService
+      .setBreedOrder(newOrder)
+      .then(() => Promise.all([refetchBreeds(), refetchSettings()]))
+      .catch(() => {
+        setDragError(t('members.reorderFailed'));
+        setLocalMembers(members); // 回滚到服务端顺序
+      });
     setDragError(null);
   };
   const onDragEnd = () => setDraggedId(null);
@@ -470,15 +498,15 @@ export function MemberManagement() {
       {/* global default dog */}
       <DefaultDogSelector
         breeds={breeds}
-        currentDefaultDogId={globalDefaultDog}
+        currentDefaultDogId={defaultBreedId}
         onSelect={handleDefaultDogChange}
-        isLoading={loading}
+        isLoading={breedsLoading || rosterLoading}
         fetchError={Boolean(breedsError)}
         saveError={saveError}
         onRetry={() => refetchBreeds()}
       />
 
-      {/* leader / owner card (clowder's HubCoCreatorOverviewCard) */}
+      {/* leader / owner card */}
       {leader && <LeaderOverviewCard leader={leader} onClick={() => setShowLeaderEditor(true)} />}
 
       {/* drag error */}
@@ -491,7 +519,7 @@ export function MemberManagement() {
             <MemberOverviewCard
               key={m.id}
               member={m}
-              onEdit={(mm) => setEditingMember(mm)}
+              onEdit={(mm) => setEditingBreed(breeds.find((b) => b.id === mm.id) ?? null)}
               onToggle={handleToggleEnabled}
               onDelete={handleDelete}
               toggling={togglingId === m.id}
@@ -507,8 +535,8 @@ export function MemberManagement() {
       )}
 
       {/* loading / empty states */}
-      {loading && <SettingsStatusStrip tone="muted">{t('common.loading')}</SettingsStatusStrip>}
-      {!loading && localMembers.length === 0 && (
+      {breedsLoading && <SettingsStatusStrip tone="muted">{t('common.loading')}</SettingsStatusStrip>}
+      {!breedsLoading && localMembers.length === 0 && (
         <SettingsStatusStrip tone="muted">{t('members.notFound')}</SettingsStatusStrip>
       )}
 
@@ -523,7 +551,7 @@ export function MemberManagement() {
             <MemberOverviewCard
               key={m.id}
               member={m}
-              onEdit={(mm) => setEditingMember(mm)}
+              onEdit={(mm) => setEditingBreed(breeds.find((b) => b.id === mm.id) ?? null)}
               onToggle={handleToggleEnabled}
               onDelete={handleDelete}
               toggling={togglingId === m.id}
@@ -534,30 +562,8 @@ export function MemberManagement() {
 
       {/* modals */}
       {showAddMemberModal && <HubBreedEditor onSave={handleSaveBreed} onClose={() => setShowAddMemberModal(false)} />}
-      {editingMember && <HubBreedEditor breed={memberToBreed(editingMember)} onSave={handleSaveBreed} onClose={() => setEditingMember(null)} />}
+      {editingBreed && <HubBreedEditor breed={editingBreed} onSave={handleSaveBreed} onClose={() => setEditingBreed(null)} />}
       {showLeaderEditor && <HubLeaderEditor leader={leader} onSave={updateLeader} onClose={() => setShowLeaderEditor(false)} />}
-
-      {/* confirm disable (dependency check) */}
-      {confirmDisable && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-            <h3 className="text-sm font-bold text-amber-300">{t('members.disableCheck')}</h3>
-            <p className="mt-2 text-xs text-slate-400">{t('members.disableWarning').replace('{breed}', confirmDisable.breed)}</p>
-            <div className="mt-4 flex justify-end space-x-2">
-              <button onClick={() => setConfirmDisable(null)} className="rounded-xl bg-slate-800 px-4 py-2 text-xs text-slate-300 hover:bg-slate-700">{t('common.cancel')}</button>
-              <button
-                onClick={() => {
-                  toggleMemberEnabled(confirmDisable.id, false);
-                  setConfirmDisable(null);
-                }}
-                className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-500"
-              >
-                {t('members.confirmDisable')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

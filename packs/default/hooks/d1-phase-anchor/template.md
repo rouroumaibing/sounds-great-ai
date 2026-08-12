@@ -1,4 +1,4 @@
-## Phase 锚定（对标 clowder-ai D14）
+## Phase 锚定
 
 当前 Phase：{{.CurrentPhase}}
 前置条件：{{.PhasePrerequisites}}

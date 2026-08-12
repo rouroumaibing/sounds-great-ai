@@ -4,22 +4,23 @@ import (
 	"strings"
 	"testing"
 
-	"sounds-great-ai/internal/config"
 	"sounds-great-ai/internal/skills"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 func TestBuilderBuildIdentity(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {
-			ID:          "bianmu",
-			Name:        "边牧",
-			DisplayName: "边牧",
-			Personality: "聪明、善于统筹全局",
-			RoleDescription: "任务分解与调度专家",
-			TeamStrengths:  "任务分解、多agent调度",
+			ID:               "bianmu",
+			Name:             "边牧",
+			DisplayName:      "边牧",
+			Personality:      "聪明、善于统筹全局",
+			RoleDescription:  "任务分解与调度专家",
+			TeamStrengths:    "任务分解、多agent调度",
 			DefaultVariantID: "v1",
-			Variants: []config.Variant{
+			Variants: []pack.Variant{
 				{ID: "v1", SystemPrompt: "你是边牧，指挥官。"},
 			},
 		},
@@ -46,19 +47,19 @@ func TestBuilderBuildIdentity(t *testing.T) {
 
 func TestBuilderBuildRoster(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {
 			ID: "bianmu", Name: "边牧", DisplayName: "边牧",
 			DefaultVariantID: "v1",
-			Variants: []config.Variant{{ID: "v1"}},
+			Variants:         []pack.Variant{{ID: "v1"}},
 		},
 		"xigou": {
 			ID: "xigou", Name: "细狗", DisplayName: "细狗",
-			TeamStrengths:  "代码搜索、分析",
-			RoleDescription: "代码搜索专家",
-			MentionPatterns: []string{"@细狗", "@xigou"},
+			TeamStrengths:    "代码搜索、分析",
+			RoleDescription:  "代码搜索专家",
+			MentionPatterns:  []string{"@细狗", "@xigou"},
 			DefaultVariantID: "v1",
-			Variants: []config.Variant{{ID: "v1"}},
+			Variants:         []pack.Variant{{ID: "v1"}},
 		},
 	}
 	b := NewBuilder(breeds, nil)
@@ -80,7 +81,7 @@ func TestBuilderBuildRoster(t *testing.T) {
 
 func TestBuilderBuildUnknownBreed(t *testing.T) {
 	t.Parallel()
-	b := NewBuilder(map[string]*config.BreedConfig{}, nil)
+	b := NewBuilder(map[string]*pack.BreedConfig{}, nil)
 	result := b.Build(BuildRequest{BreedID: "nonexistent"})
 	if result != "" {
 		t.Error("expected empty string for unknown breed")
@@ -89,11 +90,11 @@ func TestBuilderBuildUnknownBreed(t *testing.T) {
 
 func TestBuilderBuildNoRosterForSingleBreed(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {
 			ID: "bianmu", Name: "边牧", DisplayName: "边牧",
 			DefaultVariantID: "v1",
-			Variants: []config.Variant{{ID: "v1"}},
+			Variants:         []pack.Variant{{ID: "v1"}},
 		},
 	}
 	b := NewBuilder(breeds, nil)
@@ -105,11 +106,11 @@ func TestBuilderBuildNoRosterForSingleBreed(t *testing.T) {
 
 func TestBuilderBuildSpecificVariant(t *testing.T) {
 	t.Parallel()
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {
 			ID: "bianmu", Name: "边牧", DisplayName: "边牧",
 			DefaultVariantID: "v1",
-			Variants: []config.Variant{
+			Variants: []pack.Variant{
 				{ID: "v1", SystemPrompt: "variant 1 prompt"},
 				{ID: "v2", SystemPrompt: "variant 2 prompt"},
 			},
@@ -127,7 +128,7 @@ func TestBuilderBuildSpecificVariant(t *testing.T) {
 
 func TestBuildSkillRosterEmpty(t *testing.T) {
 	t.Parallel()
-	b := NewBuilder(map[string]*config.BreedConfig{}, nil)
+	b := NewBuilder(map[string]*pack.BreedConfig{}, nil)
 	result := b.buildSkillRoster()
 	if result != "" {
 		t.Errorf("expected empty string for nil skills, got %q", result)
@@ -139,11 +140,11 @@ func TestBuildSkillRosterNoSkills(t *testing.T) {
 	mgr := skills.NewManager("")
 	_ = mgr.LoadFromDir() // loads nothing, initializes the map
 
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {
 			ID: "bianmu", Name: "边牧", DisplayName: "边牧",
 			DefaultVariantID: "v1",
-			Variants: []config.Variant{{ID: "v1"}},
+			Variants:         []pack.Variant{{ID: "v1"}},
 		},
 	}
 	b := NewBuilder(breeds, mgr)
@@ -164,11 +165,11 @@ func TestBuildSkillRosterFormat(t *testing.T) {
 		t.Skip("no skills loaded")
 	}
 
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {
 			ID: "bianmu", Name: "边牧", DisplayName: "边牧",
 			DefaultVariantID: "v1",
-			Variants: []config.Variant{{ID: "v1"}},
+			Variants:         []pack.Variant{{ID: "v1"}},
 		},
 	}
 	b := NewBuilder(breeds, mgr)
@@ -202,11 +203,11 @@ func TestBuildIncludesSkillRoster(t *testing.T) {
 		t.Skip("no skills loaded")
 	}
 
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {
 			ID: "bianmu", Name: "边牧", DisplayName: "边牧",
 			DefaultVariantID: "v1",
-			Variants: []config.Variant{{ID: "v1"}},
+			Variants:         []pack.Variant{{ID: "v1"}},
 		},
 	}
 	b := NewBuilder(breeds, mgr)
@@ -227,11 +228,11 @@ func TestBuildStillInjectsSkillBodiesWithSkillIDs(t *testing.T) {
 		t.Skip("no skills loaded")
 	}
 
-	breeds := map[string]*config.BreedConfig{
+	breeds := map[string]*pack.BreedConfig{
 		"bianmu": {
 			ID: "bianmu", Name: "边牧", DisplayName: "边牧",
 			DefaultVariantID: "v1",
-			Variants: []config.Variant{{ID: "v1"}},
+			Variants:         []pack.Variant{{ID: "v1"}},
 		},
 	}
 	b := NewBuilder(breeds, mgr)

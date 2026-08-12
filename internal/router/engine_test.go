@@ -3,7 +3,8 @@ package router
 import (
 	"context"
 	"testing"
-	"sounds-great-ai/internal/config"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 func TestRoutingEngine_NoRules(t *testing.T) {
@@ -21,7 +22,7 @@ func TestRoutingEngine_NoRules(t *testing.T) {
 }
 
 func TestRoutingEngine_WithRoster(t *testing.T) {
-	roster := map[string]*config.BreedConfig{
+	roster := map[string]*pack.BreedConfig{
 		"bianmu": {ID: "bianmu"},
 	}
 	e := NewEngine(nil, roster)

@@ -1,4 +1,4 @@
-## A2A 协作格式（对标 clowder-ai S4 a2a-format）
+## A2A 协作格式
 
 ### @mention 语法
 

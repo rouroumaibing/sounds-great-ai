@@ -43,7 +43,7 @@ func (s *SQLiteStore) bm25Search(ctx context.Context, query string, opts SearchO
 }
 
 // rrrFusion merges vector and BM25 ranked lists using Reciprocal Rank Fusion.
-// RRF score = 1/(60+bm25_rank) + 1/(60+vector_rank), k=60 (对标 clowder-ai).
+// RRF score = 1/(60+bm25_rank) + 1/(60+vector_rank), k=60.
 func (s *SQLiteStore) rrrFusion(vecResults []*schema.Document, bm25IDs []string, opts SearchOpts) []*schema.Document {
 	const rrfK = 60.0
 

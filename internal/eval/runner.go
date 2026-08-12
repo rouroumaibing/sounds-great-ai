@@ -10,7 +10,7 @@ import (
 	"sounds-great-ai/internal/platform"
 )
 
-// EvalRunner coordinates eval domain execution (对标 clowder-ai eval runner).
+// EvalRunner coordinates eval domain execution.
 type EvalRunner struct {
 	domains  []EvalDomain
 	platform *platform.Platform

@@ -14,6 +14,7 @@ import (
 	"sounds-great-ai/internal/eval"
 	"sounds-great-ai/internal/platform"
 	"sounds-great-ai/internal/ragstore"
+	"sounds-great-ai/internal/settings"
 	"sounds-great-ai/internal/telemetry"
 	"sounds-great-ai/internal/transport"
 	"sounds-great-ai/pkg/pack"
@@ -97,33 +98,64 @@ func SetupPack() (*pack.Pack, *ragstore.StoreRegistry, embedding.Embedder, *rags
 	if err := p.LoadFromFile(breedsFile, pack.LoadPolicySkipInvalid); err != nil {
 		log.Printf("Warning: breed load failed: %v", err)
 	}
-	go WatchBreedsFile(p, breedsFile)
+	// Merge the runtime catalog (catalog is truth; template is seed) into the
+	// in-memory pack registry, so user-created/edited members survive restart.
+	catalogPath := filepath.Join(settings.ConfigRoot(workspaceDir), settings.CatalogFileName)
+	store := settings.NewFileSettingsStore(
+		filepath.Join(settings.ConfigRoot(workspaceDir), settings.AccountsFileName),
+		catalogPath,
+		false, // read-only for the merge; the authoritative store lives in platform.New / routes.go
+	)
+	templateMap := make(map[string]*pack.BreedConfig, len(p.List()))
+	for _, b := range p.List() {
+		templateMap[b.ID] = b
+	}
+	if merged, merr := platform.MergedBreeds(templateMap, store); merr != nil {
+		log.Printf("Warning: breed catalog merge failed: %v", merr)
+	} else {
+		for _, b := range merged {
+			_ = p.Register(b)
+		}
+	}
+	// Watch the catalog (not the template) and re-merge on external change.
+	go WatchBreedsFile(p, store, catalogPath)
 	return p, registry, embedder, cleaner, workspaceDir
 }
 
-// WatchBreedsFile polls the single consolidated breeds file and reloads the pack
-// when it changes.
-func WatchBreedsFile(p *pack.Pack, file string) {
+// WatchBreedsFile polls the runtime catalog file and re-merges its breeds into
+// the in-memory pack registry when the file changes (e.g. edited by another
+// process or the settings hot-reloader). The catalog is the single runtime
+// truth; the template is only a seed and is no longer watched for live breeds.
+func WatchBreedsFile(p *pack.Pack, store settings.SettingsStore, catalogPath string) {
 	var lastMod int64
-	if info, err := os.Stat(file); err == nil {
+	if info, err := os.Stat(catalogPath); err == nil {
 		lastMod = info.ModTime().UnixNano()
 	}
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		info, err := os.Stat(file)
+		info, err := os.Stat(catalogPath)
 		if err != nil {
 			continue
 		}
-		mtime := info.ModTime().UnixNano()
-		if mtime != lastMod {
-			lastMod = mtime
-			if err := p.ReloadFromFile(file, pack.LoadPolicySkipInvalid); err != nil {
-				log.Printf("Warning: breed reload failed: %v", err)
-			} else {
-				log.Printf("Breeds reloaded from %s", file)
+		if info.ModTime().UnixNano() == lastMod {
+			continue
+		}
+		lastMod = info.ModTime().UnixNano()
+		// Re-merge runtime catalog breeds into the in-memory registry. Catalog
+		// wins, so external edits/additions are reflected. Deletions performed
+		// via the API already call p.Unregister directly.
+		breeds, err := store.ListBreeds()
+		if err != nil {
+			log.Printf("Warning: breed reload failed: %v", err)
+			continue
+		}
+		for _, b := range breeds {
+			if err := p.Register(b); err != nil {
+				log.Printf("Warning: breed re-register failed: %v", err)
 			}
 		}
+		log.Printf("Breeds re-merged from %s", catalogPath)
 	}
 }
 

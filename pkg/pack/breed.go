@@ -1,5 +1,7 @@
 package pack
 
+import "fmt"
+
 // BreedSource breed 来源类型
 type BreedSource string
 
@@ -30,43 +32,6 @@ type ContextBudget struct {
 	MaxMessages      int `json:"max_messages,omitempty"`
 }
 
-// Variant is one CLI/model configuration for a breed.
-type Variant struct {
-	ID            string        `json:"id"`
-	VariantLabel  string        `json:"variant_label,omitempty"`
-	ClientID      string        `json:"client_id"`
-	DefaultModel  string        `json:"default_model"`
-	MCPSupport    bool          `json:"mcp_support"`
-	CLI           CLIConfig     `json:"cli"`
-	SystemPrompt  string        `json:"system_prompt,omitempty"`
-	Personality   string        `json:"personality,omitempty"`
-	Strengths     []string      `json:"strengths,omitempty"`
-	TeamStrengths string        `json:"team_strengths,omitempty"`
-	Caution       string        `json:"caution,omitempty"`
-	ContextBudget ContextBudget `json:"context_budget,omitempty"`
-	VoiceConfig   VoiceConfig   `json:"voice_config,omitempty"`
-}
-
-// BreedConfig breed 主配置结构 (variant-based format)
-type BreedConfig struct {
-	ID               string      `json:"id"`
-	Name             string      `json:"name"`
-	DisplayName      string      `json:"display_name"`
-	Nickname         string      `json:"nickname,omitempty"`
-	Avatar           string      `json:"avatar,omitempty"`
-	Color            *Color      `json:"color,omitempty"`
-	Personality      string      `json:"personality"`
-	RoleDescription  string      `json:"role_description,omitempty"`
-	TeamStrengths    string      `json:"team_strengths,omitempty"`
-	MentionPatterns  []string    `json:"mention_patterns,omitempty"`
-	Roles            []string    `json:"roles,omitempty"`
-	Caution          string      `json:"caution,omitempty"`
-	DefaultVariantID string      `json:"default_variant_id"`
-	Variants         []Variant   `json:"variants"`
-	Source           BreedSource `json:"source,omitempty"`
-	Enabled          bool        `json:"enabled,omitempty"`
-}
-
 // VoiceConfig 语音合成配置（voiceConfig）
 type VoiceConfig struct {
 	Voice       string  `json:"voice,omitempty"`
@@ -76,6 +41,49 @@ type VoiceConfig struct {
 	RefText     string  `json:"ref_text,omitempty"`
 	Instruct    string  `json:"instruct,omitempty"`
 	Temperature float64 `json:"temperature,omitempty"`
+}
+
+// Variant is one CLI/model configuration for a breed.
+type Variant struct {
+	ID                    string        `json:"id"`
+	VariantLabel          string        `json:"variant_label,omitempty"`
+	ClientID              string        `json:"client_id"`
+	DefaultModel          string        `json:"default_model"`
+	MCPSupport            bool          `json:"mcp_support"`
+	CLI                   CLIConfig     `json:"cli"`
+	SystemPrompt          string        `json:"system_prompt,omitempty"`
+	Personality           string        `json:"personality,omitempty"`
+	Strengths             []string      `json:"strengths,omitempty"`
+	TeamStrengths         string        `json:"team_strengths,omitempty"`
+	Caution               string        `json:"caution,omitempty"`
+	ContextBudget         ContextBudget `json:"context_budget,omitempty"`
+	VoiceConfig           VoiceConfig   `json:"voice_config,omitempty"`
+	AccountRef            string        `json:"account_ref,omitempty"`
+	Provider              string        `json:"provider,omitempty"`
+	SessionChain          string        `json:"session_chain,omitempty"`
+	Strategy              string        `json:"strategy,omitempty"`
+	AutoCompactTokenLimit int           `json:"auto_compact_token_limit,omitempty"`
+}
+
+// BreedConfig breed 主配置结构 (variant-based format)
+type BreedConfig struct {
+	ID               string             `json:"id"`
+	Name             string             `json:"name"`
+	DisplayName      string             `json:"display_name"`
+	Nickname         string             `json:"nickname,omitempty"`
+	Avatar           string             `json:"avatar,omitempty"`
+	Color            *Color             `json:"color,omitempty"`
+	Personality      string             `json:"personality"`
+	RoleDescription  string             `json:"role_description,omitempty"`
+	TeamStrengths    string             `json:"team_strengths,omitempty"`
+	MentionPatterns  []string           `json:"mention_patterns,omitempty"`
+	Roles            []string           `json:"roles,omitempty"`
+	Caution          string             `json:"caution,omitempty"`
+	DefaultVariantID string             `json:"default_variant_id"`
+	Variants         []Variant          `json:"variants"`
+	Review           *BreedReviewPolicy `json:"review_policy,omitempty"`
+	Source           BreedSource        `json:"source,omitempty"`
+	Enabled          bool               `json:"enabled,omitempty"`
 }
 
 // DefaultVariant returns the default variant, or the first variant if not found.
@@ -121,14 +129,39 @@ type ClientDefault struct {
 	Models       []string `json:"models"`
 }
 
-// Leader is the human owner of the pack
+// Leader is the human owner of the pack (the @leader handle).
+// JSON tags use camelCase to match the frontend contract and the settings
+// store's on-disk format.
 type Leader struct {
 	Name            string   `json:"name"`
 	Nickname        string   `json:"nickname,omitempty"`
 	Avatar          string   `json:"avatar,omitempty"`
-	TimeZone        string   `json:"time_zone,omitempty"`
+	TimeZone        string   `json:"timeZone,omitempty"`
 	Aliases         []string `json:"aliases,omitempty"`
-	MentionPatterns []string `json:"mention_patterns,omitempty"`
+	MentionPatterns []string `json:"mentionPatterns,omitempty"`
+	ColorPrimary    string   `json:"colorPrimary,omitempty"`
+	ColorSecondary  string   `json:"colorSecondary,omitempty"`
+}
+
+// DefaultLeaderConfig returns the default leader configuration.
+func DefaultLeaderConfig() Leader {
+	return Leader{
+		Name:            "You",
+		Aliases:         []string{"Owner"},
+		MentionPatterns: []string{"@You", "@leader", "@owner"},
+		TimeZone:        "Asia/Shanghai",
+	}
+}
+
+// Validate checks that the leader config is valid.
+func (l *Leader) Validate() error {
+	if l.Name == "" {
+		return fmt.Errorf("leader name cannot be empty")
+	}
+	if len(l.MentionPatterns) == 0 {
+		return fmt.Errorf("leader must have at least one mention pattern")
+	}
+	return nil
 }
 
 // RosterEntry is a per-instance assignment.
@@ -140,10 +173,34 @@ type RosterEntry struct {
 	Evaluation string   `json:"evaluation,omitempty"`
 }
 
+// BreedReviewPolicy configures per-breed review rules.
+type BreedReviewPolicy struct {
+	CanReview           []string `json:"can_review,omitempty"`
+	CannotReviewSelf    bool     `json:"cannot_review_self"`
+	CrossBreedPreferred bool     `json:"cross_breed_preferred"`
+}
+
 // ReviewPolicy configures cross-breed review requirements at pack level.
 type ReviewPolicy struct {
 	RequireDifferentBreed bool     `json:"require_different_breed"`
 	PreferActiveInThread  bool     `json:"prefer_active_in_thread"`
 	ExcludeUnavailable    bool     `json:"exclude_unavailable"`
 	PreferredRoles        []string `json:"preferred_roles,omitempty"`
+}
+
+// PackConfig is the pack-level configuration.
+type PackConfig struct {
+	ReviewPolicy   ReviewPolicy  `json:"review_policy"`
+	RoutingRules   []RoutingRule `json:"routing_rules,omitempty"`
+	SOPDefinitions []string      `json:"sop_definitions,omitempty"`
+}
+
+// RoutingRule maps task types to breeds/roles.
+type RoutingRule struct {
+	TaskType          string   `json:"task_type"`
+	AssignRoles       []string `json:"assign_roles,omitempty"`
+	Flow              []string `json:"flow,omitempty"`
+	RequireCrossBreed bool     `json:"require_cross_breed,omitempty"`
+	ReviewRequired    bool     `json:"review_required,omitempty"`
+	Skills            []string `json:"skills,omitempty"`
 }

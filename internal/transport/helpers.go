@@ -9,7 +9,6 @@ import (
 
 	"sounds-great-ai/internal/adapter/unified"
 	"sounds-great-ai/internal/capability"
-	"sounds-great-ai/internal/config"
 	"sounds-great-ai/internal/hooks"
 	"sounds-great-ai/pkg/pack"
 	"sounds-great-ai/pkg/protocol"
@@ -136,7 +135,7 @@ func ragEnabled() bool {
 	return v == "true" || v == "1" || v == "yes"
 }
 
-func breedHasRetrieverRole(breed *config.BreedConfig) bool {
+func breedHasRetrieverRole(breed *pack.BreedConfig) bool {
 	if breed == nil {
 		return false
 	}
@@ -200,5 +199,3 @@ func (h *WSHandler) SendSystemNotice(severity, title, message string) {
 		s.SendEvent(context.Background(), event)
 	}
 }
-
-

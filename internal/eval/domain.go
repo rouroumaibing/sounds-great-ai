@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// EvalDomain defines an evaluation domain (对标 clowder-ai eval-domain-registry.ts).
+// EvalDomain defines an evaluation domain.
 type EvalDomain struct {
 	DomainID      string  `yaml:"domainId"`
 	DisplayName   string  `yaml:"displayName"`

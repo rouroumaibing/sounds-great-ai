@@ -1,4 +1,4 @@
-## 客观性 carry-over（对标 clowder-ai L2）
+## 客观性 carry-over
 
 外部 claim（数据/benchmark/对比/趋势/因果）引用前先判"搜索结果只是候选线索"。
 

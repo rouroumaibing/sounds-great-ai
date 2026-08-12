@@ -64,5 +64,17 @@ export function useBreeds() {
     }
   }, [showToast]);
 
-  return { breeds, dogs, loading, error, toggleEnabled, deleteBreed, refetch: fetchBreeds };
+  const createBreed = useCallback(async (config: BreedConfig) => {
+    const created = await breedService.createBreed(config);
+    await fetchBreeds();
+    return created;
+  }, [fetchBreeds]);
+
+  const updateBreed = useCallback(async (id: string, updates: Partial<BreedConfig>) => {
+    const updated = await breedService.updateBreed(id, updates);
+    await fetchBreeds();
+    return updated;
+  }, [fetchBreeds]);
+
+  return { breeds, dogs, loading, error, toggleEnabled, deleteBreed, createBreed, updateBreed, refetch: fetchBreeds };
 }

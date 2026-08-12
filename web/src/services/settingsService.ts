@@ -1,45 +1,7 @@
-import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from './http';
-import type { SettingsMemberApi, SettingsAccountApi, SystemConfigApi } from '../types/api';
-import type { SettingsMember, SettingsAccount, SystemConfigGroup, EnvSummary, RulesData, HookManifestData } from '../types';
+import { apiGet, apiPost, apiPatch, apiDelete, apiPut, ApiError } from './http';
+import type { SettingsAccountApi, SystemConfigApi, RosterEntry, ReviewPolicy, DefaultBreedResponse, BreedOrderResponse } from '../types/api';
+import type { SettingsAccount, SystemConfigGroup, EnvSummary, RulesData, HookManifestData } from '../types';
 import { useI18n } from '../store/useI18n';
-
-function mapMemberApiToUi(m: SettingsMemberApi): SettingsMember {
-  return {
-    id: m.id,
-    name: m.display_name,
-    breed: m.role,
-    color: m.color_primary || '#4A90D9',
-    icon: 'fa-solid fa-dog',
-    model: m.default_model || '',
-    handle: `@${m.breed_id}`,
-    sessionChain: m.session_chain ?? true,
-    enabled: m.enabled,
-    provider: m.provider || '',
-    type: 'CLI (OAuth)',
-    clientId: m.client_id,
-    accountRef: m.account_ref,
-    defaultModel: m.default_model,
-    nickname: m.nickname,
-    avatar: m.avatar,
-    colorPrimary: m.color_primary,
-    colorSecondary: m.color_secondary,
-    mentionPatterns: m.mention_patterns,
-    personality: m.personality,
-    roleDescription: m.role_description,
-    teamStrengths: m.team_strengths,
-    caution: m.caution,
-    cliCommand: m.cli_command,
-    outputFormat: m.output_format,
-    defaultArgs: m.default_args,
-    effort: m.effort,
-    contextWindow: m.context_window,
-    maxPromptTokens: m.max_prompt_tokens,
-    maxContextTokens: m.max_context_tokens,
-    maxMessages: m.max_messages,
-    mcpSupport: m.mcp_support,
-    strategy: m.strategy,
-  };
-}
 
 function mapAccountApiToUi(a: SettingsAccountApi): SettingsAccount {
   return {
@@ -61,79 +23,44 @@ function mapAccountApiToUi(a: SettingsAccountApi): SettingsAccount {
 }
 
 export const settingsService = {
-  async getMembers(): Promise<SettingsMember[]> {
-    const data = await apiGet<SettingsMemberApi[]>('/api/settings/members');
-    return Array.isArray(data) ? data.map(mapMemberApiToUi) : [];
+  // ----- roster (runtime membership meta) -----
+  async getRoster(): Promise<Record<string, RosterEntry>> {
+    const data = await apiGet<Record<string, RosterEntry>>('/api/settings/roster');
+    return data ?? {};
   },
 
-  async addMember(member: Omit<SettingsMember, 'id'>): Promise<SettingsMember> {
-    const data = await apiPost<SettingsMemberApi>('/api/settings/members', {
-      breed_id: member.breed,
-      display_name: member.name,
-      role: member.breed,
-      enabled: member.enabled,
-      client_id: member.clientId,
-      account_ref: member.accountRef,
-      default_model: member.defaultModel,
-      provider: member.provider,
-      nickname: member.nickname,
-      avatar: member.avatar,
-      color_primary: member.colorPrimary,
-      color_secondary: member.colorSecondary,
-      mention_patterns: member.mentionPatterns,
-      personality: member.personality,
-      role_description: member.roleDescription,
-      team_strengths: member.teamStrengths,
-      caution: member.caution,
-      cli_command: member.cliCommand,
-      output_format: member.outputFormat,
-      default_args: member.defaultArgs,
-      effort: member.effort,
-      context_window: member.contextWindow,
-      max_prompt_tokens: member.maxPromptTokens,
-      max_context_tokens: member.maxContextTokens,
-      max_messages: member.maxMessages,
-      mcp_support: member.mcpSupport,
-      session_chain: member.sessionChain,
-      strategy: member.strategy,
-    });
-    return mapMemberApiToUi(data);
+  async updateRosterEntry(id: string, patch: Partial<RosterEntry>): Promise<void> {
+    await apiPatch(`/api/settings/roster/${id}`, patch);
   },
 
-  async updateMember(id: string, updates: Partial<SettingsMember>): Promise<void> {
-    const body: Record<string, unknown> = {};
-    if (updates.name !== undefined) body.display_name = updates.name;
-    if (updates.breed !== undefined) body.role = updates.breed;
-    if (updates.enabled !== undefined) body.enabled = updates.enabled;
-    if (updates.clientId !== undefined) body.client_id = updates.clientId;
-    if (updates.accountRef !== undefined) body.account_ref = updates.accountRef;
-    if (updates.defaultModel !== undefined) body.default_model = updates.defaultModel;
-    if (updates.provider !== undefined) body.provider = updates.provider;
-    if (updates.nickname !== undefined) body.nickname = updates.nickname;
-    if (updates.avatar !== undefined) body.avatar = updates.avatar;
-    if (updates.colorPrimary !== undefined) body.color_primary = updates.colorPrimary;
-    if (updates.colorSecondary !== undefined) body.color_secondary = updates.colorSecondary;
-    if (updates.mentionPatterns !== undefined) body.mention_patterns = updates.mentionPatterns;
-    if (updates.personality !== undefined) body.personality = updates.personality;
-    if (updates.roleDescription !== undefined) body.role_description = updates.roleDescription;
-    if (updates.teamStrengths !== undefined) body.team_strengths = updates.teamStrengths;
-    if (updates.caution !== undefined) body.caution = updates.caution;
-    if (updates.cliCommand !== undefined) body.cli_command = updates.cliCommand;
-    if (updates.outputFormat !== undefined) body.output_format = updates.outputFormat;
-    if (updates.defaultArgs !== undefined) body.default_args = updates.defaultArgs;
-    if (updates.effort !== undefined) body.effort = updates.effort;
-    if (updates.contextWindow !== undefined) body.context_window = updates.contextWindow;
-    if (updates.maxPromptTokens !== undefined) body.max_prompt_tokens = updates.maxPromptTokens;
-    if (updates.maxContextTokens !== undefined) body.max_context_tokens = updates.maxContextTokens;
-    if (updates.maxMessages !== undefined) body.max_messages = updates.maxMessages;
-    if (updates.mcpSupport !== undefined) body.mcp_support = updates.mcpSupport;
-    if (updates.sessionChain !== undefined) body.session_chain = updates.sessionChain;
-    if (updates.strategy !== undefined) body.strategy = updates.strategy;
-    await apiPatch(`/api/settings/members/${id}`, body);
+  // ----- review policy -----
+  async getReviewPolicy(): Promise<ReviewPolicy> {
+    const data = await apiGet<ReviewPolicy>('/api/settings/review-policy');
+    return data ?? {};
   },
 
-  async deleteMember(id: string): Promise<void> {
-    await apiDelete(`/api/settings/members/${id}`);
+  async updateReviewPolicy(policy: ReviewPolicy): Promise<void> {
+    await apiPut('/api/settings/review-policy', policy);
+  },
+
+  // ----- default breed -----
+  async getDefaultBreed(): Promise<DefaultBreedResponse> {
+    const data = await apiGet<DefaultBreedResponse>('/api/config/default-breed');
+    return { breed_id: data?.breed_id ?? '', is_override: Boolean(data?.is_override) };
+  },
+
+  async setDefaultBreed(breedId: string): Promise<void> {
+    await apiPut('/api/config/default-breed', { breed_id: breedId });
+  },
+
+  // ----- breed order -----
+  async getBreedOrder(): Promise<string[]> {
+    const data = await apiGet<BreedOrderResponse>('/api/config/breed-order');
+    return data?.order ?? [];
+  },
+
+  async setBreedOrder(order: string[]): Promise<void> {
+    await apiPut('/api/config/breed-order', { order });
   },
 
   async getAccounts(): Promise<SettingsAccount[]> {
@@ -180,8 +107,9 @@ export const settingsService = {
     await apiPatch(`/api/settings/accounts/${id}`, body);
   },
 
-  async deleteAccount(id: string): Promise<void> {
-    await apiDelete(`/api/settings/accounts/${id}`);
+  async deleteAccount(id: string, opts?: { force?: boolean }): Promise<void> {
+    const qs = opts?.force ? '?force=true' : '';
+    await apiDelete(`/api/settings/accounts/${id}${qs}`);
   },
 
   async getSystemConfig(): Promise<SystemConfigGroup[]> {

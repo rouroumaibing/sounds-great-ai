@@ -1,10 +1,14 @@
 .env
 .superpowers/
 docs/superpowers
+.workbuddy
+.sounds-great-ai
 
 tmp/
 readonly-docs
+analysis/
 
+# Logs
 .logs/
 .pids/
 bin/

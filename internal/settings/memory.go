@@ -2,6 +2,7 @@ package settings
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -15,25 +16,27 @@ import (
 // of truth (clowder-homologous); the deprecated Member methods are projected
 // onto that structure via the shared helpers breedToMember/applyBreedUpdates.
 type InMemorySettingsStore struct {
-	mu           sync.RWMutex
-	breeds       map[string]*pack.BreedConfig
-	breedOrder   []string
-	roster       map[string]pack.RosterEntry
-	reviewPolicy *pack.ReviewPolicy
-	accounts     map[string]*Account
-	configs      []*SystemConfig
-	leader       *pack.Leader
+	mu            sync.RWMutex
+	breeds        map[string]*pack.BreedConfig
+	breedOrder    []string
+	roster        map[string]pack.RosterEntry
+	reviewPolicy  *pack.ReviewPolicy
+	accounts      map[string]*Account
+	configs       []*SystemConfig
+	leader        *pack.Leader
+	deletedBreeds map[string]bool
 }
 
 // NewInMemorySettingsStore creates a new in-memory settings store.
 func NewInMemorySettingsStore() *InMemorySettingsStore {
 	l := pack.DefaultLeaderConfig()
 	return &InMemorySettingsStore{
-		breeds:   make(map[string]*pack.BreedConfig),
-		roster:   make(map[string]pack.RosterEntry),
-		accounts: make(map[string]*Account),
-		configs:  defaultConfig(),
-		leader:   &l,
+		breeds:        make(map[string]*pack.BreedConfig),
+		roster:        make(map[string]pack.RosterEntry),
+		accounts:      make(map[string]*Account),
+		configs:       defaultConfig(),
+		leader:        &l,
+		deletedBreeds: make(map[string]bool),
 	}
 }
 
@@ -99,6 +102,7 @@ func (s *InMemorySettingsStore) DeleteBreed(id string) error {
 	}
 	delete(s.breeds, id)
 	delete(s.roster, id)
+	s.deletedBreeds[id] = true
 	for i, oid := range s.breedOrder {
 		if oid == id {
 			s.breedOrder = append(s.breedOrder[:i], s.breedOrder[i+1:]...)
@@ -106,6 +110,19 @@ func (s *InMemorySettingsStore) DeleteBreed(id string) error {
 		}
 	}
 	return nil
+}
+
+// ListDeletedBreeds returns the IDs of breeds the customer has explicitly
+// deleted (see FileSettingsStore.ListDeletedBreeds for semantics).
+func (s *InMemorySettingsStore) ListDeletedBreeds() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]string, 0, len(s.deletedBreeds))
+	for id := range s.deletedBreeds {
+		out = append(out, id)
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 func (s *InMemorySettingsStore) ReorderBreeds(order []string) error {

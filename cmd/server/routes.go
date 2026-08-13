@@ -111,7 +111,9 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	mux.Handle("/api/threads/", threadHandler.Routes())
 	mux.Handle("/api/sessions/", threadHandler.Routes())
 
-	credStore := settings.NewFileCredentialStore(filepath.Join(settingsDir, settings.CredentialsFileName), true)
+	// Credentials live in the global home directory (CredentialRoot) per the
+	// customer-safety layout, independent of the project-local config root.
+	credStore := settings.NewFileCredentialStore(filepath.Join(settings.CredentialRoot(), settings.CredentialsFileName), true)
 	settingsHandler := transport.NewSettingsHandlerWithCredentials(settingsStore, credStore, eventBus)
 	mux.Handle("/api/settings/", auth.Wrap(settingsHandler.Routes()))
 

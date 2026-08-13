@@ -159,7 +159,7 @@ E. 日常修 bug / 小改动 → 直接做，提交前查时刻 2
 | `docs/architecture/collaboration-landscape.md` | 协同全景。人 & 犬 & 犬的协作 |
 | `CLAUDE.md` | bianmu (Border Collie) CLI 配置（Claude Code 自动读取） |
 | `GEMINI.md` | jinmao (Golden Retriever) CLI 配置（Gemini CLI 自动读取） |
-| `packs/default/breeds/dog-template.json` | 狗狗身份配置（personality / role / system_prompt / CLI binding），单文件含 role_templates + breeds |
+| `packs/default/breeds/dog-template.json` | 狗狗身份**种子**配置（role_templates / client_defaults / breeds[含 variants] / roster / review_policy / leader）。字段含 `dog_id`、`name`、`display_name`、`avatar`、`color`、`mention_patterns`、`role_description`、`personality`、`team_strengths`、`features`、`restrictions`、`relationship_key`（对齐 clowder `cat-template.json`，保持 snake_case）。运行时以 `.sounds-great-ai/dog-catalog.json` 为准 |
 | `AGENTS.md` | 所有犬共享的铁律、限制、红旗、Vision Check Protocol、Magic Words、决策漏斗、治理协议 |
 | `docs/decisions/` | Architecture Decision Records (ADR-XXX) |
 | `docs/plans/` | 实施计划 |

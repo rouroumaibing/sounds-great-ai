@@ -13,14 +13,15 @@ import (
 //
 // Per plan 1.2 / decision D2 the catalog (.sounds-great-ai/dog-catalog.json)
 // is the single runtime truth; the pack template (dog-template.json) is only a
-// seed used on first init (and as a fallback when the catalog is entirely
-// empty/missing).
+// seed (first init) and an additive source of new breeds on upgrade.
 //
 // On first init — when the catalog has no breeds yet — the template breeds are
-// copied into the catalog so that subsequent deletions of a seed persist across
-// restart (no template resurrection).
+// copied into the catalog so subsequent deletions of a seed persist across
+// restart (no template resurrection). On every init we also additively sync any
+// NEW template breeds into an existing customer catalog, skipping breeds the
+// customer has explicitly deleted (tracked in the store's deleted_breeds set).
 func MergedBreeds(templateBreeds map[string]*pack.BreedConfig, store settings.SettingsStore) (map[string]*pack.BreedConfig, error) {
-	if err := seedCatalogIfEmpty(templateBreeds, store); err != nil {
+	if err := SyncTemplateBreeds(templateBreeds, store); err != nil {
 		return nil, err
 	}
 	catalog, err := store.ListBreeds()
@@ -37,29 +38,55 @@ func MergedBreeds(templateBreeds map[string]*pack.BreedConfig, store settings.Se
 	return merged, nil
 }
 
-// seedCatalogIfEmpty copies the template breeds into the catalog when the
-// catalog currently has no breeds. It is idempotent: if the catalog already
-// has breeds (migrated, previously seeded, or runtime-created) it is left
-// untouched.
-func seedCatalogIfEmpty(templateBreeds map[string]*pack.BreedConfig, store settings.SettingsStore) error {
+// SyncTemplateBreeds additively copies template breeds into the catalog:
+//   - breeds already present (by ID) are left untouched
+//   - breeds the customer deleted (recorded in the store's deleted_breeds set)
+//     are skipped, so a removed template dog is never resurrected (decision D2)
+//   - any other template breed not yet in the catalog is added (enabled=true)
+//
+// This makes new template dogs appear for existing customers after an upgrade,
+// while honoring the "no resurrection of deleted seeds" rule. It is idempotent:
+// re-running it only adds breeds still missing.
+func SyncTemplateBreeds(templateBreeds map[string]*pack.BreedConfig, store settings.SettingsStore) error {
 	existing, err := store.ListBreeds()
 	if err != nil {
 		return err
 	}
-	if len(existing) > 0 {
-		return nil
+	existingIDs := make(map[string]bool, len(existing))
+	for _, b := range existing {
+		if b != nil {
+			existingIDs[b.ID] = true
+		}
 	}
+	deletedIDs := make(map[string]bool)
+	if dl, err := store.ListDeletedBreeds(); err == nil {
+		for _, id := range dl {
+			if id != "" {
+				deletedIDs[id] = true
+			}
+		}
+	}
+
+	added := 0
 	for _, b := range templateBreeds {
 		if b == nil || b.ID == "" {
 			continue
 		}
-		// Copy so the template slice is never mutated; keep source as-is
-		// (template seeds are editable per D2 — they are not marked "system").
+		if existingIDs[b.ID] || deletedIDs[b.ID] {
+			continue
+		}
+		// Copy so the template slice is never mutated; mark enabled=true so
+		// freshly synced seeds surface as active in the UI (the template
+		// carries no `enabled` field, whose zero value would disable them).
 		b2 := *b
+		b2.Enabled = true
 		if err := store.CreateBreed(&b2); err != nil {
 			return err
 		}
+		added++
 	}
-	log.Printf("Seeded runtime catalog with %d template breeds", len(templateBreeds))
+	if added > 0 {
+		log.Printf("Synced %d new template breeds into catalog", added)
+	}
 	return nil
 }

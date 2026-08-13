@@ -44,6 +44,10 @@ func (a *SettingsStoreAdapter) DeleteMember(id string) error {
 	return a.inner.DeleteMember(id)
 }
 
+func (a *SettingsStoreAdapter) ListDeletedBreeds() ([]string, error) {
+	return a.inner.ListDeletedBreeds()
+}
+
 func (a *SettingsStoreAdapter) ListAccounts() ([]*settingsPorts.Account, error) {
 	accounts, err := a.inner.ListAccounts()
 	if err != nil {

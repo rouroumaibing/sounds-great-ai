@@ -6,9 +6,10 @@ import (
 	"testing"
 )
 
-// TestFileStore_CorruptAccountsBackedUp verifies that a corrupt accounts.json
-// is backed up to .bak and the store treats it as empty (no 500).
-func TestFileStore_CorruptAccountsBackedUp(t *testing.T) {
+// TestFileStore_CorruptAccountsTreatedAsEmpty verifies that a corrupt
+// accounts.json is treated as empty (no 500) and, per the customer-safety
+// decision, is NOT auto-backed-up at load time (backups are edit-time only).
+func TestFileStore_CorruptAccountsTreatedAsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	accountsPath := filepath.Join(dir, AccountsFileName)
 	catalogPath := filepath.Join(dir, CatalogFileName)
@@ -31,22 +32,19 @@ func TestFileStore_CorruptAccountsBackedUp(t *testing.T) {
 		t.Fatalf("corrupt accounts should be treated as empty, got %d", len(accounts))
 	}
 
-	bak := accountsPath + ".bak"
-	if _, err := os.Stat(bak); err != nil {
-		t.Fatalf("corrupt accounts file should be backed up to .bak: %v", err)
+	// No .bak (plain or timestamped) should be written at load time.
+	if _, err := os.Stat(accountsPath + ".bak"); err == nil {
+		t.Errorf("corrupt accounts file should NOT be backed up at load (.bak present)")
 	}
-	raw, err := os.ReadFile(bak)
-	if err != nil {
-		t.Fatalf("read bak: %v", err)
-	}
-	if string(raw) != "{not valid json" {
-		t.Fatalf("bak content mismatch: %q", string(raw))
+	if matches, _ := filepath.Glob(accountsPath + ".bak-*"); len(matches) > 0 {
+		t.Errorf("corrupt accounts file should NOT be backed up at load (.bak-* present)")
 	}
 }
 
-// TestFileStore_CorruptCredentialBackedUp verifies a corrupt credentials.json
-// is backed up and treated as empty (Get returns not found).
-func TestFileStore_CorruptCredentialBackedUp(t *testing.T) {
+// TestFileStore_CorruptCredentialTreatedAsEmpty verifies a corrupt
+// credentials.json is treated as empty (Get returns not found) and is NOT
+// auto-backed-up at load time.
+func TestFileStore_CorruptCredentialTreatedAsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	credPath := filepath.Join(dir, CredentialsFileName)
 	if err := os.WriteFile(credPath, []byte("@@@bad@@@"), 0o644); err != nil {
@@ -56,9 +54,61 @@ func TestFileStore_CorruptCredentialBackedUp(t *testing.T) {
 	if _, err := store.Get("x"); err == nil {
 		t.Fatalf("Get on corrupt store should error (not found), got nil")
 	}
-	if _, err := os.Stat(credPath + ".bak"); err != nil {
-		t.Fatalf("corrupt credential file should be backed up: %v", err)
+	if _, err := os.Stat(credPath + ".bak"); err == nil {
+		t.Errorf("corrupt credential file should NOT be backed up at load (.bak present)")
 	}
+	if matches, _ := filepath.Glob(credPath + ".bak-*"); len(matches) > 0 {
+		t.Errorf("corrupt credential file should NOT be backed up at load (.bak-* present)")
+	}
+}
+
+// TestFileStore_EditCreatesTimestampedBak verifies that an edit write snapshots
+// the previous file to a timestamped .bak (the customer-safety recovery point),
+// and that the previous content is preserved in the backup.
+func TestFileStore_EditCreatesTimestampedBak(t *testing.T) {
+	dir := t.TempDir()
+	accountsPath := filepath.Join(dir, AccountsFileName)
+	catalogPath := filepath.Join(dir, CatalogFileName)
+
+	store := NewFileSettingsStore(accountsPath, catalogPath, false)
+	// First write establishes a baseline file.
+	if _, err := store.CreateAccount("openai", "sk-old"); err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	// Second write (edit) must create a timestamped .bak of the baseline.
+	if _, err := store.CreateAccount("anthropic", "sk-new"); err != nil {
+		t.Fatalf("second create account: %v", err)
+	}
+
+	matches, err := filepath.Glob(accountsPath + ".bak-*")
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
+	if len(matches) == 0 {
+		t.Fatalf("expected a timestamped .bak after edit, found none")
+	}
+	raw, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatalf("read bak: %v", err)
+	}
+	// The backup must contain the baseline account (openai), proving it is a
+	// snapshot of the pre-edit state.
+	if !contains(string(raw), "openai") {
+		t.Errorf("timestamped .bak is not a snapshot of the pre-edit state")
+	}
+}
+
+func contains(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || indexOf(s, sub) >= 0)
+}
+
+func indexOf(s, sub string) int {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return i
+		}
+	}
+	return -1
 }
 
 // TestFileStore_EnvVarReservedPrefix verifies that env_vars keys with the

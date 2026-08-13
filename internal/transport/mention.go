@@ -23,7 +23,7 @@ func parseMention(msg string, p *pack.Pack) string {
 
 // isLeaderMention returns true if the message starts with one of the leader's
 // mention patterns (e.g. "@leader do something"). This ensures leader messages
-// are attributed as human user messages (catId=null) rather than breed-routed.
+// are attributed as human user messages (dog_id=null) rather than breed-routed.
 func isLeaderMention(text string, patterns []string) bool {
 	trimmed := strings.TrimSpace(text)
 	for _, p := range patterns {

@@ -61,17 +61,24 @@ func TestIntegrationPromptBuilderWithRealBreeds(t *testing.T) {
 				if !strings.Contains(result, "## 队友名册") {
 					t.Error("missing ## 队友名册 section")
 				}
-				// Must NOT contain self in roster
-				lines := strings.Split(result, "\n")
-				for _, line := range lines {
-					if strings.Contains(line, "|") && strings.Contains(line, breed.DisplayName) {
-						// This line has the breed name in a table row — could be roster
-						// The roster header line is "| 狗狗 | @mention |" so skip that
-						if !strings.Contains(line, "狗狗") && !strings.Contains(line, "---") {
-							t.Errorf("self appears in roster: %s", line)
-						}
-					}
+			// Must NOT contain self in roster
+			lines := strings.Split(result, "\n")
+			for _, line := range lines {
+				if !strings.Contains(line, "|") {
+					continue
 				}
+				// roster header row / separator row — skip
+				if strings.Contains(line, "狗狗") || strings.Contains(line, "---") {
+					continue
+				}
+				// Match the first table cell exactly against the breed's display name.
+				// A naive substring check would false-positive when one breed's
+				// display name is a prefix of another's (e.g. 金毛 ⊂ 金毛·开源).
+				parts := strings.Split(line, "|")
+				if len(parts) >= 2 && strings.TrimSpace(parts[1]) == breed.DisplayName {
+					t.Errorf("self appears in roster: %s", line)
+				}
+			}
 			}
 
 			// 5. Must contain variant system prompt if configured

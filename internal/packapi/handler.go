@@ -189,6 +189,50 @@ func (h *Handler) UpdateBreed(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if v, ok := updates["color"]; ok {
+		if err := json.Unmarshal(v, &cfg.Color); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid color: %w", err))
+			return
+		}
+	}
+	if v, ok := updates["nickname"]; ok {
+		if err := json.Unmarshal(v, &cfg.Nickname); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid nickname: %w", err))
+			return
+		}
+	}
+	if v, ok := updates["caution"]; ok {
+		if err := json.Unmarshal(v, &cfg.Caution); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid caution: %w", err))
+			return
+		}
+	}
+	if v, ok := updates["default_variant_id"]; ok {
+		if err := json.Unmarshal(v, &cfg.DefaultVariantID); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid default_variant_id: %w", err))
+			return
+		}
+	}
+	if v, ok := updates["features"]; ok {
+		var f pack.BreedFeatures
+		if err := json.Unmarshal(v, &f); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid features: %w", err))
+			return
+		}
+		cfg.Features = &f
+	}
+	if v, ok := updates["restrictions"]; ok {
+		if err := json.Unmarshal(v, &cfg.Restrictions); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid restrictions: %w", err))
+			return
+		}
+	}
+	if v, ok := updates["relationship_key"]; ok {
+		if err := json.Unmarshal(v, &cfg.RelationshipKey); err != nil {
+			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid relationship_key: %w", err))
+			return
+		}
+	}
 	if v, ok := updates["variants"]; ok {
 		if err := json.Unmarshal(v, &cfg.Variants); err != nil {
 			respondError(w, http.StatusBadRequest, fmt.Errorf("invalid variants: %w", err))

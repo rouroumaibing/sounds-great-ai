@@ -15,7 +15,7 @@
 - **业务/技术目标**:
   - As a **平台使用者（operator）**,
   - I want to **在设置页统一管理「犬队成员」（创建/编辑/启用停用/排序/设默认犬/绑定账号），且让成员的运行时名册（roster）与排序真正落盘**,
-  - So that **成员与 pack 层 breed 同源（clowder 同构）、默认犬与拖拽顺序刷新不丢失、账号绑定不产生悬空引用，且后端有别名唯一性/白名单/account_ref 守护**。
+  - So that **成员与 pack 层 breed 同源、默认犬与拖拽顺序刷新不丢失、账号绑定不产生悬空引用，且后端有别名唯一性/白名单/account_ref 守护**。
 - **关键指标/埋点**: 无（内部配置管理链路，非对外曝光功能）。
 
 ---
@@ -129,7 +129,7 @@
 
 - `GET /api/breeds`（`ListBreeds`）→ `h.pack.List()` 返回合并 breeds。
 - `POST /api/breeds`（`CreateBreed`）→ 解码 `BreedConfig`；`Source` 空则补 `user`；`validateBreed` + `pack.Validate`；`pack.Register`；`persistBreed`（写 catalog）；任一失败回滚（Unregister / 500）。→ 200 `breed`。
-- `PATCH /api/breeds/{id}`（`UpdateBreed`）→ 取现有 breed；**`source==system` → 403 `system breeds cannot be modified`**；逐字段部分解码（`display_name/avatar/personality/role_description/team_strengths/mention_patterns/roles/variants`）；`validateBreed` + `pack.Validate` + `persistBreed`；成功 `eventBus.Emit`。→ 200 `breed`。
+- `PATCH /api/breeds/{id}`（`UpdateBreed`）→ 取现有 breed；**`source==system` → 403 `system breeds cannot be modified`**；逐字段部分解码（白名单：`display_name/avatar/personality/role_description/team_strengths/mention_patterns/roles/color/nickname/caution/default_variant_id/features/restrictions/relationship_key/variants`；未传字段保留，不被覆盖）；`validateBreed` + `pack.Validate` + `persistBreed`；成功 `eventBus.Emit`。→ 200 `breed`。
 - `DELETE /api/breeds/{id}`（`DeleteBreed`）→ `pack.Unregister`（system 403）；`removeBreed`（catalog 删 breed + 删对应 roster entry + 从 breedOrder 移除）；→ 200。
 - `GET /api/breeds/templates`（`GetTemplates`）→ 返回 `dog-template.json` 的 `role_templates`（**只读种子**）。
 
@@ -150,7 +150,7 @@
 
 - `GET /api/config/default-breed`（`GetDefaultBreed`）→ 优先 `DEFAULT_BREED_ID` 环境变量（`is_override=true`），否则读 `configs["default_breed"]`；返回 `{breed_id, is_override}`。
 - `PUT /api/config/default-breed`（`SetDefaultBreed`）→ 非空时 `knownBreedIDs()`（模板 union catalog）校验，未知 → 404；落 `UpdateConfig("default_breed", id)`（持久化）；env override 在读取时仍优先。**（修复旧版只 `os.Setenv` 不持久化）**。
-- `GET /api/config/breed-order`（`GetBreedOrder`）→ 返回 catalog `breeds[]` 顺序（空则回退模板顺序）；**排序真相 = breeds[] 数组顺序**（clowder 同构）。
+- `GET /api/config/breed-order`（`GetBreedOrder`）→ 返回 catalog `breeds[]` 顺序（空则回退模板顺序）；**排序真相 = breeds[] 数组顺序**。
 - `PUT /api/config/breed-order`（`SetBreedOrder`）→ `knownBreedIDs()` 校验未知 id（返回 `unknown breed IDs` + `missing` 列表 400）；`store.ReorderBreeds(order)` 重排 catalog `breeds[]`。（**修复旧版写 `configs["breed_order"]` 而该 key 不在 defaultConfig → 实际 500 的坏逻辑**）。
 - `GET/PATCH /api/config/leader`（`GetLeader`/`UpdateLeader`）→ pack.Leader 读写（catalog 持久化）。
 
@@ -163,7 +163,7 @@
 `internal/settings/validation.go`：
 - `ValidCLIClientIDs = {claude, codex, gemini, opencode, kimi}`；`OAuthClientRefs` 同值。
 - `ValidateClientID(id)`：空 → true（generic api_key 账号，不限厂商、不设白名单）；非空必须命中白名单，否则 false。
-- `ValidateAccountRef(store, ref)`：空 → 放行（解绑）；命中 `OAuthClientRefs` → 放行（内置 CLI OAuth，非 catalog 账号）；否则必须命中 `store.ListAccounts()` 的 id，否则 400。**该校验复用 handler 持有的同一 `store` 实例**，绝不重新解析数据根 → 规避 clowder #1303「写 A 根、校验读 B 根」分裂。
+- `ValidateAccountRef(store, ref)`：空 → 放行（解绑）；命中 `OAuthClientRefs` → 放行（内置 CLI OAuth，非 catalog 账号）；否则必须命中 `store.ListAccounts()` 的 id，否则 400。**该校验复用 handler 持有的同一 `store` 实例**，绝不重新解析数据根 → 规避「写 A 根、校验读 B 根」数据根分裂。
 
 前端 `filterAccounts(clientId, profiles)`（D5 前端语义）：`clientId` 为空 → 返回全部账号（含无 clientId 的通用 api_key 账号）；否则返回 `profile.clientId===clientId || !profile.clientId`（匹配或通用账号均可见）。
 
@@ -171,7 +171,7 @@
 
 ## 5. 存储与数据模型
 
-### 5.1 catalog 唯一真相（clowder 同构）
+### 5.1 catalog 唯一真相
 
 `.sounds-great-ai/dog-catalog.json`（0644，由 `FileSettingsStore` 管理，`MarshalIndent` + tmp+rename 原子写）：
 
@@ -187,29 +187,31 @@
 }
 ```
 
-`packs/default/breeds/dog-template.json`（0644，**只读种子**）：`version:2 + role_templates + client_defaults + leader + breeds[]`（默认 6 只 system 犬）；首启 `seedCatalogIfEmpty` 把模板 breeds 复制进 catalog（catalog 成为全量真相），删 catalog 成员不复活模板。
+`packs/default/breeds/dog-template.json`（0644，**只读种子**）：`version:2 + role_templates + client_defaults + leader + breeds[]`（默认 6 只 system 犬）；`MergedBreeds` → `SyncTemplateBreeds` **追加式**把模板 breeds 复制进 catalog（catalog 成为全量真相）。首启 catalog 为空时全部种子化；之后**每次启动只追加 catalog 里没有、且不在 `deleted_breeds` 里的模板犬**——老客户升级后能看到新预置犬，但**自己删过的犬不复活**（决策 D2）。
 
 ### 5.2 三文件隔离（与 accounts 同根）
 
-| 文件 | 内容 | 权限 | 管理方 |
-|---|---|---|---|
-| `dog-catalog.json` | breeds + breedOrder + roster + review_policy + leader + configs | 0644 | `FileSettingsStore` |
-| `accounts.json` | 账号元数据 | 0644 | `FileSettingsStore` |
-| `credentials.json` | 密钥（明文） | 0600 | `FileCredentialStore` |
+| 文件 | 内容 | 权限 | 管理方 | 落盘根 |
+|---|---|---|---|---|
+| `dog-catalog.json` | breeds + breedOrder + roster + review_policy + leader + configs + deleted_breeds | 0644 | `FileSettingsStore` | `ConfigRoot`（项目 `.sounds-great-ai`） |
+| `accounts.json` | 账号元数据 | 0644 | `FileSettingsStore` | `ConfigRoot`（项目 `.sounds-great-ai`） |
+| `credentials.json` | 密钥（明文） | 0600 | `FileCredentialStore` | `CredentialRoot`（**全局 home `~/.sounds-great-ai`**，独立于项目根） |
 
-`settings.ConfigRoot(projectRoot)` 顺序：`SOUNDS_GREAT_AI_GLOBAL_CONFIG_ROOT`（支持 `~`）→ `{projectRoot}/.sounds-great-ai` → `{home}/.sounds-great-ai`。`routes.go` 只算一次 `settingsDir`，三文件均同一目录（同 §5.2 在账号 story 已述，此处复用：SG 不踩 #1303 的根因）。
+**根目录已拆分（客户配置安全）**：`catalog/accounts` 走 `ConfigRoot(projectRoot)`（项目下 `.sounds-great-ai`）；`credentials` 单独走 `CredentialRoot()`（全局 home `~/.sounds-great-ai`，可被 `SOUNDS_GREAT_AI_CREDENTIAL_ROOT` 覆盖）。清项目配置**不会**误删密钥。详见 `SG-OPS-001-customer-config-safety.md`。
 
 ### 5.3 关键结构体（`pkg/pack/breed.go`）
 
-- `BreedConfig`：`ID, Name, DisplayName, Nickname, Avatar, Color{Primary,Secondary}, Personality, RoleDescription, TeamStrengths, MentionPatterns[], Roles[], Caution, DefaultVariantID, Variants[], Review, Source(system/user/plugin), Enabled`。
-- `Variant`：`ID, VariantLabel, ClientID, DefaultModel, MCPSupport, CLI{Command,OutputFormat,DefaultArgs[],Effort}, SystemPrompt, Personality, Strengths[], TeamStrengths, Caution, ContextBudget{MaxPromptTokens,MaxContextTokens,MaxMessages}, VoiceConfig, AccountRef, Provider, SessionChain, Strategy, AutoCompactTokenLimit`。← 成员绑定账号走 `variant.account_ref`。
+- `BreedConfig`：`ID, Name, DisplayName, Nickname, Avatar, Color{Primary,Secondary}, Personality, RoleDescription, TeamStrengths, MentionPatterns[], Roles[], Caution, DefaultVariantID, Variants[], Review, Features{SessionChain, MissionHub{SelfClaimScope}}, Restrictions[], RelationshipKey, DogID, Source(system/user/plugin), Enabled`。← `dog_id` / `features` / `restrictions` / `relationship_key` 对齐 clowder `cat-template.json`（保持 snake_case 以兼容 Go 解析器）。
+- `Variant`：`ID, VariantLabel, ClientID, DefaultModel, MCPSupport, CLI{Command,OutputFormat,DefaultArgs[],Effort}, SystemPrompt, Personality, Strengths[], TeamStrengths, Caution, ContextBudget{MaxPromptTokens,MaxContextTokens,MaxMessages}, VoiceConfig, AccountRef, Provider, SessionChain, Strategy, AutoCompactTokenLimit, Name, DisplayName, Avatar, Color{Primary,Secondary}, MentionPatterns[], RoleDescription, DogID, Restrictions[]`。← 成员绑定账号走 `variant.account_ref`；`name/display_name/avatar/color/mention_patterns/role_description/dog_id/restrictions` 为逐变体可覆盖身份字段（对齐 clowder 多模型变体矩阵），主变体缺省时继承 breed。
 - `RosterEntry`：`Family, Roles[], Lead, Available, Evaluation`。← `Available` 为启用唯一真相。
-- `ReviewPolicy`：`RequireDifferentBreed, PreferActiveInThread, ExcludeUnavailable, PreferredRoles[]`。
+- `ReviewPolicy`：`RequireDifferentBreed, PreferActiveInThread, ExcludeUnavailable, PreferLead, PreferredRoles[]`。← `PreferLead=true` 时强制优先 lead 评审（见 SOP §Reviewer 配对规则）。
 - `Leader`：`Name, Nickname, Avatar, TimeZone, Aliases[], MentionPatterns[], ColorPrimary, ColorSecondary`。
 
-### 5.4 损坏自动备份（F4）
+### 5.4 损坏处理与编辑时备份（F4，已调整）
 
-`file_store.go` `reloadFromDisk` 解析 catalog/accounts/credentials 失败时 `backupCorrupt` 复制为 `.bak`（0o644）后当空处理，不再 500。
+- **加载时损坏**：`reloadFromDisk`（file_store.go / credential.go）解析 JSON 失败 → **仅告警并当空处理**，不再自动备份（不再掩盖损坏）。
+- **编辑时备份**：每次写盘（`flushCatalog` / `flushAccounts` / credential `flush`）覆盖前，若目标文件已存在，先快照为 `<path>.bak-<YYYYMMDD-HHMMSS>`（保留最近 5 份，`pruneBackups`），供客户回滚到上一版本。
+- 三种文件（accounts / dog-catalog / credentials）均覆盖。
 
 ---
 
@@ -339,7 +341,7 @@ DELETE /api/settings/accounts/{id}       → 200 nil | 409(bound_member_ids) | 4
   - When 编辑默认 system 犬，Then 403 `system breeds cannot be modified`。
   - When 设置默认犬 / 排序传入未知 breed id，Then 404 / 400 `unknown breed IDs`。
   - When roster 指向不存在的 breed，Then PATCH 返回 404。
-  - When 配置文件损坏，Then 自动备份 `.bak` 且当空处理，不 500（F4）。
+  - When 配置文件加载时损坏，Then 仅告警并当空处理（不 500）；编辑写盘前自动生成时间戳 `.bak-<YYYYMMDD-HHMMSS>`（保留最近 5 份）供客户回滚（F4）。
   - When 拖拽排序保存失败，Then 列表回滚到服务端顺序 + `members.reorderFailed` toast。
 - [x] **AC-03 (权限与安全)**:
   - 生产环境设 `AUTH_TOKEN` 后，When 未带 `Authorization` 访问 `/api/settings/*`（roster/review-policy/accounts），Then 返回 401（auth.Wrap）。
@@ -357,6 +359,7 @@ DELETE /api/settings/accounts/{id}       → 200 nil | 409(bound_member_ids) | 4
   - ✅ **鉴权已统一**：`/api/breeds` 与 `/api/config/` 已包 `auth.Wrap`（详见 AC-03），与「账户与密钥」页一致，不再存在相对缺口。
 - **[x] 高并发与限流降级**: 普通（本地配置链路）。`FileSettingsStore` 用 `sync.RWMutex` 保护；写路径 tmp+rename 原子写；外部改动由 `HotReloader` ~30s 防抖热加载。
 - **[x] 可服务性与监控**: 无独立 TraceID；关键失败返回结构化 error。成员写链路（breeds/config）现已与 accounts 一致接入 `auth.Wrap` 鉴权（401 拦截）。
+- **[x] 数据质量护栏（种子默认启用 + 追加式升级同步）**: `internal/platform/breeds_merge.go` 的 `SyncTemplateBreeds`（原 `seedCatalogIfEmpty`，已重构为追加式）在把模板犬写入 catalog 时强制 `b2.Enabled = true`。**背景 bug**：模板 `dog-template.json` 的 breed 不带 `enabled` 字段（零值 `false`），旧逻辑 `CreateBreed` 会写 `RosterEntry{Available: b.Enabled}` → `Available:false`，且 `RosterEntry.Available` 带 `omitempty` 被省略为 `{"family":""}`；前端 `available = r?.available ?? b.enabled` 两者皆 false → 整支犬队被误判为「已停用」，点开未配置过的犬即报错。**升级同步**：每次启动 `MergedBreeds` → `SyncTemplateBreeds` 仅把 catalog 里没有、且不在 `deleted_breeds` 里的模板犬追加进 catalog（老客户升级可见新预置犬，但自己删过的犬不复活，决策 D2）；`DeleteBreed` 会把 id 记入 `catalog.deleted_breeds`。回归测试 `internal/platform/breeds_merge_test.go`：`TestSyncTemplateBreedsSeedsEmpty`（种子犬 `Enabled=true` 且 roster `Available=true`）、`TestSyncTemplateBreedsIdempotent`（重复 sync 不重复）、`TestSyncTemplateBreedsSkipsDeleted`（删过的犬不被复活）、`TestMergedBreedsCatalogWins`（catalog 优先）。
 
 ---
 
@@ -365,8 +368,9 @@ DELETE /api/settings/accounts/{id}       → 200 nil | 409(bound_member_ids) | 4
 - [x] 3-Corner 澄清通过（方案 B 决策 + 本次现状梳理，AC 已锁定）。
 - [x] 单元测试覆盖：packapi 包（Create/Update/Delete breed、别名唯一、client_id、account_ref、system 403、ErrBreedNotFound）；transport 包（TestRosterEndpoints、TestReviewPolicyEndpoints、TestSetBreedOrderReordersCatalog、TestSetDefaultBreedValidatesMergedBreeds、TestDeleteAccount_ReferentialIntegrity）。
 - [x] 静态/构建门禁：`go build ./...` 0、`go test ./...` 0、`cd web && tsc -b` 0、`vite build` ✓。
-- [x] 前端三旧坑已消除：globalDefaultDog 不落盘（→ default-breed 端点）、拖拽不落盘（→ breed-order 端点）、双数据源（→ 合并 breeds 同构）。
+- [x] 前端三旧坑已消除：globalDefaultDog 不落盘（→ default-breed 端点）、拖拽不落盘（→ breed-order 端点）、双数据源（→ 合并 breeds 同源）。
 - [x] 鉴权一致性：已完成 `/api/breeds` 与 `/api/config/` 补 `auth.Wrap`，与生产 `AUTH_TOKEN` 模式下 accounts 页一致（2026-08-12 实施，`go build ./...` + `go test ./...` 全绿）。
+- [x] 种子默认启用 + 追加式同步回归测试：`internal/platform/breeds_merge_test.go` 锁定「模板犬种子化后 `Enabled=true` 且 roster `Available=true`」「重复 sync 不重复」「删过的犬不被复活（D2）」「catalog 优先于模板」，防止整队误判停用的 seed bug 复现。同步已就地修复运行时 `.sounds-great-ai/dog-catalog.json`（6 只犬 `enabled/available` 全置 true，昵称/默认犬/leader 配置保留，备份 `dog-catalog.json.bak-20260812-enable-fix`）。
 
 ---
 
@@ -374,9 +378,11 @@ DELETE /api/settings/accounts/{id}       → 200 nil | 409(bound_member_ids) | 4
 
 - **2026-08-12（初版）**：基于方案 B 落地后代码实况梳理成员管理 + 添加成员前后端逻辑，记录 `routes.go` 中 `/api/breeds`、`/api/config/` 未包 `auth.Wrap` 的鉴权一致性缺口（AC-03 / §9）。
 - **2026-08-12（补丁）**：用户确认后于 `cmd/server/routes.go:81-82,124` 为 `/api/breeds`、`/api/breeds/`、`/api/config/` 补 `auth.Wrap`，关闭 AC-03 鉴权缺口；`go build ./...` + `go test ./...` 全绿（cmd/server 与全模块均 ok）。本文档 §4.2/§4.4、数据流注释、AC-03、§9、DoD 同步更新为已闭环。
+- **2026-08-12（seed 修复）**：用户反馈「成员管理里预置很多停用的狗狗、点开未配置过的犬即报错」。根因定位为 seed bug——`breeds_merge.go` 的 `seedCatalogIfEmpty` 复制模板犬时未设 `enabled`，导致整支犬队 roster 被写成 `Available:false`（JSON omitempty 省略）而被前端误判「已停用」。修复：种子化时强制 `b2.Enabled = true`（默认启用），已存在 catalog 不受影响（idempotent）。新增回归测试 `internal/platform/breeds_merge_test.go`（`TestSeedCatalogEnablesBreeds` / `TestSeedCatalogIdempotentWhenBreedsExist`）。同步就地修复运行时 `.sounds-great-ai/dog-catalog.json`：6 只犬 `enabled`/`roster.available` 全置 true（昵称/默认犬 `bianmu`/leader `Owner` 均保留，备份 `dog-catalog.json.bak-20260812-enable-fix`）。`go build ./...` + `go test ./...` 全绿。本文档 §9 增加「数据质量护栏（seed 默认启用）」、DoD 增加回归测试条目。
+- **2026-08-12（客户安全三改）**：按用户决策落实客户配置安全：① **根目录拆分**——`credentials.json` 改由新增 `settings.CredentialRoot()`（全局 home `~/.sounds-great-ai`，可被 `SOUNDS_GREAT_AI_CREDENTIAL_ROOT` 覆盖）管理，`routes.go:114` 的 `credStore` 改用之；`catalog/accounts` 仍走 `ConfigRoot`（项目 `.sounds-great-ai`）。② **编辑时备份**——移除加载期的 `backupCorrupt`（`reloadFromDisk` 损坏仅告警+当空），写盘前 `backupBeforeWrite` 生成 `<path>.bak-<YYYYMMDD-HHMMSS>`（保留最近 5 份，`pruneBackups`）。③ **追加式升级同步**——`seedCatalogIfEmpty` 重构为 `SyncTemplateBreeds`：`MergedBreeds` 每次启动仅追加 catalog 缺失且不在 `deleted_breeds` 的模板犬；`DeleteBreed` 记录 id 到 `catalog.deleted_breeds`（接口新增 `ListDeletedBreeds`，File/InMemory/Adapter 均实现）。`go build ./...` + `go test ./...` 全绿。本文档 §5.1/§5.2/§5.4、AC-02、§9、DoD 同步更新；详见 `SG-OPS-001-customer-config-safety.md`。
 
 ---
 
+- **2026-08-13（PATCH 字段白名单补全）**：对齐 clowder `cat-template.json` 在 `breed.go` 新增 `dog_id`/`features`/`restrictions`/`relationship_key` 及 variant 级 8 字段后，重梳 `internal/packapi/handler.go` 的 `UpdateBreed` PATCH 白名单。原白名单（`display_name/avatar/personality/role_description/team_strengths/mention_patterns/roles/variants`）漏掉前端 `buildBreedPayload` 实际发送的 `color`/`nickname`/`caution`，导致用户在设置页改了颜色/昵称/禁区保存后被静默丢弃；另补 `default_variant_id`/`features`/`restrictions`/`relationship_key` 以便将来编辑这些元数据。同步扩展 `TestUpdateBreedMultipleFields` 断言上述字段持久化。`go build ./...` + `go test ./internal/packapi/...` 全绿。§4.2 PATCH 字段清单同步更新。
 > 关联文档：`sg-member-catalog-plan.md`（方案 B 规划与 D1–D6 决策）、`SG-ACC-001-accounts-keys-auth.md`（同分区「账户与密钥」设计，成员经 `account_ref` 反向引用）。
-> 对照样本：`readonly-docs/clowder-ai`（Fastify + `cat-catalog.json` V2，clowder 同构来源）。
-> 历史备注：旧版「成员管理」基于扁平 `Member` + `/api/settings/members`，该端点在方案 B 阶段 3 已删除；本文档仅描述当前 breed 同构实现。
+> 历史备注：旧版「成员管理」基于扁平 `Member` + `/api/settings/members`，该端点在方案 B 阶段 3 已删除；本文档仅描述当前 breed 同源实现。

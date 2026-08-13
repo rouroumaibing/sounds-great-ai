@@ -80,7 +80,7 @@ func UpgradeHandler(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "make build failed", "logs": logs})
 			return
 		}
-		out, err = exec.Command("go", "build", "-o", "bin/server", "cmd/server/main.go").CombinedOutput()
+		out, err = exec.Command("go", "build", "-o", "bin/sounds-great-ai", "cmd/server/main.go").CombinedOutput()
 		logs = append(logs, string(out))
 		if err != nil {
 			json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "go build failed", "logs": logs})
@@ -129,7 +129,11 @@ func UpgradeHandler(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "failed to create bin dir: " + err.Error(), "logs": logs})
 			return
 		}
-		outFile, err := os.Create("bin/server")
+		binName := "bin/sounds-great-ai"
+		if runtime.GOOS == "windows" {
+			binName = "bin/sounds-great-ai.exe"
+		}
+		outFile, err := os.Create(binName)
 		if err != nil {
 			json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "failed to create binary file: " + err.Error(), "logs": logs})
 			return
@@ -140,8 +144,8 @@ func UpgradeHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		outFile.Close()
-		os.Chmod("bin/server", 0755)
-		logs = append(logs, fmt.Sprintf("Downloaded %s to bin/server", downloadURL))
+		os.Chmod(binName, 0755)
+		logs = append(logs, fmt.Sprintf("Downloaded %s to %s", downloadURL, binName))
 		json.NewEncoder(w).Encode(map[string]any{"success": true, "message": fmt.Sprintf("Upgrade complete (release mode, %s). Restart the server to apply.", release.TagName), "logs": logs})
 	}
 }

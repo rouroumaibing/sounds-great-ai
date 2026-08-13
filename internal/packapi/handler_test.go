@@ -279,7 +279,7 @@ func TestGetTemplates(t *testing.T) {
 	h, dir := setupTestPackHandler(t)
 
 	// Write template file (consolidated format)
-	templates := `{"version":2,"role_templates":[{"id":"orchestrator","name":"Orchestrator","default_roles":["orchestrator"]}],"breeds":[]}`
+	templates := `{"version":2,"role_templates":[{"id":"orchestrator","name":"Orchestrator"}],"breeds":[]}`
 	os.WriteFile(filepath.Join(dir, "dog-template.json"), []byte(templates), 0644)
 
 	mux := h.Routes()
@@ -756,6 +756,10 @@ func TestUpdateBreedMultipleFields(t *testing.T) {
 		"display_name":     "Updated Name",
 		"personality":      "energetic",
 		"role_description": "reviewer",
+		"color":            map[string]any{"primary": "#ff0000", "secondary": "#00ff00"},
+		"nickname":         "tester",
+		"caution":          "do not edit prod",
+		"restrictions":     []string{"no-code"},
 	})
 	req := httptest.NewRequest("PATCH", "/api/breeds/test-breed", bytes.NewReader(body))
 	req.SetPathValue("id", "test-breed")
@@ -775,6 +779,18 @@ func TestUpdateBreedMultipleFields(t *testing.T) {
 	}
 	if result.RoleDescription != "reviewer" {
 		t.Errorf("RoleDescription = %q, want %q", result.RoleDescription, "reviewer")
+	}
+	if result.Color.Primary != "#ff0000" || result.Color.Secondary != "#00ff00" {
+		t.Errorf("Color = %+v, want primary #ff0000 / secondary #00ff00", result.Color)
+	}
+	if result.Nickname != "tester" {
+		t.Errorf("Nickname = %q, want %q", result.Nickname, "tester")
+	}
+	if result.Caution != "do not edit prod" {
+		t.Errorf("Caution = %q, want %q", result.Caution, "do not edit prod")
+	}
+	if len(result.Restrictions) != 1 || result.Restrictions[0] != "no-code" {
+		t.Errorf("Restrictions = %v, want [no-code]", result.Restrictions)
 	}
 }
 

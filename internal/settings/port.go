@@ -98,6 +98,9 @@ type SettingsStore interface {
 	CreateBreed(b *pack.BreedConfig) error
 	UpdateBreed(id string, b *pack.BreedConfig) error
 	DeleteBreed(id string) error
+	// ListDeletedBreeds returns IDs of breeds the customer explicitly removed,
+	// so the upgrade sync can skip resurrecting them (decision D2).
+	ListDeletedBreeds() ([]string, error)
 	// ReorderBreeds reorders the persisted catalog breeds[] array to match the
 	// given order (clowder-homologous: the array order is the sort truth).
 	// IDs not present in the catalog are ignored; catalog breeds missing from

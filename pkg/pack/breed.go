@@ -63,6 +63,16 @@ type Variant struct {
 	SessionChain          string        `json:"session_chain,omitempty"`
 	Strategy              string        `json:"strategy,omitempty"`
 	AutoCompactTokenLimit int           `json:"auto_compact_token_limit,omitempty"`
+	// cat-style per-variant overrides (mirrors clowder cat-template.json):
+	// allow a variant to diverge from its breed for identity/linkage fields.
+	Name            string   `json:"name,omitempty"`
+	DisplayName     string   `json:"display_name,omitempty"`
+	Avatar          string   `json:"avatar,omitempty"`
+	Color           *Color   `json:"color,omitempty"`
+	MentionPatterns []string `json:"mention_patterns,omitempty"`
+	RoleDescription string   `json:"role_description,omitempty"`
+	DogID           string   `json:"dog_id,omitempty"`
+	Restrictions    []string `json:"restrictions,omitempty"`
 }
 
 // BreedConfig breed 主配置结构 (variant-based format)
@@ -82,8 +92,25 @@ type BreedConfig struct {
 	DefaultVariantID string             `json:"default_variant_id"`
 	Variants         []Variant          `json:"variants"`
 	Review           *BreedReviewPolicy `json:"review_policy,omitempty"`
+	Features         *BreedFeatures     `json:"features,omitempty"`
+	Restrictions     []string           `json:"restrictions,omitempty"`
+	RelationshipKey  string             `json:"relationship_key,omitempty"`
+	DogID            string             `json:"dog_id,omitempty"`
 	Source           BreedSource        `json:"source,omitempty"`
 	Enabled          bool               `json:"enabled,omitempty"`
+}
+
+// BreedFeatures mirrors clowder's per-breed `features` block: optional
+// capability flags that tune runtime behavior (session chaining, mission
+// self-claim scope, etc.).
+type BreedFeatures struct {
+	SessionChain bool             `json:"sessionChain,omitempty"`
+	MissionHub   *MissionHubFlags `json:"missionHub,omitempty"`
+}
+
+// MissionHubFlags configures how a breed may self-claim missions.
+type MissionHubFlags struct {
+	SelfClaimScope string `json:"selfClaimScope,omitempty"`
 }
 
 // DefaultVariant returns the default variant, or the first variant if not found.
@@ -120,7 +147,6 @@ type RoleTemplate struct {
 	RoleDescription string   `json:"role_description,omitempty"`
 	Personality     string   `json:"personality,omitempty"`
 	TeamStrengths   string   `json:"team_strengths,omitempty"`
-	DefaultRoles    []string `json:"default_roles,omitempty"`
 }
 
 // ClientDefault holds per-client model defaults .
@@ -185,6 +211,7 @@ type ReviewPolicy struct {
 	RequireDifferentBreed bool     `json:"require_different_breed"`
 	PreferActiveInThread  bool     `json:"prefer_active_in_thread"`
 	ExcludeUnavailable    bool     `json:"exclude_unavailable"`
+	PreferLead            bool     `json:"prefer_lead,omitempty"`
 	PreferredRoles        []string `json:"preferred_roles,omitempty"`
 }
 

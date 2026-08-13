@@ -3,8 +3,10 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +22,10 @@ const (
 	AccountsFileName    = "accounts.json"
 	CatalogFileName     = "dog-catalog.json"
 	CredentialsFileName = "credentials.json"
+
+	// maxBackups is the number of timestamped .bak files kept per config file
+	// (most recent wins); older snapshots are pruned to avoid unbounded growth.
+	maxBackups = 5
 )
 
 // EnvConfigRoot overrides the root directory for persisted settings. When set,
@@ -61,6 +67,29 @@ func expandHome(p string) string {
 	return p
 }
 
+// EnvCredentialRoot overrides the directory for secret credentials only.
+// When set, credentials.json lives under this directory instead of the
+// default global home location.
+const EnvCredentialRoot = "SOUNDS_GREAT_AI_CREDENTIAL_ROOT"
+
+// CredentialRoot returns the directory where credentials.json is stored,
+// resolved in this order:
+//  1. SOUNDS_GREAT_AI_CREDENTIAL_ROOT (env, "~" expanded per-OS)
+//  2. {home}/.sounds-great-ai            (global home, the customer-safe default)
+//
+// Per the customer-safety layout (aligned with clowder-ai), secrets live in a
+// GLOBAL home directory independent of the project-local config root, so that
+// clearing the project config never wipes API keys.
+func CredentialRoot() string {
+	if d := os.Getenv(EnvCredentialRoot); d != "" {
+		return expandHome(d)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".sounds-great-ai")
+	}
+	return ".sounds-great-ai"
+}
+
 // accountsDocument is the on-disk envelope for account metadata.
 type accountsDocument struct {
 	Accounts []*Account `json:"accounts"`
@@ -76,6 +105,9 @@ type catalogDocument struct {
 	ReviewPolicy *pack.ReviewPolicy          `json:"review_policy,omitempty"`
 	Leader       *pack.Leader                `json:"leader,omitempty"`
 	Configs      []*SystemConfig             `json:"configs,omitempty"`
+	// DeletedBreeds records breed IDs the customer explicitly removed, so the
+	// upgrade sync never resurrects a deleted template dog (decision D2).
+	DeletedBreeds []string `json:"deleted_breeds,omitempty"`
 }
 
 // FileSettingsStore implements SettingsStore with JSON files on disk:
@@ -86,18 +118,19 @@ type catalogDocument struct {
 // When watch is true, a HotReloader polls the two files and reloads the
 // in-memory cache ~30s after an external modification (config hot-load).
 type FileSettingsStore struct {
-	accountsPath string
-	catalogPath  string
-	mu           sync.RWMutex
-	breeds       map[string]*pack.BreedConfig
-	breedOrder   []string
-	roster       map[string]pack.RosterEntry
-	reviewPolicy *pack.ReviewPolicy
-	accounts     map[string]*Account
-	configs      []*SystemConfig
-	leader       *pack.Leader
-	loaded       bool
-	reload       *HotReloader
+	accountsPath  string
+	catalogPath   string
+	mu            sync.RWMutex
+	breeds        map[string]*pack.BreedConfig
+	breedOrder    []string
+	roster        map[string]pack.RosterEntry
+	reviewPolicy  *pack.ReviewPolicy
+	accounts      map[string]*Account
+	configs       []*SystemConfig
+	leader        *pack.Leader
+	deletedBreeds map[string]bool
+	loaded        bool
+	reload        *HotReloader
 }
 
 // NewFileSettingsStore creates a file-backed settings store. accountsPath and
@@ -110,12 +143,13 @@ func NewFileSettingsStore(accountsPath, catalogPath string, watch bool) *FileSet
 		_ = os.MkdirAll(dir, 0o755)
 	}
 	s := &FileSettingsStore{
-		accountsPath: accountsPath,
-		catalogPath:  catalogPath,
-		breeds:       make(map[string]*pack.BreedConfig),
-		roster:       make(map[string]pack.RosterEntry),
-		accounts:     make(map[string]*Account),
-		configs:      defaultConfig(),
+		accountsPath:  accountsPath,
+		catalogPath:   catalogPath,
+		breeds:        make(map[string]*pack.BreedConfig),
+		roster:        make(map[string]pack.RosterEntry),
+		accounts:      make(map[string]*Account),
+		configs:       defaultConfig(),
+		deletedBreeds: make(map[string]bool),
 	}
 	if watch {
 		s.reload = NewHotReloader([]string{accountsPath, catalogPath}, func() {
@@ -149,7 +183,7 @@ func (s *FileSettingsStore) reloadFromDisk() error {
 	if raw, err := os.ReadFile(s.accountsPath); err == nil {
 		var doc accountsDocument
 		if err := json.Unmarshal(raw, &doc); err != nil {
-			backupCorrupt(s.accountsPath, raw)
+			log.Printf("WARN: accounts file %s is corrupt; treating as empty (no backup written at load)", s.accountsPath)
 			s.accounts = make(map[string]*Account)
 		} else {
 			for _, a := range doc.Accounts {
@@ -186,7 +220,7 @@ func (s *FileSettingsStore) reloadFromDisk() error {
 
 		var doc catalogDocument
 		if err := json.Unmarshal(raw, &doc); err != nil {
-			backupCorrupt(s.catalogPath, raw)
+			log.Printf("WARN: catalog file %s is corrupt; treating as empty (no backup written at load)", s.catalogPath)
 			s.breeds = make(map[string]*pack.BreedConfig)
 			s.breedOrder = nil
 			s.roster = make(map[string]pack.RosterEntry)
@@ -211,6 +245,11 @@ func (s *FileSettingsStore) reloadFromDisk() error {
 			if len(doc.Configs) > 0 {
 				s.configs = doc.Configs
 			}
+			for _, id := range doc.DeletedBreeds {
+				if id != "" {
+					s.deletedBreeds[id] = true
+				}
+			}
 		}
 	} else if !os.IsNotExist(err) {
 		return err
@@ -228,7 +267,7 @@ func (s *FileSettingsStore) migrateLegacyMembers(raw []byte) error {
 		Configs []*SystemConfig `json:"configs,omitempty"`
 	}
 	if err := json.Unmarshal(raw, &legacy); err != nil {
-		backupCorrupt(s.catalogPath, raw)
+		log.Printf("WARN: legacy catalog file %s is corrupt; cannot migrate", s.catalogPath)
 		return fmt.Errorf("parse legacy catalog: %w", err)
 	}
 	// Backup before mutating.
@@ -256,16 +295,53 @@ func (s *FileSettingsStore) migrateLegacyMembers(raw []byte) error {
 	return nil
 }
 
-// backupCorrupt copies an unreadable file to <path>.bak so the original
-// content can be recovered manually. The caller then treats the config as
-// empty. Best-effort: a failure to back up is ignored.
-func backupCorrupt(path string, raw []byte) {
-	if err := os.WriteFile(path+".bak", raw, 0o644); err != nil {
+// backupBeforeWrite snapshots the existing file to a timestamped .bak before
+// an edit write, so a customer can recover the previous version. Per product
+// decision, backups are created ONLY on edit (not when loading a corrupt file,
+// which is now treated as empty with a warning).
+func backupBeforeWrite(path string) {
+	if _, err := os.Stat(path); err != nil {
+		return // no existing file yet; nothing to snapshot
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
 		return
+	}
+	ts := time.Now().Format("20060102-150405")
+	bak := fmt.Sprintf("%s.bak-%s", path, ts)
+	if err := os.WriteFile(bak, data, 0o644); err != nil {
+		return
+	}
+	pruneBackups(path, maxBackups)
+}
+
+// pruneBackups keeps at most keep timestamped .bak files (most recent wins),
+// removing older snapshots to avoid unbounded growth.
+func pruneBackups(path string, keep int) {
+	pattern := filepath.Join(filepath.Dir(path), filepath.Base(path)+".bak-*")
+	matches, err := filepath.Glob(pattern)
+	if err != nil || len(matches) <= keep {
+		return
+	}
+	sort.Strings(matches)
+	for _, old := range matches[:len(matches)-keep] {
+		_ = os.Remove(old)
 	}
 }
 
+// sortedKeys returns the sorted keys of a string→bool set (used to persist
+// deleted_breeds deterministically).
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func (s *FileSettingsStore) flushAccounts() error {
+	backupBeforeWrite(s.accountsPath)
 	doc := accountsDocument{Accounts: make([]*Account, 0, len(s.accounts))}
 	for _, a := range s.accounts {
 		doc.Accounts = append(doc.Accounts, a)
@@ -274,6 +350,7 @@ func (s *FileSettingsStore) flushAccounts() error {
 }
 
 func (s *FileSettingsStore) flushCatalog() error {
+	backupBeforeWrite(s.catalogPath)
 	leader := s.leader
 	if leader == nil {
 		l := pack.DefaultLeaderConfig()
@@ -286,6 +363,7 @@ func (s *FileSettingsStore) flushCatalog() error {
 		ReviewPolicy: s.reviewPolicy,
 		Leader:       leader,
 		Configs:      s.configs,
+		DeletedBreeds: sortedKeys(s.deletedBreeds),
 	}
 	seen := make(map[string]bool, len(s.breedOrder))
 	for _, id := range s.breedOrder {
@@ -391,6 +469,7 @@ func (s *FileSettingsStore) DeleteBreed(id string) error {
 	}
 	delete(s.breeds, id)
 	delete(s.roster, id)
+	s.deletedBreeds[id] = true
 	for i, oid := range s.breedOrder {
 		if oid == id {
 			s.breedOrder = append(s.breedOrder[:i], s.breedOrder[i+1:]...)
@@ -398,6 +477,18 @@ func (s *FileSettingsStore) DeleteBreed(id string) error {
 		}
 	}
 	return s.flushCatalog()
+}
+
+// ListDeletedBreeds returns the IDs of breeds the customer has explicitly
+// deleted. Used by the upgrade sync to avoid resurrecting removed template dogs
+// (decision D2).
+func (s *FileSettingsStore) ListDeletedBreeds() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if err := s.ensureLoaded(); err != nil {
+		return nil, err
+	}
+	return sortedKeys(s.deletedBreeds), nil
 }
 
 // ReorderBreeds reorders the persisted catalog breeds[] to match order.

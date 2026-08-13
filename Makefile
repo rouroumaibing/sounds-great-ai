@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: dev prod daemon backend frontend build stop clean install upgrade help deep
+.PHONY: dev prod daemon backend frontend build stop restart clean install upgrade help deep
 
 .DEFAULT_GOAL := help
 
@@ -32,19 +32,18 @@ dev:
 		if [ ! -f web/node_modules/.bin/vite ]; then \
 			echo "Error: vite not found. Run 'make install' first."; exit 1; \
 		fi; \
-		go build -o bin/server-dev ./cmd/server/; \
+		echo "Checking ports :8080 (backend) and :5173 (frontend)..."; \
+		scripts/daemon-helper.sh ensure_port 8080 1 || exit 1; \
+		scripts/daemon-helper.sh ensure_port 5173 0 || exit 1; \
+		go build -o bin/sounds-great-ai-dev ./cmd/server/; \
 		if [ $$? -ne 0 ]; then echo "Error: backend build failed"; exit 1; fi; \
-		( exec ./bin/server-dev > .logs/backend.log 2>&1 ) & \
-		echo $$! > .pids/backend.pid; \
-		( cd web && exec ./node_modules/.bin/vite ) > .logs/frontend.log 2>&1 & \
-		echo $$! > .pids/frontend.pid; \
+		./bin/sounds-great-ai-dev > .logs/backend.log 2>&1 & \
+		BACK_PID=$$!; \
+		( cd web && ./node_modules/.bin/vite ) > .logs/frontend.log 2>&1 & \
+		FRONT_PID=$$!; \
 		sleep 1; \
-		for name in backend frontend; do \
-			pid=$$(cat .pids/$$name.pid 2>/dev/null); \
-			if ! kill -0 $$pid 2>/dev/null; then \
-				echo "Warning: $$name exited immediately, check .logs/$$name.log"; \
-			fi; \
-		done; \
+		if kill -0 $$BACK_PID 2>/dev/null; then echo $$BACK_PID > .pids/backend.pid; else echo "Error: backend failed to start:"; tail -n 15 .logs/backend.log; exit 1; fi; \
+		if kill -0 $$FRONT_PID 2>/dev/null; then echo $$FRONT_PID > .pids/frontend.pid; else echo "Error: frontend failed to start:"; tail -n 15 .logs/frontend.log; exit 1; fi; \
 		echo "Backend PID: $$(cat .pids/backend.pid), Frontend PID: $$(cat .pids/frontend.pid)"; \
 		echo "Logs: .logs/backend.log, .logs/frontend.log"; \
 		echo "Run 'make stop' to stop."; \
@@ -67,7 +66,7 @@ prod:
 		echo "Error: web/node_modules not found. Run 'make install' first."; exit 1; \
 	fi; \
 	$(MAKE) build; \
-	go build -o bin/server ./cmd/server/; \
+	go build -o bin/sounds-great-ai ./cmd/server/; \
 	if [ "$(DAEMON_MODE)" = "true" ]; then \
 		mkdir -p .logs .pids; \
 		for name in backend frontend; do \
@@ -80,19 +79,15 @@ prod:
 				rm -f .pids/$$name.pid; \
 			fi; \
 		done; \
-		nohup ./bin/server > .logs/backend.log 2>&1 & \
-		echo $$! > .pids/backend.pid; \
+		scripts/daemon-helper.sh ensure_port 8080 1 || exit 1; \
+		nohup ./bin/sounds-great-ai > .logs/backend.log 2>&1 & \
+		BACK_PID=$$!; \
 		sleep 1; \
-		if ! kill -0 $$(cat .pids/backend.pid) 2>/dev/null; then \
-			echo "Warning: backend exited immediately, check .logs/backend.log"; \
-		else \
-			echo "Server running on :8080 (PID $$(cat .pids/backend.pid))"; \
-			echo "Log: .logs/backend.log"; \
-			echo "Run 'make stop' to stop."; \
-		fi; \
+		if kill -0 $$BACK_PID 2>/dev/null; then echo $$BACK_PID > .pids/backend.pid; echo "Server running on :8080 (PID $$BACK_PID)"; echo "Log: .logs/backend.log"; echo "Run 'make stop' to stop."; \
+		else echo "Error: backend failed to start:"; tail -n 15 .logs/backend.log; exit 1; fi; \
 	else \
 		echo "Starting production server on :8080..."; \
-		./bin/server; \
+		./bin/sounds-great-ai; \
 	fi
 
 backend:
@@ -112,7 +107,7 @@ upgrade:
 	fi; \
 	echo "Installing dependencies..."; $(MAKE) install; \
 	echo "Building frontend..."; $(MAKE) build; \
-	echo "Building Go binary..."; go build -o bin/server cmd/server/main.go; \
+	echo "Building Go binary..."; go build -o bin/sounds-great-ai cmd/server/main.go; \
 	echo "Upgrade complete. Run 'make prod daemon' to restart."
 
 build:
@@ -140,15 +135,27 @@ stop:
 			found=true; \
 		fi; \
 	done; \
+	for port in 8080 9464 5173; do \
+		for pid in $$(scripts/daemon-helper.sh port_pid $$port); do \
+			if scripts/daemon-helper.sh is_ours $$pid; then \
+				echo "Stopping orphan on :$$port (PID $$pid)"; \
+				scripts/daemon-helper.sh kill_pid $$pid; \
+				found=true; \
+			fi; \
+		done; \
+	done; \
 	if [ "$$found" = "false" ]; then \
 		echo "No daemon processes found (no PID files in .pids/)"; \
 	fi
 
+restart: stop
+	@$(MAKE) dev daemon
+
 clean:
 	rm -rf web/dist bin/
-	rm -f main server
+	rm -f main server server-dev sounds-great-ai sounds-great-ai-dev
 
-deep: clean
+deep: stop clean
 	rm -rf .logs .pids
 	rm -f internal/platform/hooks_trace.db internal/platform/hooks_trace.db-wal internal/platform/hooks_trace.db-shm
 	find . -name "*.db" -o -name "*.db-wal" -o -name "*.db-shm" 2>/dev/null | grep -v node_modules | grep -v readonly-docs | xargs rm -f 2>/dev/null || true
@@ -166,7 +173,9 @@ help:
 	@echo "  make dev daemon    Start both in background (logs: .logs/, pids: .pids/)"
 	@echo "  make prod          Build frontend + compile Go binary + run in foreground"
 	@echo "  make prod daemon   Same as prod but in background"
-	@echo "  make stop          Stop background processes (via PID files)"
+	@echo "  make stop          Stop background processes (PID files + port-based orphan reclaim)"
+	@echo "  make restart       Stop then start both in background (make stop && make dev daemon)"
+	@echo "  Binaries: dev -> bin/sounds-great-ai-dev, prod -> bin/sounds-great-ai"
 	@echo "  make build         Build frontend for production (tsc + vite build)"
 	@echo "  make clean         Remove build artifacts (web/dist, bin/)"
 	@echo "  make clean deep    Deep clean: + logs, pids, SQLite, Go cache, node_modules"

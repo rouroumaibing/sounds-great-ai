@@ -80,9 +80,9 @@ Phase N merge → 碰头（不是"要不要继续"，是"方向对不对"）→ 
 
 ## Reviewer 配对规则
 
-动态匹配自运行时狗狗配置（`packs/default/breeds/dog-template.json`）：
+动态匹配自运行时狗狗配置（`dog-catalog.json`，种子为 `packs/default/breeds/dog-template.json`）：
 1. 跨狗狗优先 | 2. 必须有 peer-reviewer 角色 | 3. 必须 available
-4. 优先 lead | 5. 优先活跃犬
+4. 优先 lead（`review_policy.prefer_lead=true` 已强制）| 5. 优先活跃犬
 
 **降级**：无跨狗狗 reviewer → 同狗狗不同个体 → 用户。
 **铁律**：同一个体不能 review 自己的代码。

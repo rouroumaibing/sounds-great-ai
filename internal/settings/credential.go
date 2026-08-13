@@ -3,6 +3,7 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -107,14 +108,17 @@ func (s *FileCredentialStore) reloadFromDisk() error {
 		return err
 	}
 	if err := json.Unmarshal(raw, &s.data); err != nil {
-		// Back up the corrupt file for recovery, then treat it as empty.
-		backupCorrupt(s.path, raw)
+		// Per product decision, a corrupt credentials file is treated as
+		// empty with a warning (no .bak written at load; backups are edit-time
+		// only, see backupBeforeWrite in file_store.go).
+		log.Printf("WARN: credentials file %s is corrupt; treating as empty (no backup written at load)", s.path)
 		s.data = make(map[string]string)
 	}
 	return nil
 }
 
 func (s *FileCredentialStore) flush() error {
+	backupBeforeWrite(s.path)
 	data, err := json.MarshalIndent(s.data, "", "  ")
 	if err != nil {
 		return err

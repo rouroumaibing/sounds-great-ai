@@ -152,7 +152,7 @@
 4. emitEvent(...); respondJSON(200, nil)
 ```
 
-> 与 clowder 不同，SG **无「全局共享存储时非 force 一律 409」分支**（F7 判为不适用）：SG 单数据根，引用检查只看当前 store 成员列表。
+> SG **无「全局共享存储时非 force 一律 409」分支**（F7 判为不适用）：SG 单数据根，引用检查只看当前 store 成员列表。
 
 ### 4.6 成员保存 `account_ref` 校验（F3 已加）
 
@@ -161,7 +161,7 @@
 - 命中 `oauthClientRefs`（claude/codex/gemini/opencode/kimi）→ 放行（指内置 CLI OAuth，非 catalog 账号）。
 - 否则 → `h.store.ListAccounts()` 命中 id 才放行，否则 **400 `account_ref "x" not found`**。
 
-`CreateMember` / `UpdateMember` 在入口对 `account_ref` 做该校验。**该校验复用 handler 持有的同一个 `h.store`（账号写入用的同一实例）**，绝不在路径维度重新解析数据根——这是规避 clowder #1303「账号写 A 根、校验读 B 根」分裂的关键设计。
+`CreateMember` / `UpdateMember` 在入口对 `account_ref` 做该校验。**该校验复用 handler 持有的同一个 `h.store`（账号写入用的同一实例）**，绝不在路径维度重新解析数据根——这是规避「账号写 A 根、校验读 B 根」数据根分裂的关键设计。
 
 ---
 
@@ -171,22 +171,25 @@
 
 ### 5.1 三文件隔离（物理分离）
 
-| 文件 | 内容 | 权限 | 管理方 |
-|---|---|---|---|
-| `accounts.json` | 账号元数据 | 0644 | `FileSettingsStore` |
-| `dog-catalog.json` | 成员 + leader + 系统配置 | 0644 | `FileSettingsStore` |
-| `credentials.json` | 密钥（明文） | **0600** | `FileCredentialStore` |
+| 文件 | 内容 | 权限 | 管理方 | 落盘根 |
+|---|---|---|---|---|
+| `accounts.json` | 账号元数据 | 0644 | `FileSettingsStore` | `ConfigRoot`（项目 `.sounds-great-ai`） |
+| `dog-catalog.json` | 成员 + leader + 系统配置 | 0644 | `FileSettingsStore` | `ConfigRoot`（项目 `.sounds-great-ai`） |
+| `credentials.json` | 密钥（明文） | **0600** | `FileCredentialStore` | `CredentialRoot`（**全局 home `~/.sounds-great-ai`**，独立于项目根） |
 
-密钥库与元数据文件物理隔离、权限不同；`maskKey` 仅在 list 响应里脱敏，密钥明文只存在于 `credentials.json`。
+密钥库与元数据文件物理隔离、权限不同；`maskKey` 仅在 list 响应里脱敏，密钥明文只存在于 `credentials.json`。**根目录已拆分（客户配置安全）**：`catalog/accounts` 走 `ConfigRoot(projectRoot)`（项目下 `.sounds-great-ai`）；`credentials` 单独走 `CredentialRoot()`（全局 home `~/.sounds-great-ai`，可被 `SOUNDS_GREAT_AI_CREDENTIAL_ROOT` 覆盖）。清项目配置**不会**误删密钥。详见 `SG-OPS-001-customer-config-safety.md`。
 
-### 5.2 ConfigRoot 解析（单数据根，关键）
+### 5.2 数据根解析（双根：ConfigRoot + CredentialRoot）
 
-`settings.ConfigRoot(projectRoot)` 顺序：
-1. `SOUNDS_GREAT_AI_GLOBAL_CONFIG_ROOT`（支持 `~` 跨平台展开）→
-2. `{projectRoot}/.sounds-great-ai` →
-3. `{home}/.sounds-great-ai`。
+- `settings.ConfigRoot(projectRoot)`（catalog/accounts）顺序：
+  1. `SOUNDS_GREAT_AI_GLOBAL_CONFIG_ROOT`（支持 `~` 跨平台展开）→
+  2. `{projectRoot}/.sounds-great-ai` →
+  3. `{home}/.sounds-great-ai`。
+- `settings.CredentialRoot()`（credentials，**仅密钥**）顺序：
+  1. `SOUNDS_GREAT_AI_CREDENTIAL_ROOT`（支持 `~` 跨平台展开）→
+  2. `{home}/.sounds-great-ai`（全局 home，与项目根解耦）。
 
-`routes.go:102` 只计算**一次** `settingsDir`，三个文件均 `filepath.Join(settingsDir, ...)` —— 账号/成员/密钥**永远同目录**。这是 SG 不会出现 clowder #1303「路径分裂」的根因。
+`routes.go:114` 的 `credStore` 用 `CredentialRoot()`；`routes.go:61/66` 与 `setup.go`/`platform.go` 的 `settingsStore` 用 `ConfigRoot`。账号/成员/密钥不再强制同目录——密钥独立到全局 home，清项目配置不丢密钥。
 
 ### 5.3 Account 结构体（port.go）
 
@@ -204,9 +207,11 @@ type Account struct {
 ```
 `maskKey(key)`：`len<=4` → `"****"`；否则 `key[:2] + "****" + key[len-2:]`。
 
-### 5.4 损坏自动备份（F4 已加）
+### 5.4 损坏处理与编辑时备份（F4，已调整）
 
-`reloadFromDisk`（file_store.go 与 credential.go）解析 JSON 失败时调用 `backupCorrupt(path, raw)` 把损坏文件复制为 `<path>.bak`（0o644），随后当空处理，**不再直接 500**。三个文件（accounts / dog-catalog / credentials）均覆盖。
+- **加载时损坏**：`reloadFromDisk`（file_store.go / credential.go）解析 JSON 失败 → **仅告警并当空处理**，不再自动备份（不再掩盖损坏）。
+- **编辑时备份**：每次写盘（`flushCatalog` / `flushAccounts` / credential `flush`）覆盖前，若目标文件已存在，先快照为 `<path>.bak-<YYYYMMDD-HHMMSS>`（保留最近 5 份，`pruneBackups`），供客户回滚到上一版本。
+- 三种文件（accounts / dog-catalog / credentials）均覆盖。
 
 ### 5.5 env_vars 保留前缀过滤（F5 已加）
 
@@ -311,7 +316,7 @@ DELETE /api/settings/accounts/{id}       → 200 nil          (?force=true 强�
   - When PATCH 传 `api_key:""`，Then `credentials.json` 中该密钥被清除、`key_set=false`。
   - When `client_id` 不在白名单，Then 返回 400。
   - When 保存成员绑定一个不存在的 `account_ref`（非内置 OAuth），Then 返回 400 `account_ref "x" not found`。
-  - When 配置文件损坏，Then 自动备份 `.bak` 且接口当空处理，不 500。
+  - When 配置文件加载时损坏，Then 仅告警并当空处理（不 500）；编辑写盘前自动生成时间戳 `.bak-<YYYYMMDD-HHMMSS>`（保留最近 5 份）供回滚。
 - [x] **AC-03 (权限与安全)**:
   - 生产环境设置 `AUTH_TOKEN` 后，When 未带 `Authorization` 访问 `/api/settings/...`，Then 返回 401。
   - 列表响应不含明文密钥；`credentials.json` 权限 0600。
@@ -340,5 +345,10 @@ DELETE /api/settings/accounts/{id}       → 200 nil          (?force=true 强�
 
 ---
 
-> 关联文档：`sg-accounts-analysis.md`（原始梳理）、`sg-accounts-fix-plan.md`（修复规划）。
-> 对照样本：`readonly-docs/clowder-ai`（Fastify + 独立 `/api/accounts`，结构相似但实现差异明显）。
+## 11. 修订记录 (Revision History)
+
+- **2026-08-12（客户安全三改）**：按用户决策落实客户配置安全：① **根目录拆分**——新增 `settings.CredentialRoot()`（全局 home `~/.sounds-great-ai`，可被 `SOUNDS_GREAT_AI_CREDENTIAL_ROOT` 覆盖），`routes.go:114` 的 `credStore` 改用之，密钥与项目配置解耦；catalog/accounts 仍走 `ConfigRoot`（项目 `.sounds-great-ai`）。② **编辑时备份**——移除加载期 `backupCorrupt`（损坏仅告警+当空），写盘前 `backupBeforeWrite` 生成 `<path>.bak-<YYYYMMDD-HHMMSS>`（保留最近 5 份）。③ 成员侧追加式升级同步见 `SG-MEM-001` / `SG-OPS-001`。`go build ./...` + `go test ./...` 全绿。本文档 §5.1/§5.2/§5.4、AC-02、§9 同步更新。
+
+---
+
+> 关联文档：`sg-accounts-analysis.md`（原始梳理）、`sg-accounts-fix-plan.md`（修复规划）、`SG-OPS-001-customer-config-safety.md`（客户配置安全总览）。

@@ -80,8 +80,9 @@ Six dogs, six roles, each with its own specialty:
 ```
 ┌───────────────────────────────────────────────────┐
 │                 packs/default/breeds/               │
-│   dog-template.json (单文件：纯数据，用户可创建/       │
-│   修改/热加载；role_templates + breeds 同文件)         │
+│   dog-template.json (只读种子：role_templates +        │
+│   breeds；运行时以 dog-catalog.json 为准，用户在设置    │
+│   页编辑成员→落 catalog，热加载即时生效)                │
 └──────────────────────┬────────────────────────────┘
                        │ LoadFromFile / POST API
                        ▼
@@ -220,7 +221,7 @@ We build in the open. Here's where we are.
 | Package | Description | Status |
 |---------|-------------|--------|
 | `internal/adapter/` | 4 CLI adapters (claude/codex/gemini/opencode) + ProcessManager | ✅ Shipped |
-| `internal/config/` | New breed config (variants[] replaces capabilities[]+workflow[]) | ✅ Shipped |
+| `pkg/pack/` | Breed config schema & loader (variants[] replaces capabilities[]+workflow[]) | ✅ Shipped |
 | `internal/skills/` | Skills framework (.md prompt pack loading + injection) | ✅ Shipped |
 | `internal/ragstore/` | RAG store (3 backends: Memory/SQLite/Eino) | ✅ Shipped |
 | `internal/transport/` | WebSocket + HTTP API + SPA serving | ✅ Shipped |
@@ -341,14 +342,14 @@ sounds-great-ai/
 │   └── server/              # HTTP server entry point
 ├── pkg/
 │   ├── a2a/                 # A2A protocol types
-│   └── pack/                # Pack/Breed core system
+│   └── pack/                # Pack/Breed core system (breed.go schema + loader.go)
 ├── internal/
 │   ├── adapter/             # CLI adapters (claude/codex/gemini/opencode)
 │   ├── a2a/                 # A2A Hub + context compression
 │   ├── aspect/              # Safety guardrails (command_guard, approval, tracing)
 │   ├── capability/          # 6 pure-logic capabilities
 │   ├── component/           # Eino model factory
-│   ├── config/              # Breed config loader (variants[] format)
+│   ├── config/              # Event bus (config/settings change events)
 │   ├── mcp/                 # MCP registry
 │   ├── memory/              # Shared memory (evidence/decisions/lessons)
 │   ├── packapi/             # REST API handler
@@ -365,7 +366,7 @@ sounds-great-ai/
 │   └── workspace/           # Workspace management
 ├── packs/
 │   └── default/
-│       ├── breeds/          # 6 breed JSON configs
+│       ├── breeds/          # 狗狗品种配置（dog-template.json 只读种子，运行时以 dog-catalog.json 为准）
 │       └── skills/          # SKILL.md prompt packs
 ├── web/                     # Frontend (React + Vite)
 └── docs/

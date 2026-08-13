@@ -52,7 +52,7 @@
 | 能力 | 说明 |
 |------|------|
 | **CLI 适配器架构** | 4 个 CLI agent（Claude/Codex/Gemini/opencode）作为子进程启动，stdin/stdout pipe 通信，NDJSON 流解析 |
-| **配置驱动角色系统** | 狗狗角色是纯 JSON 数据，用户可在页面上创建/修改/删除狗狗，热加载立即生效 |
+| **配置驱动角色系统** | 狗狗角色是纯 JSON 数据；`dog-template.json` 为只读种子，用户在设置页创建/修改成员落盘 `dog-catalog.json`，热加载即时生效 |
 | **平台层协调** | Go + Eino 平台处理身份、路由、安全、记忆、技能 —— 平台层不做 LLM 推理 |
 | **安全护栏（Hard Rails）** | 命令黑名单、路径校验、敏感数据过滤 —— 安全由代码强制执行，不依赖 prompt |
 | **RAG 存储** | 3 后端（Memory/SQLite/Eino）动态切换，向量检索，30 天退役池 |
@@ -73,15 +73,16 @@
 | **RAG / Retriever** | 金毛 *(jinmao)* | 寻回本能强、温和靠谱 |
 | **Log & Bug Tracer** | 德牧 *(demu)* | 警觉敏锐、黑背立耳、执行力强 |
 
-> 用户可以创建自己的狗狗 —— 只需一个 JSON 文件，选择已注册的 capability，定义工作流，热加载立即生效。
+> 用户可以创建自己的狗狗 —— 在设置页填写身份与 variants 即可，无需写代码，保存落盘 `dog-catalog.json`，热加载立即生效。
 
 ## Architecture
 
 ```
 ┌───────────────────────────────────────────────────┐
 │                 packs/default/breeds/               │
-│   dog-template.json (单文件：纯数据，用户可创建/       │
-│   修改/热加载；role_templates + breeds 同文件)         │
+│   dog-template.json (只读种子：role_templates +        │
+│   breeds；运行时以 dog-catalog.json 为准，用户在设置    │
+│   页编辑成员→落 catalog，热加载即时生效)                │
 └──────────────────────┬────────────────────────────┘
                        │ LoadFromFile / POST API
                        ▼
@@ -219,7 +220,7 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 | 包 | 说明 | 状态 |
 |---|------|------|
 | `internal/adapter/` | 4 个 CLI 适配器 + ProcessManager | ✅ Shipped |
-| `internal/config/` | 新版品种配置（variants[] 格式） | ✅ Shipped |
+| `pkg/pack/` | 品种配置 schema 与加载器（variants[] 格式） | ✅ Shipped |
 | `internal/skills/` | 技能框架（.md 加载 + 注入） | ✅ Shipped |
 | `internal/ragstore/` | RAG 存储（3 后端：Memory/SQLite/Eino） | ✅ Shipped |
 | `internal/transport/` | WebSocket + HTTP API + SPA | ✅ Shipped |
@@ -340,14 +341,14 @@ sounds-great-ai/
 │   └── server/              # HTTP 服务器入口
 ├── pkg/
 │   ├── a2a/                 # A2A 协议类型
-│   └── pack/                # Pack/Breed 核心系统
+│   └── pack/                # Pack/Breed 核心系统 (breed.go schema + loader.go)
 ├── internal/
 │   ├── adapter/             # CLI 适配器 (claude/codex/gemini/opencode)
 │   ├── a2a/                 # A2A Hub + 上下文压缩
 │   ├── aspect/              # 安全护栏
 │   ├── capability/          # 6 个纯逻辑能力
 │   ├── component/           # Eino 模型工厂
-│   ├── config/              # 狗狗配置加载器 (variants[] 格式)
+│   ├── config/              # 事件总线 (config/settings 变更事件)
 │   ├── mcp/                 # MCP 注册表
 │   ├── memory/              # 共享内存
 │   ├── packapi/             # REST API handler
@@ -364,7 +365,7 @@ sounds-great-ai/
 │   └── workspace/           # 工作区管理
 ├── packs/
 │   └── default/
-│       ├── breeds/          # 6 个狗狗 JSON 配置
+│       ├── breeds/          # 狗狗品种配置（dog-template.json 只读种子，运行时以 dog-catalog.json 为准）
 │       └── skills/          # SKILL.md 提示词包
 ├── web/                     # 前端 (React + Vite)
 └── docs/

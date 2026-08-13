@@ -156,3 +156,36 @@ func ToSchemaMessages(messages []ContextMessage) []*schema.Message {
 	}
 	return result
 }
+
+// ProtectRecentPairs guarantees the most recent `keepPairs` (user, assistant)
+// exchanges survive any downstream truncation (G7 step 3: protect the Q→A
+// semantic chain from burst-window cuts). Leading system messages are always
+// retained; the trailing `keepPairs*2` (aligned to whole pairs) messages are
+// kept, and any older turns are dropped. Non-positive keepPairs is a no-op.
+func ProtectRecentPairs(msgs []*schema.Message, keepPairs int) []*schema.Message {
+	if keepPairs <= 0 || len(msgs) == 0 {
+		return msgs
+	}
+	// Separate leading system messages (always keep).
+	sysEnd := 0
+	for sysEnd < len(msgs) && msgs[sysEnd].Role == schema.System {
+		sysEnd++
+	}
+	rest := msgs[sysEnd:]
+	keep := keepPairs * 2
+	if keep > len(rest) {
+		keep = len(rest)
+	}
+	if keep%2 != 0 {
+		keep-- // keep whole pairs only
+	}
+	if keep < 0 {
+		keep = 0
+	}
+	out := make([]*schema.Message, 0, sysEnd+keep)
+	out = append(out, msgs[:sysEnd]...)
+	if keep > 0 {
+		out = append(out, rest[len(rest)-keep:]...)
+	}
+	return out
+}

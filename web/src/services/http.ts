@@ -11,7 +11,7 @@ export function setAuthToken(token: string | null) {
   else localStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

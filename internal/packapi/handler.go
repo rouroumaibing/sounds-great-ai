@@ -258,14 +258,21 @@ func (h *Handler) UpdateBreed(w http.ResponseWriter, r *http.Request) {
 	respondOK(w, cfg)
 }
 
-// GetTemplates GET /api/breeds/templates — role templates (模板只读，种子用途)
+// GetTemplates GET /api/breeds/templates — full template breeds (模板只读，种子用途).
+// Returns the complete breed configs (variants / CLI / role / caution) so the
+// "add member" UI can instantiate a ready-to-use dog identical to the template
+// design; the user only binds an account and model. The template is a menu,
+// not the active runtime registry (decision D1/D3).
 func (h *Handler) GetTemplates(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := h.loadDogTemplate()
 	if err != nil {
 		respondOK(w, []any{})
 		return
 	}
-	respondOK(w, tmpl.RoleTemplates)
+	if tmpl.Breeds == nil {
+		tmpl.Breeds = []pack.BreedConfig{}
+	}
+	respondOK(w, tmpl.Breeds)
 }
 
 // GetBreedStatus GET /api/breeds/{id}/status — runtime status

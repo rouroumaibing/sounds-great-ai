@@ -9,16 +9,24 @@ import (
 	"sounds-great-ai/internal/eval"
 )
 
+// EvalStore is the storage port the EvalHandler depends on (G10 port
+// abstraction). *eval.ResultStore satisfies it structurally, so production
+// wiring is unchanged while tests can inject a mock store.
+type EvalStore interface {
+	ListVerdicts(domainID string) ([]eval.VerdictHandoffPacket, error)
+	GetVerdict(verdictID string) (*eval.VerdictHandoffPacket, error)
+}
+
 // EvalHandler handles eval HTTP endpoints.
 type EvalHandler struct {
 	runner    *eval.EvalRunner
-	store     *eval.ResultStore
+	store     EvalStore
 	closure   eval.ClosureService
 	scheduler *eval.Scheduler
 }
 
 // NewEvalHandler creates a new EvalHandler.
-func NewEvalHandler(runner *eval.EvalRunner, store *eval.ResultStore, closure eval.ClosureService, scheduler *eval.Scheduler) *EvalHandler {
+func NewEvalHandler(runner *eval.EvalRunner, store EvalStore, closure eval.ClosureService, scheduler *eval.Scheduler) *EvalHandler {
 	return &EvalHandler{runner: runner, store: store, closure: closure, scheduler: scheduler}
 }
 

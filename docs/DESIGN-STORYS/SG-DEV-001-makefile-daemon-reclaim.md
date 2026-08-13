@@ -40,7 +40,7 @@ make prod daemon  → 后台启动生产构建后端（不启动前端进程）
 make stop         → 回收受管进程(.pids) + 端口兜底回收自家孤儿(is_ours)
 make restart      → stop + dev daemon（一键干净重启）
 make clean        → 删 web/dist、bin/、残留二进制(sounds-great-ai*)
-make deep         → stop + clean + 删 .logs/.pids + 删 SQLite + go cache + node_modules
+make deep         → stop + clean + 删 .logs/.pids + 删 SQLite + go cache + node_modules + 删 .sounds-great-ai(运行时配置/凭据)
 make upgrade      → 拉代码(prompt) + install + build 前端 + go build 后端（不 restart）
 ```
 
@@ -97,7 +97,7 @@ daemon:
 | target | 设计意图 |
 |--------|---------|
 | `clean` | 删产物（`web/dist`、`bin/`、根目录残留二进制）。**不删 `.pids`/`.logs`、不回收进程**——它是纯"清文件"语义，进程回收交给 `stop` |
-| `deep` | `deep: stop clean` + 删 `.logs/.pids`/SQLite/go cache/node_modules。**把"先停后清"钉死在依赖顺序里**，防止"删了文件却留下孤儿进程" |
+| `deep` | `deep: stop clean` + 删 `.logs/.pids`/SQLite/go cache/node_modules + 删 `.sounds-great-ai`。**把"先停后清"钉死在依赖顺序里**，防止"删了文件却留下孤儿进程"；删除 `.sounds-great-ai` 使 `deep` 成为"从零重置"语义，但会**不可逆清除运行时凭据** |
 | `upgrade` | 拉代码 + install + build 前端 + `go build` 后端，但**刻意不 restart**——升级只更新磁盘二进制，是否重启由 operator 决定（保留人工确认点） |
 | `restart` | `restart: stop` 后 `$(MAKE) dev daemon`，提供"一键干净重启"的便捷入口 |
 
@@ -151,6 +151,7 @@ daemon:
 2. **`restart` 写死成 `dev daemon`**：`restart: stop` 后固定 `$(MAKE) dev daemon`，重启 prod 需手动 `make stop && make prod daemon`。保留 dev 为默认是出于"本地开发最常用"的假设。
 3. **prod daemon 守卫仍检查 `frontend.pid`**：prod 不写 `frontend.pid`，但守卫循环统一查两个 pidfile。若之前 dev daemon 留下 `frontend.pid`，再 `make prod daemon` 会被"frontend already running"拦下——prod 守卫理论上只需查 backend。
 4. **`upgrade` 与 `prod` 的 build 步骤重叠**：`upgrade` 内 `$(MAKE) build` + `go build` 与 `prod` 重复，属冗余不致命。
+5. **`deep` 会不可逆清除运行时凭据**：`deep` 现删除仓库根 `.sounds-great-ai` 目录（含 `credentials.json` 0600 密钥、`accounts.json`、`dog-catalog.json`）。该目录已在 `.gitignore` 内、属 gitignored 的运行时数据，**不进版本库**。删除后下次启动按 `packs/default/breeds/dog-template.json` 重新生成种子。这是"从零重置"语义的有意延伸，但意味着 `deep` 不再只是"清构建产物"——operator 若只想清构建产物、保留账号/密钥/成员配置，应改用 `make clean`（浅清理，不含 `stop` 与目录删除）。此行为已同步到 `make help` 文案。
 
 ---
 
@@ -167,12 +168,16 @@ daemon:
   - `is_ours` 只认 `sounds-great-ai`，When 端口被其他项目进程占用，Then `make stop` / `ensure_port` **绝不误杀**，仅报告 PID。
   - 跨平台：mac（lsof）、linux（lsof 或 ss 回退）、windows（netstat）均按 `os_detect` 选择正确命令。
   - 二进制改名后，`make` 启动名、自升级输出名、clean 删除名三者一致，无错位。
+- [x] **AC-04 (`deep` 运行时数据清理范围)**:
+  - When 执行 `make clean deep`，Then 除既有构建产物/日志/pid/SQLite/go cache/`node_modules` 外，还删除仓库根 `.sounds-great-ai`（accounts/credentials/dog-catalog 落盘）。
+  - When 仅执行 `make clean`（浅清理），Then **不**删除 `.sounds-great-ai`、不回收进程——保留运行时账号/密钥/成员配置。
+  - `.sounds-great-ai` 已在 `.gitignore`，删除不触动版本库；下次启动按 `dog-template.json` 重新种子化。
 
 ---
 
 ## 8. 稳定性与工程护栏 (Engineering & Stability Guardrails)
 
-- **[x] 资损与网络安全 (Security)**: 无敏感数据。核心护栏是"不误杀外来进程"——`is_ours` 白名单严格限定 `sounds-great-ai`，`clean`/`stop` 不会误伤其他服务。
+- **[x] 资损与网络安全 (Security)**: `clean`/`stop` 无敏感数据——核心护栏是"不误杀外来进程"，`is_ours` 白名单严格限定 `sounds-great-ai`，不会误伤其他服务。**但 `deep` 例外**：它现在会删除仓库根 `.sounds-great-ai`（含 `credentials.json` 0600 密钥、账号、成员目录），这是**不可逆的运行时凭据清除**。该目录 gitignored、不进版本库，删除以"从零重置"为预期。operator 须意识到 `deep` 已超出"清构建产物"范畴；仅清产物请用 `clean`。`deep` 在删除 `.sounds-great-ai` 前会先 `stop`（依赖 `deep: stop clean`），确保不删仍在运行的进程所对应的落盘数据时的进程状态已停止。
 - **[x] 高并发与限流降级**: 不涉及（本地单机开发工具链）。
 - **[x] 可服务性与监控**: `ensure_port` / `stop` 输出可读的占用者 PID 与命令，便于人工干预；`make dev daemon` 启动失败时输出 `backend.log` 末尾，缩短排障路径。
 
@@ -192,6 +197,8 @@ daemon:
 ## 10. 修订记录 (Revision History)
 
 - **2026-08-12（初版）**：以设计视角梳理 `Makefile` 目标体系与守护生命周期——`daemon` 开关、双入口骨架、启动三道关、`stop` 双层回收、`clean/deep/upgrade/restart` 意图、跨平台 `daemon-helper.sh`、`sounds-great-ai` 命名约定与安全边界。落盘为 Tech Story（纯设计文档，不含事件背景）。
+- **2026-08-13（拆分恢复为独立文档）**：此前被并入 `SG-MEM-001-member-management.md` 的附录 A；经用户确认 Makefile/守护进程生命周期应独立于「成员管理」成文，故从合并文档中剔除并恢复为本独立 Tech Story（内容未改）。
+- **2026-08-13（`deep` 扩展删除 `.sounds-great-ai`）**：应需求将 `make clean deep` 的清理范围扩展到项目根 `.sounds-great-ai` 运行时目录。`Makefile` 的 `deep` target 新增 `rm -rf .sounds-great-ai`（位于 `node_modules` 清理之后、`go clean` 之前），`make help` 文案同步标注。随之更新本文：§2 命令契约、§3.5 `deep` 行、§6 增补"不可逆清除运行时凭据"取舍项、§8 资安护栏改写（区分 `clean`/`stop` 无敏感数据 vs `deep` 删凭据）。
 
 ---
 

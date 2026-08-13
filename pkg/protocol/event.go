@@ -16,6 +16,7 @@ const (
 	EventUserInput      EventType = "USER_INPUT"
 	EventHITLApproval   EventType = "HITL_APPROVAL"
 	EventHitlResponse   EventType = "HITL_RESPONSE"
+	EventWakeHold       EventType = "WAKE_HOLD"
 )
 
 // Event 是 WebSocket 协议的统一事件结构
@@ -85,6 +86,16 @@ type HitlResponsePayload struct {
 	RequestID string `json:"request_id"`
 	Approved  bool   `json:"approved"`
 	Reason    string `json:"reason"`
+}
+
+// WakeHoldPayload is the payload for WAKE_HOLD events (client → server). It
+// releases a parked hold_ball (P2) so the orchestrator can resume the holder.
+// Kind is "manual" (human click) or "webhook" (external POST). Token is only
+// required for webhook-kind holds.
+type WakeHoldPayload struct {
+	SessionID string `json:"session_id"`
+	Kind      string `json:"kind"`
+	Token     string `json:"token,omitempty"`
 }
 
 // Bark 事件类型

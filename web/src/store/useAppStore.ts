@@ -105,7 +105,7 @@ export const useAppStore = create<AppStore>()(
   persist(
     (set) => ({
       activeNav: 'threads',
-      activeSettingsTab: 'members',
+      activeSettingsTab: 'accounts',
       activeThreadId: 'thread-1',
       showRightDrawer: true,
       leftPanelVisible: true,

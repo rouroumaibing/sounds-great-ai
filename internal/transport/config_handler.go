@@ -36,6 +36,8 @@ func (h *ConfigHandler) Routes() *http.ServeMux {
 	mux.HandleFunc("PUT /api/config/default-breed", h.SetDefaultBreed)
 	mux.HandleFunc("GET /api/config/breed-order", h.GetBreedOrder)
 	mux.HandleFunc("PUT /api/config/breed-order", h.SetBreedOrder)
+	mux.HandleFunc("GET /api/config/repo", h.GetRepo)
+	mux.HandleFunc("PUT /api/config/repo", h.SetRepo)
 	mux.HandleFunc("GET /api/config/env-summary", h.GetEnvSummary)
 	mux.HandleFunc("PATCH /api/config/env", h.UpdateEnv)
 	mux.HandleFunc("GET /api/config/leader", h.GetLeader)
@@ -56,6 +58,54 @@ func (h *ConfigHandler) GetDefaultBreed(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"breed_id": breedID, "is_override": isOverride})
+}
+
+// repoConfigKey is the SystemConfig key holding the optional code-repo URL that
+// powers the project archive source (G8). Empty = git-ref tracking disabled.
+const repoConfigKey = "repo_url"
+
+// GetRepo returns the configured code-repo URL (empty string when unset).
+func (h *ConfigHandler) GetRepo(w http.ResponseWriter, r *http.Request) {
+	repoURL := ""
+	if configs, err := h.settingsStore.ListConfig(); err == nil {
+		for _, c := range configs {
+			if c.Key == repoConfigKey {
+				repoURL = c.Value
+				break
+			}
+		}
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"repo_url": repoURL})
+}
+
+// SetRepo upserts the code-repo URL. An empty string clears/disables it.
+func (h *ConfigHandler) SetRepo(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		RepoURL string `json:"repo_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	if body.RepoURL != "" && !isValidRepoURL(body.RepoURL) {
+		respondJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "invalid repo url (must be http(s)://, git@, or an absolute path)",
+		})
+		return
+	}
+	if err := h.settingsStore.UpsertConfig(repoConfigKey, body.RepoURL); err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"repo_url": body.RepoURL})
+}
+
+// isValidRepoURL accepts http(s)://, git@ (scp-like) remotes, or absolute paths.
+func isValidRepoURL(u string) bool {
+	return strings.HasPrefix(u, "http://") ||
+		strings.HasPrefix(u, "https://") ||
+		strings.HasPrefix(u, "git@") ||
+		strings.HasPrefix(u, "/")
 }
 
 func (h *ConfigHandler) SetDefaultBreed(w http.ResponseWriter, r *http.Request) {

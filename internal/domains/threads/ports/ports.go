@@ -2,6 +2,7 @@ package ports
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // Thread represents a conversation thread.
@@ -38,17 +39,22 @@ type IThreadStore interface {
 	UnsealSession(sessionID string) error
 }
 
-// IMessageStore is the port for message storage.
+// IMessageStore is the port for message storage. Mirrors the flat
+// threadstore.MessageStore interface (Append / GetByThread / GetByThreadBefore)
+// so the adapter wraps the existing store without behavior change.
 type IMessageStore interface {
-	AddMessage(threadID string, role string, content string) (int64, error)
-	ListMessages(threadID string, limit int) ([]Message, error)
+	Append(msg *Message) error
+	GetByThread(threadID string, limit int) ([]*Message, error)
+	GetByThreadBefore(threadID string, before time.Time, beforeID string, limit int) ([]*Message, error)
 }
 
-// Message represents a chat message.
+// Message represents a chat message. Mirrors the flat threadstore.Message
+// shape so adapters can map 1:1 and preserve the exact JSON contract.
 type Message struct {
-	ID        int64  `json:"id"`
-	ThreadID  string `json:"thread_id"`
-	Role      string `json:"role"`
-	Content   string `json:"content"`
-	CreatedAt int64  `json:"created_at"`
+	ID        string    `json:"id"`
+	ThreadID  string    `json:"thread_id"`
+	Role      string    `json:"role"`
+	Content   string    `json:"content"`
+	Sender    string    `json:"sender"`
+	Timestamp time.Time `json:"timestamp"`
 }

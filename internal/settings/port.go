@@ -101,6 +101,20 @@ type SettingsStore interface {
 	// ListDeletedBreeds returns IDs of breeds the customer explicitly removed,
 	// so the upgrade sync can skip resurrecting them (decision D2).
 	ListDeletedBreeds() ([]string, error)
+	// ListSeenTemplateBreeds returns the IDs of template breeds the catalog has
+	// already been "exposed to". Breeds in this set are never auto-added again
+	// (no resurrection). It unifies D1 (empty first run) and D3 (auto-add new
+	// template breeds on upgrade); see docs/DESIGN-STORYS/SG-MEM-002.
+	ListSeenTemplateBreeds() ([]string, error)
+	// AddSeenTemplateBreeds marks the given template breed IDs as seen and
+	// persists them. Called by the upgrade sync when a new template breed is
+	// added, and on first run (all template IDs) so a later restart does not
+	// re-inject an empty catalog.
+	AddSeenTemplateBreeds(ids []string) error
+	// CatalogFileExists reports whether the runtime catalog file exists on disk.
+	// It distinguishes a first run (file absent → write empty catalog + seen)
+	// from an existing customer catalog.
+	CatalogFileExists() bool
 	// ReorderBreeds reorders the persisted catalog breeds[] array to match the
 	// given order (clowder-homologous: the array order is the sort truth).
 	// IDs not present in the catalog are ignored; catalog breeds missing from
@@ -124,6 +138,9 @@ type SettingsStore interface {
 
 	UpdateAccount(id string, updates map[string]any) error
 	UpdateConfig(key, value string) error
+	// UpsertConfig creates or updates a system config key. Unlike UpdateConfig
+	// it does not require the key to pre-exist (used for new keys like repo_url).
+	UpsertConfig(key, value string) error
 
 	// Leader (operator) config, persisted in dog-catalog.json.
 	GetLeader() (*pack.Leader, error)

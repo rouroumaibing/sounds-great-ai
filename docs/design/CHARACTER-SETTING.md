@@ -9,7 +9,7 @@
 
 | Module / Role | Breed Mapping | Personality & Traits | Core Responsibilities | Eino / Go Architecture |
 |---|---|---|---|---|
-| Orchestrator | Border Collie *(bianmu)* | Extremely intelligent, field-control master, sharp-eyed | Task decomposition, DAG workflow scheduling, state machine control | Based on Eino Graph, serves as main Task Coordinator |
+| Orchestrator | Border Collie *(bianmu)* | Extremely intelligent, field-control master, sharp-eyed | Task decomposition, dynamic routing, result synthesis | Based on Eino Graph, serves as main Task Coordinator |
 | Safety Guardrail | Chinese Rural Dog *(zhonghuatianyuanquan)* | Loyal, reliable, highly alert, familiar with home terrain | Home defense: Hard Rails safety boundaries, command blocklist, permission auditing | Interceptor + Sandbox isolation validation, absolute loyal guard |
 | UI / CLI Presentation | Tibetan Mastiff *(zangao)* | Majestic, imposing, steadfast, gatekeeper | Global watchkeeping & terminal interaction: TUI status rendering, log dashboard, human confirmation for critical ops | TUI (e.g. Bubbletea) interface, providing steady, authoritative interaction & status summary |
 | Code Hunter | Xigou (Greyhound) *(xigou)* | Streamlined, lightning-fast, laser-focused | Precision hunting: automated Refactor design, high-difficulty Bug fix code generation | Focused on high-difficulty code optimization, automated security vulnerability "hunting" & repair |

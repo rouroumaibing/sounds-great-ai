@@ -278,8 +278,10 @@ func setupTestPackHandler(t *testing.T) (*Handler, string) {
 func TestGetTemplates(t *testing.T) {
 	h, dir := setupTestPackHandler(t)
 
-	// Write template file (consolidated format)
-	templates := `{"version":2,"role_templates":[{"id":"orchestrator","name":"Orchestrator"}],"breeds":[]}`
+	// Write template file with a full breed (consolidated format). The endpoint
+	// returns the complete template breeds so the "add member" UI can
+	// instantiate a ready-to-use dog (variants / CLI / role / caution).
+	templates := `{"version":2,"role_templates":[{"id":"orchestrator","name":"Orchestrator"}],"breeds":[{"id":"orchestrator","name":"Orchestrator","display_name":"调度犬","default_variant_id":"v1","variants":[{"id":"v1","client_id":"claude","default_model":"claude-opus-4-6"}]}]}`
 	os.WriteFile(filepath.Join(dir, "dog-template.json"), []byte(templates), 0644)
 
 	mux := h.Routes()
@@ -294,7 +296,7 @@ func TestGetTemplates(t *testing.T) {
 	var result []map[string]any
 	json.NewDecoder(rec.Body).Decode(&result)
 	if len(result) != 1 || result[0]["id"] != "orchestrator" {
-		t.Fatalf("got %v, want 1 template with id=orchestrator", result)
+		t.Fatalf("got %v, want 1 template breed with id=orchestrator", result)
 	}
 }
 

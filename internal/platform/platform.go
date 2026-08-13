@@ -1,9 +1,11 @@
 package platform
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"path/filepath"
+	"time"
 
 	"github.com/cloudwego/eino/components/embedding"
 	"sounds-great-ai/internal/a2a"
@@ -17,11 +19,26 @@ import (
 	"sounds-great-ai/internal/memory"
 	"sounds-great-ai/internal/prompt"
 	"sounds-great-ai/internal/ragstore"
-	"sounds-great-ai/internal/router"
 	"sounds-great-ai/internal/settings"
+
+	routingPorts "sounds-great-ai/internal/domains/routing/ports"
+	routingServices "sounds-great-ai/internal/domains/routing/services"
+	routingStores "sounds-great-ai/internal/domains/routing/stores"
 	"sounds-great-ai/internal/skills"
 	"sounds-great-ai/internal/sop"
 	"sounds-great-ai/internal/threadstore"
+	threadPorts "sounds-great-ai/internal/domains/threads/ports"
+	threadStores "sounds-great-ai/internal/domains/threads/stores"
+
+	agentsPorts "sounds-great-ai/internal/domains/agents/ports"
+	agentsServices "sounds-great-ai/internal/domains/agents/services"
+
+	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
+	custodyServices "sounds-great-ai/internal/domains/custody/services"
+	custodyStores "sounds-great-ai/internal/domains/custody/stores"
+
+	sopPorts "sounds-great-ai/internal/domains/sop/ports"
+	sopServices "sounds-great-ai/internal/domains/sop/services"
 
 	"sounds-great-ai/pkg/pack"
 )
@@ -32,7 +49,10 @@ import (
 type Platform struct {
 	// CLI Adapters
 	ProcessManager *unified.ProcessManager
-	Adapters       map[string]unified.AgentExecutor // keyed by CLI name
+	// AgentExecutor is the agents domain port wrapping the 4 CLI adapters
+	// (claude/codex/gemini/opencode). execution.go consumes this port instead
+	// of reaching into internal/adapter directly (D4-3).
+	AgentExecutor agentsPorts.IAgentExecutor
 
 	// Config
 	Breeds map[string]*pack.BreedConfig
@@ -42,9 +62,8 @@ type Platform struct {
 	// Platform Services
 	Skills *skills.SkillManager
 	MCP    *mcp.MCPRegistry
-	Router *router.RoutingEngine
-	A2AHub *a2a.A2AHub
-	SOP    *sop.SOPGuardian
+	A2AHub routingPorts.IA2AHub
+	SOP    sopPorts.IA2AGuardian
 	Memory *memory.MemoryStore
 
 	// Prompt Hooks
@@ -56,7 +75,7 @@ type Platform struct {
 	Compressor *a2a.ContextCompressor
 
 	// Stores (port/factory pattern)
-	ThreadStore   threadstore.ThreadStore
+	ThreadStore   threadPorts.IThreadStore
 	SettingsStore settings.SettingsStore
 	EvidenceStore memory.EvidenceStore
 
@@ -70,10 +89,24 @@ type Platform struct {
 	ContextAssembler *prompt.ContextAssembler
 
 	// Messages
-	MessageStore threadstore.MessageStore
+	MessageStore threadPorts.IMessageStore
+
+	// Ball custody ledger (orchestration ball-custody event ledger)
+	BallLedger custodyPorts.IBallLedger
+
+	// HoldScheduler manages parked holds (P2 hold_ball: manual/webhook wake).
+	HoldScheduler custodyPorts.IHoldScheduler
 
 	// Routing
-	MentionRouter *Router
+	MentionRouter routingPorts.IMentionRouter
+
+	// Worklist enforces per-invocation A2A depth + ping-pong breaking (G2).
+	Worklist routingPorts.IWorklist
+
+	// RepoTrajectoryStore + GitRefCollector power the project archive source (G8).
+	// Both are nil-safe: when repo_url is empty the collector never runs.
+	RepoTrajectoryStore *custodyStores.RepoTrajectoryStore
+	GitRefCollector     *custodyServices.GitRefCollector
 }
 
 // Config holds initialization parameters.
@@ -126,10 +159,7 @@ func New(cfg Config) (*Platform, error) {
 
 	mcpReg := mcp.NewRegistry()
 
-	routingRules := []pack.RoutingRule{} // loaded from pack config
-	routingEngine := router.NewEngine(routingRules, breeds)
-
-	a2aHub := a2a.NewHub(nil)
+	a2aHub := routingStores.NewA2AHubAdapter(a2a.NewHub(nil))
 
 	maxDepth := cfg.MaxA2ADepth
 	if maxDepth <= 0 {
@@ -148,6 +178,7 @@ func New(cfg Config) (*Platform, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create thread store: %w", err)
 	}
+	threadStorePort := threadStores.NewThreadStoreAdapter(threadStore)
 	evidenceStore := memory.NewEvidenceStore()
 
 	promptBuilder := prompt.NewBuilder(breeds, skillMgr)
@@ -175,7 +206,21 @@ func New(cfg Config) (*Platform, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create message store: %w", err)
 	}
-	router := NewRouter(breeds)
+	messageStorePort := threadStores.NewMessageStoreAdapter(messageStore)
+
+	ballStore := custodyStores.NewMemoryBallLedgerStore()
+	ballLedger := custodyServices.NewBallLedger(ballStore)
+	holdScheduler := custodyServices.NewHoldScheduler(ballLedger, pm)
+	mentionRouter := routingServices.NewMentionRouterService(breeds)
+	worklist := routingServices.NewWorklistRegistry()
+
+	// Project archive source (G8): file-backed repo trajectory store + git-ref
+	// collector. repo_url defaults empty → the collector is inert until the
+	// operator configures a code-repo URL (VISION §6 new capability).
+	repoTrajectoryStore := custodyStores.NewRepoTrajectoryStore(
+		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), settings.RepoTrajectoryFileName),
+	)
+	gitRefCollector := custodyServices.NewGitRefCollector(repoTrajectoryStore, nil)
 
 	// Initialize leader config, loading any persisted value from the catalog.
 	leaderCfg := pack.DefaultLeaderConfig()
@@ -185,19 +230,18 @@ func New(cfg Config) (*Platform, error) {
 
 	return &Platform{
 		ProcessManager: pm,
-		Adapters:       adapters,
+		AgentExecutor:  agentsServices.NewAgentExecutor(adapters),
 		Breeds:         breeds,
 		Loader:         loader,
 		Leader:         &leaderCfg,
 		Skills:         skillMgr,
 		MCP:            mcpReg,
-		Router:         routingEngine,
 		A2AHub:         a2aHub,
-		SOP:            sopGuardian,
+		SOP:            sopServices.NewSOPGuardianService(sopGuardian),
 		Memory:         memStore,
 		Compressor:     compressor,
 
-		ThreadStore:   threadStore,
+		ThreadStore:   threadStorePort,
 		SettingsStore: settingsStore,
 		EvidenceStore: evidenceStore,
 
@@ -210,19 +254,26 @@ func New(cfg Config) (*Platform, error) {
 		HookPipeline:   hookPipeline,
 		HookTraceStore: hookTraceStore,
 
-		MessageStore: messageStore,
+		MessageStore: messageStorePort,
 
-		MentionRouter: router,
+		BallLedger: ballLedger,
+
+		HoldScheduler: holdScheduler,
+
+		MentionRouter: mentionRouter,
+
+		Worklist: worklist,
+
+		RepoTrajectoryStore: repoTrajectoryStore,
+		GitRefCollector:     gitRefCollector,
 	}, nil
 }
 
-// GetAdapter returns the CLI adapter for a given CLI name.
+// GetAdapter returns the CLI adapter for a given CLI name. It delegates to the
+// agents domain port (D4-3) and is retained for eval + tests that need the
+// concrete unified.AgentExecutor.
 func (p *Platform) GetAdapter(cliName string) (unified.AgentExecutor, error) {
-	adapter, ok := p.Adapters[cliName]
-	if !ok {
-		return nil, fmt.Errorf("unknown CLI: %s", cliName)
-	}
-	return adapter, nil
+	return p.AgentExecutor.Get(cliName)
 }
 
 // GetBreed returns a breed config by ID.
@@ -252,6 +303,62 @@ func (p *Platform) BuildMCPConfig() *unified.MCPConfig {
 	return result
 }
 
+// defaultReconcileInterval is how often the ball-custody zombie reconciler runs.
+const defaultReconcileInterval = 60 * time.Second
+
+// defaultReconcileTimeout is how long an invocation may go without a heartbeat
+// (or start event, if no heartbeat was emitted) before it is healed as died.
+const defaultReconcileTimeout = 5 * time.Minute
+
+// repoCollectInterval is how often the git-ref collector snapshots branch heads
+// (G8). It is decoupled from the reconcile interval so collection runs on its
+// own cadence regardless of reconcile activity.
+const repoCollectInterval = 5 * time.Minute
+
+// StartReconciler runs the ball-custody zombie sweep until ctx is cancelled.
+// It heals dangling invocations (started but never ended) into died/zombie so
+// the projected custody state never hangs in "active" forever. Mirrors
+// clowder-ai's reconcileZombies. Call once at process startup (main.go).
+func (p *Platform) StartReconciler(ctx context.Context) {
+	if p.BallLedger == nil {
+		return
+	}
+	ticker := time.NewTicker(defaultReconcileInterval)
+	defer ticker.Stop()
+	var lastRepoCollect int64
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := p.BallLedger.ReconcileZombies(ctx, defaultReconcileTimeout)
+			if err != nil {
+				log.Printf("ball-custody reconciler error: %v", err)
+			} else if n > 0 {
+				log.Printf("ball-custody reconciler healed %d dangling invocation(s)", n)
+			}
+			// G5: advance timed/command holds (auto-wake or expire).
+			if p.HoldScheduler != nil {
+				if terr := p.HoldScheduler.Tick(time.Now().Unix()); terr != nil {
+					log.Printf("hold scheduler tick error: %v", terr)
+				}
+			}
+			// G8: periodic git-ref collection (only when repo_url is set).
+			now := time.Now().Unix()
+			if p.GitRefCollector != nil && now-lastRepoCollect >= int64(repoCollectInterval.Seconds()) {
+				if repoURL := p.GetRepoURL(ctx); repoURL != "" {
+					if collected, cerr := p.GitRefCollector.Collect(ctx, repoURL); cerr != nil {
+						log.Printf("repo-trajectory collect error: %v", cerr)
+					} else if collected > 0 {
+						log.Printf("repo-trajectory collected %d branch event(s)", collected)
+					}
+					lastRepoCollect = now
+				}
+			}
+		}
+	}
+}
+
 // Close releases platform resources. Called during graceful shutdown.
 func (p *Platform) Close() error {
 	// ProcessManager processes are cleaned up via context cancellation
@@ -259,7 +366,52 @@ func (p *Platform) Close() error {
 	return nil
 }
 
+// HoldBall parks a thread, writing ball.held and registering an active hold.
+// resumeMsg is the context handed back to the holder when the hold is released.
+func (p *Platform) HoldBall(ctx context.Context, threadID, holder string, cond custodyPorts.WakeCondition, resumeMsg string) error {
+	if p.HoldScheduler == nil {
+		return fmt.Errorf("hold scheduler not initialized")
+	}
+	return p.HoldScheduler.Hold(ctx, threadID, holder, cond, resumeMsg)
+}
+
+// WakeHold releases a parked hold (validating wake kind/token) and returns the
+// record so the caller can resume the holder breed.
+func (p *Platform) WakeHold(ctx context.Context, threadID string, kind custodyPorts.WakeKind, token string) (*custodyPorts.HoldRecord, error) {
+	if p.HoldScheduler == nil {
+		return nil, fmt.Errorf("hold scheduler not initialized")
+	}
+	return p.HoldScheduler.Wake(ctx, threadID, kind, token)
+}
+
+// GetHold returns the active hold for a thread, if any.
+func (p *Platform) GetHold(ctx context.Context, threadID string) (*custodyPorts.HoldRecord, bool) {
+	if p.HoldScheduler == nil {
+		return nil, false
+	}
+	return p.HoldScheduler.GetHold(ctx, threadID)
+}
+
 // Ready checks if the platform is ready to serve requests.
 func (p *Platform) Ready() bool {
-	return len(p.Adapters) > 0 && len(p.Breeds) > 0
+	return p.AgentExecutor != nil && p.AgentExecutor.Count() > 0 && len(p.Breeds) > 0
+}
+
+// GetRepoURL returns the configured code-repo URL (empty string when unset).
+// Reads live from the settings store so a PUT /api/config/repo takes effect
+// without a restart.
+func (p *Platform) GetRepoURL(ctx context.Context) string {
+	if p.SettingsStore == nil {
+		return ""
+	}
+	configs, err := p.SettingsStore.ListConfig()
+	if err != nil {
+		return ""
+	}
+	for _, c := range configs {
+		if c.Key == "repo_url" {
+			return c.Value
+		}
+	}
+	return ""
 }

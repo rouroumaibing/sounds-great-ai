@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"sounds-great-ai/internal/config"
+	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
+	custodyServices "sounds-great-ai/internal/domains/custody/services"
 	"sounds-great-ai/internal/hooks"
 	"sounds-great-ai/internal/memory"
 	"sounds-great-ai/internal/ops"
@@ -21,6 +24,8 @@ import (
 	"sounds-great-ai/internal/settings"
 	"sounds-great-ai/internal/telemetry"
 	"sounds-great-ai/internal/threadstore"
+	threadPorts "sounds-great-ai/internal/domains/threads/ports"
+	threadStores "sounds-great-ai/internal/domains/threads/stores"
 	"sounds-great-ai/internal/transport"
 	"sounds-great-ai/pkg/pack"
 
@@ -47,7 +52,7 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{
 				"status":   "ready",
-				"adapters": len(pl.Adapters),
+				"adapters": pl.AgentExecutor.Count(),
 				"breeds":   len(pl.Breeds),
 			})
 		} else {
@@ -95,11 +100,12 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 		})
 	}
 
-	var threadStore threadstore.ThreadStore
+	var threadStore threadPorts.IThreadStore
 	if pl != nil {
 		threadStore = pl.ThreadStore
 	} else {
-		threadStore, _ = threadstore.NewThreadStore(threadstore.StoreConfig{})
+		ts, _ := threadstore.NewThreadStore(threadstore.StoreConfig{})
+		threadStore = threadStores.NewThreadStoreAdapter(ts)
 	}
 	var threadHandler *transport.ThreadHandler
 	if pl != nil && pl.MessageStore != nil {
@@ -160,6 +166,24 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	if evalHandler != nil {
 		mux.Handle("/api/evals", evalHandler.Routes())
 	}
+
+	// P2 hold_ball webhook: POST /api/custody/holds/{threadID}/webhook?token=XXX
+	// releases a parked hold and resumes the holder (D3 scope: webhook wake).
+	// G3: wrapped with operator-level auth so an external party still needs the
+	// AUTH_TOKEN (in addition to the per-hold wake token).
+	mux.HandleFunc("POST /api/custody/holds/", auth.WrapFunc(CustodyWakeHandler(wsHandler, pl)))
+
+	// P4 Brief & Trail API: GET /api/custody/threads/{threadID}/trail projects
+	// the custody ledger into a briefing (D5 engine; UI deferred to P5).
+	mux.HandleFunc("GET /api/custody/threads/", CustodyTrailHandler(pl))
+
+	// G6: cross-thread duty briefing (operations view). Snapshot every thread's
+	// custody state into needsUser / deadBalls / voidPasses / staleBlocked.
+	mux.HandleFunc("GET /api/custody/briefing", auth.WrapFunc(CustodyDutyBriefingHandler(pl)))
+
+	// G8: project archive source — code-repo trajectory timeline + test endpoint.
+	repoHandler := transport.NewRepoTrajectoryHandler(pl)
+	mux.Handle("/api/repo/", repoHandler.Routes())
 
 	mux.HandleFunc("GET /api/skills", SkillsHandler(pl))
 	mux.HandleFunc("GET /api/mcp/servers", MCPServersHandler(pl))
@@ -281,6 +305,91 @@ func DiagnosticsPoolHandler(wsHandler *transport.WSHandler, logBuf *ops.LogBuffe
 			"log_buffer":   map[string]any{"entries": logBuf.Len()},
 			"rag_cache":    map[string]any{"available": registry != nil},
 		})
+	}
+}
+
+// CustodyWakeHandler releases a parked hold_ball via an external webhook POST
+// (D3 scope: webhook wake kind). Path: /api/custody/holds/{threadID}/webhook,
+// with the shared secret passed as ?token=XXX. On success it resumes the holder
+// breed over the existing WS session.
+func CustodyWakeHandler(wsHandler *transport.WSHandler, pl *platform.Platform) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if pl == nil || pl.HoldScheduler == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]string{"error": "hold scheduler unavailable"})
+			return
+		}
+		// Path pattern: /api/custody/holds/{threadID}/webhook
+		rest := strings.TrimPrefix(r.URL.Path, "/api/custody/holds/")
+		rest = strings.TrimSuffix(rest, "/webhook")
+		threadID := strings.Trim(rest, "/")
+		if threadID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "missing thread id"})
+			return
+		}
+		token := r.URL.Query().Get("token")
+		if err := wsHandler.ResumeHeldThread(r.Context(), threadID, custodyPorts.WakeWebhook, token); err != nil {
+			status := http.StatusBadRequest
+			if errors.Is(err, custodyServices.ErrNoActiveHold) {
+				status = http.StatusNotFound
+			}
+			w.WriteHeader(status)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{"status": "resumed", "thread_id": threadID})
+	}
+}
+
+// CustodyTrailHandler projects the custody ledger for a thread into a briefing
+// (D5: Brief & Trail API engine). Path: /api/custody/threads/{threadID}/trail.
+func CustodyTrailHandler(pl *platform.Platform) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if pl == nil || pl.BallLedger == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]string{"error": "ledger unavailable"})
+			return
+		}
+		// Path pattern: /api/custody/threads/{threadID}/trail
+		rest := strings.TrimPrefix(r.URL.Path, "/api/custody/threads/")
+		threadID := strings.TrimSuffix(rest, "/trail")
+		threadID = strings.Trim(threadID, "/")
+		if threadID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "missing thread id"})
+			return
+		}
+		briefing, err := pl.BallLedger.ProjectTrail(r.Context(), threadID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		json.NewEncoder(w).Encode(briefing)
+	}
+}
+
+// CustodyDutyBriefingHandler aggregates every thread's custody state into an
+// operations view (G6). Path: GET /api/custody/briefing.
+func CustodyDutyBriefingHandler(pl *platform.Platform) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if pl == nil || pl.BallLedger == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]string{"error": "ledger unavailable"})
+			return
+		}
+		briefing, err := pl.BallLedger.ProjectDutyBriefing(r.Context())
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		json.NewEncoder(w).Encode(briefing)
 	}
 }
 

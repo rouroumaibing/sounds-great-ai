@@ -113,6 +113,15 @@ func SetupPack() (*pack.Pack, *ragstore.StoreRegistry, embedding.Embedder, *rags
 	if merged, merr := platform.MergedBreeds(templateMap, store); merr != nil {
 		log.Printf("Warning: breed catalog merge failed: %v", merr)
 	} else {
+		// The runtime registry (p) must contain ONLY catalog breeds; the
+		// template is no longer active (decision D1/D3). p was loaded with the
+		// full template via LoadFromFile, so remove any template-only breed
+		// that is not in the catalog, then register the catalog breeds.
+		for _, b := range p.List() {
+			if _, ok := merged[b.ID]; !ok {
+				_ = p.Unregister(b.ID)
+			}
+		}
 		for _, b := range merged {
 			_ = p.Register(b)
 		}

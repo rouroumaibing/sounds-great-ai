@@ -4,12 +4,15 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"sounds-great-ai/internal/settings"
 )
 
 func TestPlatformNew(t *testing.T) {
 	// Create temp dirs for breeds and skills
 	breedsDir := t.TempDir()
 	skillsDir := t.TempDir()
+	workspaceDir := t.TempDir()
 
 	// Write a minimal breed JSON
 	breedJSON := `{
@@ -21,14 +24,14 @@ func TestPlatformNew(t *testing.T) {
 	}`
 	os.WriteFile(filepath.Join(breedsDir, "dog-template.json"), []byte(`{"version":2,"breeds":[`+breedJSON+`]}`), 0644)
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir(), MaxA2ADepth: 3})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: workspaceDir, MaxA2ADepth: 3})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 
 	// Verify adapters
-	if len(p.Adapters) != 4 {
-		t.Fatalf("expected 4 adapters, got %d", len(p.Adapters))
+	if p.AgentExecutor.Count() != 4 {
+		t.Fatalf("expected 4 adapters, got %d", p.AgentExecutor.Count())
 	}
 	for _, name := range []string{"claude", "codex", "gemini", "opencode"} {
 		if _, err := p.GetAdapter(name); err != nil {
@@ -36,9 +39,13 @@ func TestPlatformNew(t *testing.T) {
 		}
 	}
 
-	// Verify breeds
-	if p.GetBreed("bianmu") == nil {
-		t.Error("expected bianmu breed")
+	// Decision D1: on a fresh first run (no catalog file) the runtime registry
+	// is empty — no dogs are auto-injected; the template is only a menu.
+	if len(p.Breeds) != 0 {
+		t.Errorf("expected empty breed registry on first run (D1), got %d", len(p.Breeds))
+	}
+	if p.GetBreed("bianmu") != nil {
+		t.Error("did not expect bianmu on first run (D1)")
 	}
 
 	// Verify SOP
@@ -73,15 +80,27 @@ func TestPlatformGetAdapterUnknown(t *testing.T) {
 func TestPlatformReadyWithBreeds(t *testing.T) {
 	breedsDir := t.TempDir()
 	skillsDir := t.TempDir()
+	workspaceDir := t.TempDir()
 
-	breedJSON := `{"id":"bianmu","name":"边牧","display_name":"边牧","default_variant_id":"v1","variants":[{"id":"v1","client_id":"anthropic","default_model":"claude-opus-4-6","cli":{"command":"claude","output_format":"stream-json"}}]}`
-	os.WriteFile(filepath.Join(breedsDir, "dog-template.json"), []byte(`{"version":2,"breeds":[`+breedJSON+`]}`), 0644)
+	// Pre-seed an existing catalog (so this exercises the existing-catalog
+	// path, not first-run) with a ready breed.
+	catalogDir := settings.ConfigRoot(workspaceDir)
+	if err := os.MkdirAll(catalogDir, 0o755); err != nil {
+		t.Fatalf("mkdir catalog dir: %v", err)
+	}
+	catalogJSON := `{"version":2,"breeds":[{"id":"bianmu","name":"边牧","display_name":"边牧","default_variant_id":"v1","enabled":true,"variants":[{"id":"v1","client_id":"anthropic","default_model":"claude-opus-4-6","cli":{"command":"claude","output_format":"stream-json"}}]}],"seen_template_breeds":["bianmu"]}`
+	if err := os.WriteFile(filepath.Join(catalogDir, settings.CatalogFileName), []byte(catalogJSON), 0644); err != nil {
+		t.Fatalf("write catalog: %v", err)
+	}
 
-	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: workspaceDir})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 
+	if p.GetBreed("bianmu") == nil {
+		t.Error("expected bianmu from existing catalog")
+	}
 	if !p.Ready() {
 		t.Error("expected Ready()=true with breeds loaded")
 	}
@@ -234,7 +253,7 @@ func TestPlatformAdaptersCount(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	if len(p.Adapters) != 4 {
-		t.Errorf("expected 4 adapters, got %d", len(p.Adapters))
+	if p.AgentExecutor.Count() != 4 {
+		t.Errorf("expected 4 adapters, got %d", p.AgentExecutor.Count())
 	}
 }

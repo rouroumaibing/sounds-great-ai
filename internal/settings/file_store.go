@@ -21,6 +21,7 @@ import (
 const (
 	AccountsFileName    = "accounts.json"
 	CatalogFileName     = "dog-catalog.json"
+	RepoTrajectoryFileName = "repo-trajectory.json"
 	CredentialsFileName = "credentials.json"
 
 	// maxBackups is the number of timestamped .bak files kept per config file
@@ -108,6 +109,11 @@ type catalogDocument struct {
 	// DeletedBreeds records breed IDs the customer explicitly removed, so the
 	// upgrade sync never resurrects a deleted template dog (decision D2).
 	DeletedBreeds []string `json:"deleted_breeds,omitempty"`
+	// SeenTemplateBreeds records template breed IDs the catalog has already been
+	// "exposed to". Persisting it unifies D1 (empty first run) and D3 (auto-add
+	// new template breeds on upgrade) — a breed in this set is never re-added
+	// after a later deletion. See docs/DESIGN-STORYS/SG-MEM-002.
+	SeenTemplateBreeds []string `json:"seen_template_breeds,omitempty"`
 }
 
 // FileSettingsStore implements SettingsStore with JSON files on disk:
@@ -129,8 +135,11 @@ type FileSettingsStore struct {
 	configs       []*SystemConfig
 	leader        *pack.Leader
 	deletedBreeds map[string]bool
-	loaded        bool
-	reload        *HotReloader
+	// seenTemplateBreeds records template breed IDs already exposed to this
+	// catalog (see SeenTemplateBreeds in catalogDocument).
+	seenTemplateBreeds map[string]bool
+	loaded              bool
+	reload              *HotReloader
 }
 
 // NewFileSettingsStore creates a file-backed settings store. accountsPath and
@@ -150,6 +159,7 @@ func NewFileSettingsStore(accountsPath, catalogPath string, watch bool) *FileSet
 		accounts:      make(map[string]*Account),
 		configs:       defaultConfig(),
 		deletedBreeds: make(map[string]bool),
+		seenTemplateBreeds: make(map[string]bool),
 	}
 	if watch {
 		s.reload = NewHotReloader([]string{accountsPath, catalogPath}, func() {
@@ -248,6 +258,11 @@ func (s *FileSettingsStore) reloadFromDisk() error {
 			for _, id := range doc.DeletedBreeds {
 				if id != "" {
 					s.deletedBreeds[id] = true
+				}
+			}
+			for _, id := range doc.SeenTemplateBreeds {
+				if id != "" {
+					s.seenTemplateBreeds[id] = true
 				}
 			}
 		}
@@ -363,7 +378,8 @@ func (s *FileSettingsStore) flushCatalog() error {
 		ReviewPolicy: s.reviewPolicy,
 		Leader:       leader,
 		Configs:      s.configs,
-		DeletedBreeds: sortedKeys(s.deletedBreeds),
+		DeletedBreeds:     sortedKeys(s.deletedBreeds),
+		SeenTemplateBreeds: sortedKeys(s.seenTemplateBreeds),
 	}
 	seen := make(map[string]bool, len(s.breedOrder))
 	for _, id := range s.breedOrder {
@@ -489,6 +505,46 @@ func (s *FileSettingsStore) ListDeletedBreeds() ([]string, error) {
 		return nil, err
 	}
 	return sortedKeys(s.deletedBreeds), nil
+}
+
+// ListSeenTemplateBreeds returns the template breed IDs this catalog has already
+// been exposed to (never re-added). See SG-MEM-002 §4.1.
+func (s *FileSettingsStore) ListSeenTemplateBreeds() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if err := s.ensureLoaded(); err != nil {
+		return nil, err
+	}
+	return sortedKeys(s.seenTemplateBreeds), nil
+}
+
+// AddSeenTemplateBreeds marks the given template breed IDs as seen and persists
+// them to the catalog file. Idempotent: IDs already seen are skipped.
+func (s *FileSettingsStore) AddSeenTemplateBreeds(ids []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ensureLoaded(); err != nil {
+		return err
+	}
+	changed := false
+	for _, id := range ids {
+		if id != "" && !s.seenTemplateBreeds[id] {
+			s.seenTemplateBreeds[id] = true
+			changed = true
+		}
+	}
+	if changed {
+		return s.flushCatalog()
+	}
+	return nil
+}
+
+// CatalogFileExists reports whether the runtime catalog file exists on disk.
+// It distinguishes a first run (absent → write empty catalog + seen) from an
+// existing customer catalog.
+func (s *FileSettingsStore) CatalogFileExists() bool {
+	_, err := os.Stat(s.catalogPath)
+	return err == nil
 }
 
 // ReorderBreeds reorders the persisted catalog breeds[] to match order.
@@ -793,6 +849,24 @@ func (s *FileSettingsStore) UpdateConfig(key, value string) error {
 		}
 	}
 	return fmt.Errorf("config key %q not found", key)
+}
+
+// UpsertConfig creates or updates a config key. Used for new keys (e.g.
+// repo_url) that are not guaranteed to exist in a pre-upgrade catalog.
+func (s *FileSettingsStore) UpsertConfig(key, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ensureLoaded(); err != nil {
+		return err
+	}
+	for _, c := range s.configs {
+		if c.Key == key {
+			c.Value = value
+			return s.flushCatalog()
+		}
+	}
+	s.configs = append(s.configs, &SystemConfig{Key: key, Value: value, Category: "system"})
+	return s.flushCatalog()
 }
 
 // GetLeader returns the persisted leader config, or the default if none.

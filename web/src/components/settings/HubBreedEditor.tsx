@@ -37,17 +37,6 @@ interface HubBreedEditorProps {
   onClose: () => void;
 }
 
-interface BreedTemplate {
-  id: string;
-  name: string;
-  nickname?: string;
-  avatar?: string;
-  color?: { primary: string; secondary: string };
-  role_description?: string;
-  personality?: string;
-  default_roles?: string[];
-}
-
 export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) {
   const { t } = useI18n();
   const isEdit = Boolean(breed);
@@ -60,7 +49,7 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState<BreedEditorFormState>(() => initialState(breed));
-  const [templates, setTemplates] = useState<BreedTemplate[]>([]);
+  const [templates, setTemplates] = useState<BreedConfig[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>('custom');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -120,7 +109,7 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
   useEffect(() => {
     if (isEdit) return;
     let cancelled = false;
-    apiGet<BreedTemplate[]>('/api/breeds/templates')
+    apiGet<BreedConfig[]>('/api/breeds/templates')
       .then((data) => {
         if (!cancelled) setTemplates(Array.isArray(data) ? data : []);
       })
@@ -171,7 +160,7 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
     }
   };
 
-  const handleTemplateSelect = (tpl: BreedTemplate | null) => {
+  const handleTemplateSelect = (tpl: BreedConfig | null) => {
     if (!tpl) {
       setSelectedTemplateId('custom');
       setForm(initialState(null));
@@ -179,9 +168,13 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
       return;
     }
     setSelectedTemplateId(tpl.id);
+    // 全量实例化：从模板 BreedConfig 复制 variant / CLI / role / caution 等，
+    // 用户只需绑定账号与模型即可得到与模板设计一致的可用犬（决策 D1/D3）。
+    const base = initialState(tpl);
     const name = tpl.name;
     const dogId = autoSlug(name);
-    const rawAliases = [tpl.nickname, name, ...(tpl.default_roles ?? [])].filter(
+    // 别名去重：模板的 nickname / name / mention_patterns 投影为可 @ 别名。
+    const rawAliases = [tpl.nickname, name, ...(tpl.mention_patterns ?? [])].filter(
       (x): x is string => Boolean(x),
     );
     const deduped = rawAliases.map((alias) => {
@@ -194,14 +187,9 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
       return normalized;
     });
     patchForm({
+      ...base,
       name,
-      displayName: name,
-      nickname: tpl.nickname ?? '',
-      avatar: tpl.avatar ?? '',
-      colorPrimary: tpl.color?.primary ?? '',
-      colorSecondary: tpl.color?.secondary ?? '',
-      roleDescription: tpl.role_description ?? '',
-      personality: tpl.personality ?? '',
+      displayName: tpl.display_name || name,
       dogId,
       mentionPatterns: joinTags(deduped),
     });
@@ -322,7 +310,7 @@ export function HubBreedEditor({ breed, onSave, onClose }: HubBreedEditorProps) 
                         : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    {tpl.nickname ?? tpl.name}
+                    {tpl.display_name || tpl.nickname || tpl.name}
                   </button>
                 ))}
               </div>

@@ -20,4 +20,4 @@ What happened as a result.
 
 ## Index
 
-(No ADRs yet — create as architecture decisions are made.)
+- [ADR-001: 首启空 Catalog、成员按需添加 + 凭据就绪闸门](./ADR-001-empty-catalog-first-run.md)

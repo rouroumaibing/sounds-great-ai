@@ -180,6 +180,11 @@ export const en: Record<string, string> = {
   'members.deleteMember': 'Delete member',
   'members.dragSort': 'Drag to sort',
   'members.cliConfig': 'CLI (config)',
+  'members.emptyTitle': 'No members yet',
+  'members.emptyHint': 'The member list is empty on first install. Add from a built-in template or custom — a dog only appears in collaboration after being added. Members without keys or CLI are marked "Needs config".',
+  'members.emptyAdd': 'Add Member',
+  'members.emptyFromTemplate': 'Instantiate from a member template (with model & runtime defaults) in the dialog',
+  'members.noDefaultHint': 'Add a member to set the global default dog',
 
   // Rules Panel
   'rules.title': 'Rules & Governance',
@@ -289,7 +294,7 @@ export const en: Record<string, string> = {
   'breedEditor.createDog': 'Create Dog',
   'breedEditor.memberTemplate': 'Member template',
   'breedEditor.templateHint': 'Start from a built-in member template; selecting one auto-fills identity, model and runtime defaults.',
-  'breedEditor.createHint': 'A single breed is enabled by default on first install; add more members from member management.',
+  'breedEditor.createHint': 'The member list is empty on first install; add a member from a template or custom to make a dog appear in collaboration.',
   'breedEditor.custom': 'Custom',
   'breedEditor.identityInfo': 'Identity info',
   'breedEditor.accountBinding': 'Account binding',

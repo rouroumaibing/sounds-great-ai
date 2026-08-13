@@ -8,22 +8,22 @@ import (
 	"strings"
 	"time"
 
-	"sounds-great-ai/internal/threadstore"
+	threadPorts "sounds-great-ai/internal/domains/threads/ports"
 )
 
 // ThreadHandler handles thread + session + message HTTP endpoints.
 type ThreadHandler struct {
-	store        threadstore.ThreadStore
-	messageStore threadstore.MessageStore // optional, nil = message endpoints disabled
+	store        threadPorts.IThreadStore
+	messageStore threadPorts.IMessageStore // optional, nil = message endpoints disabled
 }
 
 // NewThreadHandler creates a new ThreadHandler.
-func NewThreadHandler(store threadstore.ThreadStore) *ThreadHandler {
+func NewThreadHandler(store threadPorts.IThreadStore) *ThreadHandler {
 	return &ThreadHandler{store: store}
 }
 
 // NewThreadHandlerWithMessages creates a ThreadHandler with message store support.
-func NewThreadHandlerWithMessages(store threadstore.ThreadStore, ms threadstore.MessageStore) *ThreadHandler {
+func NewThreadHandlerWithMessages(store threadPorts.IThreadStore, ms threadPorts.IMessageStore) *ThreadHandler {
 	return &ThreadHandler{store: store, messageStore: ms}
 }
 

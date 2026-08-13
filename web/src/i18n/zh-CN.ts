@@ -180,6 +180,11 @@ export const zhCN: Record<string, string> = {
   'members.deleteMember': '删除成员',
   'members.dragSort': '拖动排序',
   'members.cliConfig': 'CLI（配置）',
+  'members.emptyTitle': '还没有成员',
+  'members.emptyHint': '首次安装成员列表为空。从内置成员模板或自定义添加后，犬才会出现在协作中——未配置密钥或 CLI 的成员会标记为「待配置」。',
+  'members.emptyAdd': '添加成员',
+  'members.emptyFromTemplate': '可在弹窗中从成员模板一键实例化（含模型与运行时默认值）',
+  'members.noDefaultHint': '添加成员后可设置全局默认犬',
 
   // Rules Panel
   'rules.title': '协作与规则',
@@ -289,7 +294,7 @@ export const zhCN: Record<string, string> = {
   'breedEditor.createDog': '创建狗狗',
   'breedEditor.memberTemplate': '成员模板',
   'breedEditor.templateHint': '从内置成员模板开始，选择后自动填充身份、模型与运行时默认值。',
-  'breedEditor.createHint': '首次安装默认只启用一个品种；可在成员管理继续添加其他成员。',
+  'breedEditor.createHint': '首次安装成员列表为空；添加成员并从模板或自定义配置后，犬才会出现在协作中。',
   'breedEditor.custom': '自定义',
   'breedEditor.identityInfo': '身份信息',
   'breedEditor.accountBinding': '账户绑定',

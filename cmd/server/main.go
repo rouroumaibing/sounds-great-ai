@@ -98,6 +98,12 @@ func main() {
 		}
 	}()
 
+	// Ball-custody zombie reconciler (P1): heals dangling invocations that
+	// never wrote a terminal event (crashed CLI agent / leaked fiber).
+	if pl != nil {
+		go pl.StartReconciler(ctx)
+	}
+
 	burnRateMonitor, monitorCancel := setupBurnRateMonitor(wsHandler)
 
 	sig := <-sigCh

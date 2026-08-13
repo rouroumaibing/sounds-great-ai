@@ -3,6 +3,7 @@ import { useThreads } from '../../hooks/useThreads';
 import { ThreadList } from '../threads/ThreadList';
 import { SettingsNav } from '../settings/SettingsNav';
 import { MemoryTab } from '../drawer/tabs/MemoryTab';
+import { CustodyTrail } from '../workspace/CustodyTrail';
 
 export function SecondaryPanel() {
   const activeNav = useAppStore((s) => s.activeNav);
@@ -58,6 +59,8 @@ export function SecondaryPanel() {
       )}
 
       {activeNav === 'settings' && <SettingsNav />}
+
+      {activeNav === 'custody' && activeThreadId && <CustodyTrail threadId={activeThreadId} />}
     </div>
   );
 }

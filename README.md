@@ -75,6 +75,8 @@ Six dogs, six roles, each with its own specialty:
 
 > Users can create their own dogs — just one JSON file, select registered capabilities, define a workflow, and hot-reload takes effect instantly.
 
+> **Empty on first run, build your pack on demand**: a fresh install starts with an empty member list (Owner only); the six dogs are an optional *template menu*. Add a dog from **Member Management → Add from template**, bind an account and credentials, and it joins the runtime. Members without credentials show as "Needs config" rather than "Enabled". See `docs/VISION.md` §5.1 and `docs/decisions/ADR-001`.
+
 ## Architecture
 
 ```

@@ -49,6 +49,7 @@ export function PrimaryNav() {
         <NavButton nav="threads" icon="fa-solid fa-comments" label={t('nav.threads')} activeNav={activeNav} onClick={() => setActiveNav('threads')} badge={hasUnreadEscalation} />
         <NavButton nav="tasks" icon="fa-solid fa-diagram-project" label={t('nav.tasks')} activeNav={activeNav} onClick={() => setActiveNav('tasks')} />
         <NavButton nav="memory" icon="fa-solid fa-database" label={t('nav.memory')} activeNav={activeNav} onClick={() => setActiveNav('memory')} />
+        <NavButton nav="custody" icon="fa-solid fa-circle-nodes" label={t('nav.custody', '球权轨迹')} activeNav={activeNav} onClick={() => setActiveNav('custody')} />
       </div>
 
       {/* Bottom Nav Icons */}

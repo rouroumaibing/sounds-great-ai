@@ -9,10 +9,13 @@ import (
 	"sync"
 	"time"
 
+	routingPorts "sounds-great-ai/internal/domains/routing/ports"
+	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
 	"sounds-great-ai/internal/platform"
 	"sounds-great-ai/pkg/pack"
 	"sounds-great-ai/pkg/protocol"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -57,7 +60,7 @@ func newUpgrader() websocket.Upgrader {
 // NewWSHandlerWithPlatform creates a WSHandler with platform adapter support.
 // When platform is set, execution goes through CLI adapters instead of pack.Bark().
 func NewWSHandlerWithPlatform(p *pack.Pack, pl *platform.Platform) *WSHandler {
-	return &WSHandler{
+	h := &WSHandler{
 		upgrader:    newUpgrader(),
 		streamers:   make(map[string]*Streamer),
 		pack:        p,
@@ -67,6 +70,13 @@ func NewWSHandlerWithPlatform(p *pack.Pack, pl *platform.Platform) *WSHandler {
 			log.Printf("WARN: broadcast rate exceeded for session %s: %d events/1s", sessionID, count)
 		}),
 	}
+	// G5: timed/command holds auto-resume their holder through this handler.
+	if pl != nil && pl.HoldScheduler != nil {
+		pl.HoldScheduler.SetOnWake(func(ctx context.Context, threadID, holder, resumeMsg string) {
+			go h.resumeHeld(ctx, threadID, holder, resumeMsg)
+		})
+	}
+	return h
 }
 
 func (h *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
@@ -139,10 +149,24 @@ func (h *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 
 			// Parse @mention to determine breed(s)
 			var breedID string
-			var routingDecision *platform.RoutingDecision
-			if h.platform != nil && h.platform.MentionRouter != nil {
-				rd := h.platform.MentionRouter.Route(payload.Message)
-				routingDecision = &rd
+		var routingDecision *routingPorts.RoutingDecision
+		if h.platform != nil && h.platform.MentionRouter != nil {
+			rd, _ := h.platform.MentionRouter.Route(context.Background(), payload.Message)
+			routingDecision = &rd
+				if len(rd.TargetBreeds) == 0 {
+					// No available breeds (e.g. empty first-run catalog).
+					// Surface a friendly error instead of routing to a
+					// non-existent default breed that would fail at execution.
+					warn := "无可用犬，请先在成员管理添加成员"
+					if len(rd.Warnings) > 0 {
+						warn = rd.Warnings[0]
+					}
+					streamer.SendEvent(context.Background(), protocol.NewEvent(protocol.EventBarkError, sessionID, &protocol.BarkErrorPayload{
+						Breed: "",
+						Error: warn,
+					}))
+					continue
+				}
 				breedID = rd.TargetBreeds[0]
 			} else {
 				breedID = parseMention(payload.Message, h.pack)
@@ -157,24 +181,30 @@ func (h *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 			streamer.SendEvent(context.Background(), startEvent)
 
 			// Run Bark in goroutine with session-scoped context
-			go func(breedID, sessionID, query string, rd *platform.RoutingDecision) {
+			go func(breedID, sessionID, query string, rd *routingPorts.RoutingDecision) {
 				// Acquire semaphore
 				h.sem <- struct{}{}
 				defer func() { <-h.sem }()
 
-				// Use context that survives client disconnect
-				barkCtx := context.Background()
+			// Use context that survives client disconnect
+			barkCtx := context.Background()
+			// Mint one invocation id per user message so the A2A worklist
+			// (depth + ping-pong) shares a single budget for the whole chain.
+			invID := uuid.NewString()
 
-				if h.platform != nil {
-					if rd != nil && rd.Strategy == "serial" {
-						h.executeSerial(barkCtx, rd.TargetBreeds, sessionID, query)
-					} else if rd != nil && rd.Strategy == "parallel" {
-						h.executeParallel(barkCtx, rd.TargetBreeds, sessionID, query)
-					} else {
-						h.executeWithPlatform(barkCtx, breedID, sessionID, query)
-					}
-					return
+			if h.platform != nil {
+				if rd != nil && rd.Strategy == "serial" {
+					h.executeSerial(barkCtx, rd.TargetBreeds, sessionID, query, invID)
+				} else if rd != nil && rd.Strategy == "parallel" {
+					h.executeParallel(barkCtx, rd.TargetBreeds, sessionID, query, invID)
+				} else {
+					h.executeWithPlatform(barkCtx, breedID, sessionID, query, invID, false)
 				}
+				if h.platform.Worklist != nil {
+					h.platform.Worklist.Done(invID)
+				}
+				return
+			}
 
 				input := &pack.TaskInput{
 					Query: query,
@@ -232,6 +262,27 @@ func (h *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 			}
 			log.Printf("HITL_RESPONSE received: request_id=%s approved=%v reason=%s", payload.RequestID, payload.Approved, payload.Reason)
 			// TODO: Forward to agent/hitl channel when HITL flow is fully integrated
+			continue
+		}
+
+		if ev.Type == protocol.EventWakeHold {
+			var payload protocol.WakeHoldPayload
+			if err := json.Unmarshal(ev.Payload, &payload); err != nil {
+				log.Printf("WAKE_HOLD parse failed: %v", err)
+				continue
+			}
+			sessionID = payload.SessionID
+			if sessionID == "" {
+				sessionID = ev.SessionID
+			}
+			if h.platform == nil || h.platform.HoldScheduler == nil {
+				log.Printf("WAKE_HOLD ignored: hold scheduler unavailable")
+				continue
+			}
+			if err := h.ResumeHeldThread(context.Background(), sessionID, custodyPorts.WakeKind(payload.Kind), payload.Token); err != nil {
+				log.Printf("WAKE_HOLD failed for %s: %v", sessionID, err)
+				h.SendSystemNotice("warning", "唤醒失败", err.Error())
+			}
 			continue
 		}
 	}

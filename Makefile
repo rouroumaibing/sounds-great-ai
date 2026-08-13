@@ -160,6 +160,7 @@ deep: stop clean
 	rm -f internal/platform/hooks_trace.db internal/platform/hooks_trace.db-wal internal/platform/hooks_trace.db-shm
 	find . -name "*.db" -o -name "*.db-wal" -o -name "*.db-shm" 2>/dev/null | grep -v node_modules | grep -v readonly-docs | xargs rm -f 2>/dev/null || true
 	rm -rf web/node_modules
+	rm -rf .sounds-great-ai
 	go clean -testcache
 	go clean -cache
 	@echo "Deep clean complete. Run 'make install' to reinstall dependencies."
@@ -178,6 +179,6 @@ help:
 	@echo "  Binaries: dev -> bin/sounds-great-ai-dev, prod -> bin/sounds-great-ai"
 	@echo "  make build         Build frontend for production (tsc + vite build)"
 	@echo "  make clean         Remove build artifacts (web/dist, bin/)"
-	@echo "  make clean deep    Deep clean: + logs, pids, SQLite, Go cache, node_modules"
+	@echo "  make clean deep    Deep clean: + logs, pids, SQLite, Go cache, node_modules, .sounds-great-ai (runtime settings/credentials)"
 	@echo "  make backend       Start Go backend only"
 	@echo "  make frontend      Start Vite dev server only"

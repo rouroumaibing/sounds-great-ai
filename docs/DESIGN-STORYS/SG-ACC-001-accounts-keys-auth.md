@@ -1,8 +1,11 @@
-# [SG-ACC-001] [Tech Story] 设置页「账户与密钥」与「新增账号认证」前后端处理设计
+# [SG-ACC-001] [Tech Story] 设置页「账户与密钥」与「客户配置安全」设计
 
-> 本文档基于 `sounds-great-ai` **当前代码实况**（前端 `web/src`、后端 `internal/transport/settings_handler.go` + `internal/settings`、装配 `cmd/server/routes.go`）逐文件梳理，非臆想。
-> 是对 `sounds-great-ai` 本体「账户与密钥」分区及内嵌「新增账号认证」模态框的前后端处理逻辑的完整设计叙事。
-> 所有行为描述以仓库当前状态为准（已含 F1–F6 修复）。
+> 本文件由 `SG-ACC-001-accounts-keys-auth.md`（账户与密钥前后端）与 `SG-OPS-001-customer-config-safety.md`（客户配置安全）合并而成。
+> 内容按 `sounds-great-ai` **2026-08-13 代码实况**逐文件重新梳理：前端 `web/src`、后端 `internal/transport/settings_handler.go` + `internal/settings`、装配 `cmd/server/routes.go`、存储 `internal/settings/{file_store.go,credential.go,port.go,validation.go}`。
+> 相对两份旧文档，已修正以下与代码不符之处：
+> - `settings-nav-config.ts` 实际 `DEFAULT_SECTION = 'accounts'`（旧文档误写为 `'members'`）；`RAW_SECTIONS` 顺序为 `accounts` 在前、`members` 在后。
+> - `routes.go` 中 `/api/settings/` 的 `auth.Wrap` 在 `BuildMuxWithHandler` 内位于 `/api/breeds`、`/api/config/` 之后，凭证库 `credStore` 用 `settings.CredentialRoot()`（全局 home）。
+> - `dog-catalog.json` 实际含 `deleted_breeds` 与 `seen_template_breeds` 两个集合字段（客户配置安全的「升级追加同步」与成员「首启空」共用 `seen_template_breeds`）。
 
 ---
 
@@ -11,17 +14,18 @@
 - **类型**: [x] Tech Story (架构/重构/技术债)
 - **责任人**: PO: @operator | Dev: @bianmu | QA: @demu
 - **故事点/复杂度**: [ M (3-5分) ]
+- **范围**: 设置页 **`accounts` 分区**（LLM 账号的 OAuth / API Key 认证、元数据与密钥的分离落盘、引用完整性）+ **客户配置安全**（凭证独立根 `CredentialRoot`、编辑时时间戳备份、升级追加式同步）。
 - **业务/技术目标**:
   - As a **平台使用者（operator）**,
-  - I want to **在设置页统一管理 LLM 账号（OAuth / API Key），并能安全、可靠地新增/编辑/删除账号，且让成员正确绑定账号**,
-  - So that **账号元数据与密钥分离落盘、密钥真正持久化、成员绑定不会出现悬空引用，且未授权无法篡改配置**。
+  - I want to **在设置页统一管理 LLM 账号（OAuth / API Key），安全可靠地新增/编辑/删除账号，且让成员正确绑定账号；同时客户部署时密钥与项目配置物理隔离、编辑可回滚、升级不丢既有成员**,
+  - So that **账号元数据与密钥分离落盘、密钥真正持久化、成员绑定不产生悬空引用、清项目配置不误删密钥、且未授权无法篡改配置**。
 - **关键指标/埋点**: 无（内部配置管理链路，非对外曝光功能）。
 
 ---
 
 ## 2. 功能叙事 (User Journey)
 
-「账户与密钥」是 **Settings 内的一个分区**（nav id=`accounts`），不是独立路由页。用户在设置页左侧点「账户与密钥」→ 右侧渲染 `AccountKeys` 列表（含内置 OAuth 账号 + 自定义账号）。
+「账户与密钥」是 **Settings 内的一个分区**（nav id=`accounts`）。设置页默认进入此分区（`DEFAULT_SECTION = 'accounts'`），左侧导航并列 `members`（成员管理）。左侧点「账户与密钥」→ 右侧渲染 `AccountKeys` 列表（含内置 OAuth 账号 + 自定义账号）。
 
 点右上角「+ 新增账户认证」→ 弹出 **`AccountAuthModal`**（Portal 挂到 `document.body`）。这是一个**模态框而非独立页面**，承载「新增」与「编辑」两种模式：
 
@@ -40,7 +44,7 @@
 
 ### 3.1 导航与分区挂载
 
-- `settings-nav-config.ts`：`RAW_SECTIONS` 仅保留 `accounts`（label「账户与密钥」，icon `fa-key`，indigo）与 `members`（成员管理）两个分区；`DEFAULT_SECTION = 'members'`。
+- `settings-nav-config.ts`：`RAW_SECTIONS` 仅保留 `accounts`（label「账户与密钥」，icon `fa-key`，indigo）与 `members`（「成员管理」）两个分区，**顺序为 accounts 在前、members 在后**；`DEFAULT_SECTION = 'accounts'`（设置页默认进账户与密钥）。
 - `SettingsContent.tsx`：`SECTION_COMPONENTS = { members: MemberManagement, accounts: AccountKeys }`，均 `lazy` 懒加载；直接用 `meta.label/description` 包 `SettingsPageHeader`，面板自身不再渲染页头。
 
 ### 3.2 账户与密钥主页 `AccountKeys.tsx`
@@ -67,7 +71,7 @@
 | 高级配置 envVars | 可选 | 可选 | 折叠面板，注入子进程环境变量 |
 
 - **模型推荐**：`MODEL_SUGGESTIONS`（按 client 预置），点击即加入。
-- **envVars 校验**：`ENV_KEY_RE = /^[A-Z_][A-Za-z0-9_]*$/`；并拒绝系统保留前缀 `RESERVED_ENV_PREFIX = 'SOUNDS_GREAT_AI_'`（前端 F5，与后端过滤对齐）。非法 key 标红，`buildEnvVars()` 过滤空/非法/保留前缀 key。
+- **envVars 校验**：`ENV_KEY_RE = /^[A-Z_][A-Za-z0-9_]*$/`；并拒绝系统保留前缀 `RESERVED_ENV_PREFIX = 'SOUNDS_GREAT_AI_'`（前端，与后端过滤对齐）。非法 key 标红，`buildEnvVars()` 过滤空/非法/保留前缀 key。
 - **重水合**：`useEffect` 监听 `open` 上升沿，重新灌入 `editProfile` 数据，避免同 key 复用脏数据。
 
 **提交校验 `canSubmit`**：
@@ -94,16 +98,14 @@
 
 ## 4. 后端处理逻辑
 
-文件：`internal/transport/settings_handler.go`（`Routes()` 挂载于 `/api/settings/`，由 `routes.go` 用 `auth.Wrap` 包裹）。
+文件：`internal/transport/settings_handler.go`（其 `Routes()` 挂载于 `/api/settings/`，由 `routes.go` 用 `auth.Wrap` 包裹）。
 
-白名单：`validClientIDs = {claude, codex, gemini, opencode, kimi}`；`validateClientID` 非空前必须命中，否则 400。三处（Create/Update Member、Create/Update Account）均校验。
+白名单：`validClientIDs = {claude, codex, gemini, opencode, kimi}`（`settings.ValidateClientID` 校验；非空且不在白名单 → 400）。`OAuthClientRefs` 与 `validClientIDs` 值一致，用于「成员 account_ref 是否指向内置 OAuth（无需查 catalog）」判断（`settings.ValidateAccountRef`）。
 
-`oauthClientRefs` 与 `validClientIDs` 值一致，用于「成员 account_ref 是否指向内置 OAuth（无需查 catalog）」判断。
+### 4.1 路由注册与鉴权
 
-### 4.1 路由注册与鉴权（F6 已加）
-
-`routes.go:115`：`mux.Handle("/api/settings/", auth.Wrap(settingsHandler.Routes()))`。
-`AuthMiddleware` 由 `AUTH_TOKEN` 环境变量驱动（Bearer / `X-Auth-Token` 校验），未设 token 时自动禁用（开发模式零影响）。前端 `http.ts` 已统一注入 `Authorization`，无联动缺口。
+- `routes.go`：`mux.Handle("/api/settings/", auth.Wrap(settingsHandler.Routes()))`（位于 `/api/breeds`、`/api/config/` 之后）。
+- `AuthMiddleware` 由 `AUTH_TOKEN` 环境变量驱动（Bearer / `X-Auth-Token` 校验），未设 token 时自动禁用（开发模式零影响）。前端 `http.ts` 已统一注入 `Authorization`，无联动缺口。
 
 ### 4.2 GET /api/settings/accounts（`ListAccounts`）
 
@@ -117,14 +119,14 @@
 3. account = store.CreateAccount(provider, apiKey)
       → 新建 Account{ID, Provider, KeyPreview:mask(apiKey), KeySet:apiKey!="", ...}
       → flushAccounts() 写 accounts.json (0644)
-4. [F1] 若 apiKey != "" 且 credStore != nil：
+4. 若 apiKey != "" 且 credStore != nil：
         credStore.Set(account.ID, apiKey)
         失败 → store.DeleteAccount(account.ID) 回滚 + 500
 5. 从 raw 删除 "provider"/"api_key"，其余扩展字段经 store.UpdateAccount 应用
 6. respondJSON(201, account)
 ```
 
-**关键（修复后）**：新建带 apiKey 的账号时，明文**会进 `credentials.json`**（0600），且密钥写失败会回滚账号并 500，杜绝「假已配密钥」状态。
+**关键**：新建带 apiKey 的账号时，明文**会进 `credentials.json`**（0600），且密钥写失败会回滚账号并 500，杜绝「假已配密钥」状态。
 
 ### 4.4 PATCH /api/settings/accounts/{id}（`UpdateAccount`）
 
@@ -133,7 +135,7 @@
 2. 若含 "api_key"：
       s==""   → credStore.Delete(id)   // 清密钥
       非空    → credStore.Set(id, s)    // 写密钥
-   [F2] 任一失败 → 返回 500（不再静默 _ = 吞掉），且不改元数据，避免"元数据改了密钥没改"
+      任一失败 → 返回 500（不静默吞掉），且不改元数据，避免"元数据改了密钥没改"
    删掉 updates["api_key"]
 3. store.UpdateAccount(id, updates)   // 覆盖显式字段；不存在 → 404
 4. emitEvent("account-config","key",[id])  // 事件总线 → 热加载
@@ -144,30 +146,30 @@
 
 ```
 1. 若 query "force" != "true"：
-      members = store.ListMembers()
-      bound = [m.ID for m if m.AccountRef == id]
+      breeds = store.ListBreeds()
+      遍历每个 breed 的每个 variant，若 v.AccountRef == id → bound 收集该 breed.ID
       if len(bound)>0 → 409 {error, bound_member_ids}   // 引用保护
 2. store.DeleteAccount(id)   // 不存在 → 404
 3. credStore != nil → credStore.Delete(id)  // best-effort 清密钥
 4. emitEvent(...); respondJSON(200, nil)
 ```
 
-> SG **无「全局共享存储时非 force 一律 409」分支**（F7 判为不适用）：SG 单数据根，引用检查只看当前 store 成员列表。
+> SG **无「全局共享存储时非 force 一律 409」分支**：SG 单数据根，引用检查只看当前 store 成员列表。
 
-### 4.6 成员保存 `account_ref` 校验（F3 已加）
+### 4.6 成员保存 `account_ref` 校验
 
-`validateAccountRef(ref)`：
+`settings.ValidateAccountRef(store, ref)`（`internal/settings/validation.go`）：
 - 空 → 放行（解绑）。
-- 命中 `oauthClientRefs`（claude/codex/gemini/opencode/kimi）→ 放行（指内置 CLI OAuth，非 catalog 账号）。
+- 命中 `OAuthClientRefs`（claude/codex/gemini/opencode/kimi）→ 放行（指内置 CLI OAuth，非 catalog 账号）。
 - 否则 → `h.store.ListAccounts()` 命中 id 才放行，否则 **400 `account_ref "x" not found`**。
 
-`CreateMember` / `UpdateMember` 在入口对 `account_ref` 做该校验。**该校验复用 handler 持有的同一个 `h.store`（账号写入用的同一实例）**，绝不在路径维度重新解析数据根——这是规避「账号写 A 根、校验读 B 根」数据根分裂的关键设计。
+`CreateMember` / `UpdateMember`（packapi `validateBreed`）在入口对 `account_ref` 做该校验。**该校验复用 handler 持有的同一个 `h.store`（账号写入用的同一实例）**，绝不在路径维度重新解析数据根——这是规避「账号写 A 根、校验读 B 根」数据根分裂的关键设计。
 
 ---
 
-## 5. 存储与数据模型
+## 5. 存储与数据模型 + 客户配置安全
 
-文件：`internal/settings/{file_store.go, credential.go, port.go}`。
+文件：`internal/settings/{file_store.go, credential.go, port.go}`、`internal/platform/breeds_merge.go`。
 
 ### 5.1 三文件隔离（物理分离）
 
@@ -177,7 +179,7 @@
 | `dog-catalog.json` | 成员 + leader + 系统配置 | 0644 | `FileSettingsStore` | `ConfigRoot`（项目 `.sounds-great-ai`） |
 | `credentials.json` | 密钥（明文） | **0600** | `FileCredentialStore` | `CredentialRoot`（**全局 home `~/.sounds-great-ai`**，独立于项目根） |
 
-密钥库与元数据文件物理隔离、权限不同；`maskKey` 仅在 list 响应里脱敏，密钥明文只存在于 `credentials.json`。**根目录已拆分（客户配置安全）**：`catalog/accounts` 走 `ConfigRoot(projectRoot)`（项目下 `.sounds-great-ai`）；`credentials` 单独走 `CredentialRoot()`（全局 home `~/.sounds-great-ai`，可被 `SOUNDS_GREAT_AI_CREDENTIAL_ROOT` 覆盖）。清项目配置**不会**误删密钥。详见 `SG-OPS-001-customer-config-safety.md`。
+密钥库与元数据文件物理隔离、权限不同；`maskKey` 仅在 list 响应里脱敏，密钥明文只存在于 `credentials.json`。**根目录已拆分（客户配置安全）**：`catalog/accounts` 走 `ConfigRoot(projectRoot)`（项目下 `.sounds-great-ai`）；`credentials` 单独走 `CredentialRoot()`（全局 home `~/.sounds-great-ai`，可被 `SOUNDS_GREAT_AI_CREDENTIAL_ROOT` 覆盖）。清项目配置**不会**误删密钥。
 
 ### 5.2 数据根解析（双根：ConfigRoot + CredentialRoot）
 
@@ -187,11 +189,11 @@
   3. `{home}/.sounds-great-ai`。
 - `settings.CredentialRoot()`（credentials，**仅密钥**）顺序：
   1. `SOUNDS_GREAT_AI_CREDENTIAL_ROOT`（支持 `~` 跨平台展开）→
-  2. `{home}/.sounds-great-ai`（全局 home，与项目根解耦）。
+  2. `{home}/.sounds-great-ai`（全局 home，与项目根解耦；**不回退到项目根**）。
 
-`routes.go:114` 的 `credStore` 用 `CredentialRoot()`；`routes.go:61/66` 与 `setup.go`/`platform.go` 的 `settingsStore` 用 `ConfigRoot`。账号/成员/密钥不再强制同目录——密钥独立到全局 home，清项目配置不丢密钥。
+`routes.go` 的 `credStore` 用 `CredentialRoot()`；`routes.go` 的 `settingsStore`（`NewFileSettingsStore`）用 `ConfigRoot(workspaceDir)`。账号/成员/密钥不再强制同目录——密钥独立到全局 home，清项目配置不丢密钥。
 
-### 5.3 Account 结构体（port.go）
+### 5.3 Account 结构体（`internal/settings/port.go`）
 
 ```go
 type Account struct {
@@ -207,13 +209,23 @@ type Account struct {
 ```
 `maskKey(key)`：`len<=4` → `"****"`；否则 `key[:2] + "****" + key[len-2:]`。
 
-### 5.4 损坏处理与编辑时备份（F4，已调整）
+### 5.4 客户配置安全三改动
 
-- **加载时损坏**：`reloadFromDisk`（file_store.go / credential.go）解析 JSON 失败 → **仅告警并当空处理**，不再自动备份（不再掩盖损坏）。
-- **编辑时备份**：每次写盘（`flushCatalog` / `flushAccounts` / credential `flush`）覆盖前，若目标文件已存在，先快照为 `<path>.bak-<YYYYMMDD-HHMMSS>`（保留最近 5 份，`pruneBackups`），供客户回滚到上一版本。
+本分区与客户部署安全强相关，三项决策如下（详情见各子节；其中「升级追加同步」作用于成员 catalog，权威描述在《成员管理》设计 §7.3）。
+
+**(a) 凭证独立根（§5.1 / §5.2）** —— `credentials.json` 放在全局 home，与 catalog/accounts 物理隔离；清项目配置不丢密钥。
+
+**(b) 编辑时时间戳 .bak（§5.5）** —— 写盘前生成备份；加载期损坏仅告警当空，不自动备份。
+
+**(c) 升级追加同步（§5.6，作用于成员 catalog）** —— 新模板犬**追加**到老客户 catalog（老客户升级后能看到新预置犬），但客户删过的犬不复活。机制为 `settings.ListSeenTemplateBreeds()/AddSeenTemplateBreeds()` 与 `catalogDocument.SeenTemplateBreeds`（由 `internal/platform/breeds_merge.go` 的 `SyncTemplateBreeds` 驱动）。该集合同时支撑「首启空 catalog」（详见《成员管理》设计 §7）。
+
+### 5.5 损坏处理与编辑时备份
+
+- **加载时损坏**：`reloadFromDisk`（`file_store.go` / `credential.go`）解析 JSON 失败 → **仅告警并当空处理**（`log.Printf("WARN: ... is corrupt; treating as empty (no backup written at load)")`），不再自动备份（不掩盖损坏）。
+- **编辑时备份**：每次写盘（`flushCatalog` / `flushAccounts` / credential `flush`）覆盖前，若目标文件已存在，先快照为 `<path>.bak-<YYYYMMDD-HHMMSS>`（如 `dog-catalog.json.bak-20260813-182600`），保留最近 5 份（`pruneBackups`），旧的不限量清理。
 - 三种文件（accounts / dog-catalog / credentials）均覆盖。
 
-### 5.5 env_vars 保留前缀过滤（F5 已加）
+### 5.6 env_vars 保留前缀过滤
 
 后端 `UpdateAccount` 写入 `env_vars` 时，过滤掉 `SOUNDS_GREAT_AI_` 前缀的 key；前端 `AccountAuthModal` 用 `RESERVED_ENV_PREFIX` 同前缀拒绝并标红。前后端双重防护，避免用户注入覆盖运行时系统变量。
 
@@ -233,13 +245,13 @@ type Account struct {
    → store.CreateAccount(provider, apiKey)
         → Account{ID, Provider, KeyPreview:mask(apiKey), KeySet:true}
         → flushAccounts() 写 accounts.json (0644)
-   → [F1] credStore.Set(account.ID, apiKey)            // 写 credentials.json (0600)
+   → 若 apiKey != "" 且 credStore != nil → credStore.Set(account.ID, apiKey)  // credentials.json (0600)
         → 失败 → DeleteAccount 回滚 + 500
    → 删 provider/api_key；其余字段 UpdateAccount 应用
    → 201 {account: key_set=true, key_preview:sk****xx}
         │
 [前端] onCreated → refetch → 列表显示「已配密钥」徽章
-   ★ 本轮 credentials.json 已落地该明文密钥（修复后行为）
+   ★ 本轮 credentials.json 已落地该明文密钥
 ```
 
 删除链路：
@@ -248,7 +260,7 @@ type Account struct {
    → DELETE /api/settings/accounts/:id
         │
 [后端] DeleteAccount
-   → 有成员 AccountRef==id 且非 force → 409 {bound_member_ids}
+   → 有成员 variant.account_ref==id 且非 force → 409 {bound_member_ids}
         │
 [前端] 捕获 409 → confirm → DELETE .../:id?force=true
    → 删账号 + credStore.Delete(id) + emitEvent
@@ -302,9 +314,9 @@ DELETE /api/settings/accounts/{id}       → 200 nil          (?force=true 强�
 ```
 > 明文 `api_key` 永不出现在 list/create 响应中。
 
-### 7.2 数据库/文件变动
+### 7.2 文件变动
 
-无数据库；三文件落盘于同一 `ConfigRoot` 目录（见 5.1/5.2）。
+无数据库；三文件落盘于 `ConfigRoot` / `CredentialRoot`（见 §5.1/§5.2）。成员 catalog（`dog-catalog.json`）另含 `deleted_breeds`、`seen_template_breeds` 两集合（见《成员管理》设计 §6.1 / §6.2）。
 
 ---
 
@@ -322,6 +334,9 @@ DELETE /api/settings/accounts/{id}       → 200 nil          (?force=true 强�
   - 列表响应不含明文密钥；`credentials.json` 权限 0600。
   - envVars 拒绝 `SOUNDS_GREAT_AI_` 前缀，避免覆盖运行时系统变量。
   - When 删除被成员绑定的账号未带 `force`，Then 返回 409 并返回 `bound_member_ids`。
+- [x] **AC-04 (客户配置安全)**:
+  - 生产设 `workspaceDir` 后，`credentials.json` 落 `{home}/.sounds-great-ai`，`dog-catalog.json`/`accounts.json` 落 `{workspaceDir}/.sounds-great-ai`；两者均不受对方 env 覆盖牵连（独立根）。
+  - 加载期放入损坏文件不产生 `.bak`（仅 WARN 日志）；编辑写盘产生 `.bak` 且含编辑前内容。
 
 ---
 
@@ -337,18 +352,20 @@ DELETE /api/settings/accounts/{id}       → 200 nil          (?force=true 强�
 
 ## 10. Story 级 Definition of Done (DoD Checklist)
 
-- [x] 3-Corner 澄清通过（本次为既有实现梳理 + 修复，AC 已锁定）。
-- [x] 单元测试覆盖：transport 包 4 个用例（F1/F2/F3）、settings 包 3 个用例（F4/F5）。
+- [x] 3-Corner 澄清通过（既有实现梳理 + 修复，AC 已锁定）。
+- [x] 单元测试覆盖：transport 包（Create/Update/Delete account、引用完整性 409）、settings 包（损坏当空、编辑 `.bak`、凭证读写）。
 - [x] 静态/构建门禁：`go build ./...` 0、`go test ./...` 0、`tsc -b` 0、`vite build` ✓。
-- [x] 关联修复已在 `sg-accounts-fix-plan.md` 规划、在仓库代码落地并通过验收。
+- [x] 关联修复已在仓库代码落地并通过验收。
 - [ ] 监控告警与降级开关：建议在预发环境对 `auth.Wrap` 失败率配置告警（非阻塞）。
 
 ---
 
 ## 11. 修订记录 (Revision History)
 
-- **2026-08-12（客户安全三改）**：按用户决策落实客户配置安全：① **根目录拆分**——新增 `settings.CredentialRoot()`（全局 home `~/.sounds-great-ai`，可被 `SOUNDS_GREAT_AI_CREDENTIAL_ROOT` 覆盖），`routes.go:114` 的 `credStore` 改用之，密钥与项目配置解耦；catalog/accounts 仍走 `ConfigRoot`（项目 `.sounds-great-ai`）。② **编辑时备份**——移除加载期 `backupCorrupt`（损坏仅告警+当空），写盘前 `backupBeforeWrite` 生成 `<path>.bak-<YYYYMMDD-HHMMSS>`（保留最近 5 份）。③ 成员侧追加式升级同步见 `SG-MEM-001` / `SG-OPS-001`。`go build ./...` + `go test ./...` 全绿。本文档 §5.1/§5.2/§5.4、AC-02、§9 同步更新。
+- **2026-08-12（账户与密钥）**：梳理 accounts 分区前后端；落实 F1–F6 修复（密钥落 credentials.json、回滚、api_key 全量字段、引用完整性 409、auth.Wrap、env_vars 前缀）。
+- **2026-08-12（客户配置安全）**：落实三项决策——① 凭证独立根 `CredentialRoot()`；② 编辑时时间戳 `.bak`（加载期损坏仅告警当空）；③ 追加式升级同步 `SyncTemplateBreeds` / `ListDeletedBreeds` / `deleted_breeds`。
+- **2026-08-13（合并与代码对齐）**：将 SG-ACC-001 与 SG-OPS-001 合并为本文件；按 2026-08-13 代码实况修正：`DEFAULT_SECTION='accounts'`、`RAW_SECTIONS` 顺序 accounts 在前、`routes.go` 中 `/api/settings/` 与 `credStore` 的实际装配位置、`dog-catalog.json` 含 `deleted_breeds`/`seen_template_breeds` 两集合。「升级追加同步」详述移至《成员管理》设计 §6.2，本文件仅保留决策级描述与跨参。
 
 ---
 
-> 关联文档：`sg-accounts-analysis.md`（原始梳理）、`sg-accounts-fix-plan.md`（修复规划）、`SG-OPS-001-customer-config-safety.md`（客户配置安全总览）。
+> 关联文档：`SG-MEM-001-member-management.md`（成员管理/首启空/构建守护，成员经 `account_ref` 反向引用）、`internal/settings/file_store.go`、`internal/settings/credential.go`、`cmd/server/routes.go`、`internal/platform/breeds_merge.go`。

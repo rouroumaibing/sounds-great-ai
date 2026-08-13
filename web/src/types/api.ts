@@ -84,6 +84,9 @@ export interface RosterEntry {
   lead?: boolean;
   available?: boolean;
   evaluation?: string;
+  // 派生状态（决策 D2）：成员绑定账号的密钥/CLI 是否就绪。
+  // 仅当 available && credential_ready 时成员真正可用（就绪态）。
+  credential_ready?: boolean;
 }
 
 // Pack-level review policy.

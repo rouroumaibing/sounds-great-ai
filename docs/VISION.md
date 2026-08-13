@@ -151,6 +151,15 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 | Presenter | Tibetan Mastiff | zangao | 输出格式化、markdown 渲染 |
 | Safety Guard | Chinese Rural Dog | zhonghuatianyuanquan | 命令拦截、路径校验、敏感过滤 |
 
+### 5.1 首启空、按需组队
+
+六犬是**模板 / 菜单**（canonical personas），不是出厂即部署。首次启动 `dog-catalog.json` 为空（仅 owner），用户通过「成员管理 → 从模板添加」把犬加入团队、绑定账号与密钥后，犬才进入运行时。这让「我们养的是团队」（§0.2）落到行为层：团队由用户亲手组建，而非预先灌满。
+
+- **可用性 = 用户开关 ∧ 凭据就绪**。凭据就绪：`oauth` 账号查 CLI 二进制，`api_key` 账号查 `~/.sounds-great-ai/credentials.json`。无凭据的犬显示「待配置」而非「已启用」。
+- **升级新增的模板犬自动加入 catalog**（`seen_template_breeds` 机制），但同样需绑定凭据才「就绪」。
+
+见 `docs/decisions/ADR-001` 与 `docs/DESIGN-STORYS/SG-MEM-001-member-management.md`（§6 首启空 Catalog + 凭据就绪闸门）。
+
 ## 6. 平台能力清单
 
 | 模块 | 职责 | 包路径 |
@@ -174,8 +183,16 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 | Eval Domains | eval domain YAML 定义（5 个初始 domain） | `packs/default/evals/` |
 | Ops Monitor | 运维监控、日志缓冲、健康状态 | `internal/ops/` |
 | Telemetry | OpenTelemetry 可观测性：traces ring buffer + metrics + Prometheus exporter + 30s 快照 + HMAC 伪匿名化。Graceful degradation：init 失败不 crash。Phase 7 扩展 | `internal/telemetry/` |
+| Ball Custody Ledger | 球权事件账本（append-only 事件流 + 纯函数投影状态机）+ CAS 租约；编排一等状态源。复用 `internal/domains/custody` 既有实现并接入运行时 | `internal/domains/custody/` |
+| Orchestration Domains | threads/routing/agents/sop/custody 五个六边形域全部接入运行时（适配器模式包装扁平包，替代 `internal/router` 直引；`internal/router` 已删除）。详见 `docs/plans/2026-multi-agent-orchestration.md` | `internal/domains/{threads,routing,agents,sop,custody}/` |
+| Brief & Trail API | 从球权账本投影简报/轨迹查询端点（GET /api/custody/threads/{id}/trail），支撑多 agent 协作可观测/可审计 | `internal/domains/custody/` 投影 + `cmd/server/routes.go` |
+| Code-Repo Trajectory | 可配置代码库地址（默认空）+ git-ref 分支轨迹采集（append-only 事件 + 纯函数投影）。默认空=零影响；非空时由 reconciler 周期采集（5min）落地 `repo-trajectory.json`，作为"项目归档源（狗狗开发讨论功能回溯）"的代码维度数据源，与球权事件流 + 聊天消息并列为三源 | `internal/domains/custody/services/git_ref_collector.go` `internal/domains/custody/stores/repo_trajectory_store.go` `internal/transport/repo_trajectory_handler.go` `internal/settings/config_handler.go` |
 
 > **运行时成员数据统一（2026-08-12）**：成员/狗狗身份数据统一持久化于 `.sounds-great-ai/dog-catalog.json`，结构为 clowder 同构的 `{version, breeds[], roster{}, review_policy, leader, configs[]}`（类型定义见 `pkg/pack`）。`packs/default/breeds/dog-template.json` 降级为只读种子（`role_templates` / `client_defaults` 仍供模板 UI；`breeds/roster/leader/review_policy` 仅首启复制进 catalog）。breed 相关类型已从 `internal/config` 剥离至 `pkg/pack`；`internal/config` 现仅承载事件总线（`event_bus.go`）。本变更未引入新的 `internal/` 顶层目录，未推翻不可逆决策（VISION §4/§7）。详见 `sg-member-catalog-plan.md`。
+
+> **编排能力升级（2026-08-13，不可逆决策）**：球权账本（append-only 事件流 + 纯函数投影状态机）成为 SG 多 agent 编排的一等状态源，落地于 `internal/domains/custody/`。同时运行时从扁平包（`internal/router`/`internal/threadstore`/`internal/adapter`/`internal/sop`/`internal/a2a`）迁往 `internal/domains/` 六边形层（适配器模式，Strangler Fig 逐域迁移）。本变更属于 Phase 7 编排完善扩展项，未引入新的 `internal/` 顶层目录，未推翻 §4 不可逆决策（仍走 CLI adapter、动态路由、平台层不内置推理）。运行时代码迁移（threads/routing/agents/sop/custody 五域 + P0 球权账本 + P1 心跳对账 + P2 托管持球 + P3 worklist/处置闭环 + P4 简报/轨迹 API + P5 前端轨迹面板）已于 2026-08-13 全部完成，双架构合并收口。详见 `docs/plans/2026-multi-agent-orchestration.md`。
+
+> **编排二期缺口 G8–G10 收口（2026-08-13，完成）**：在 G1–G7 之上补齐剩余三缺口，全部落地（代码 + 单测，`go build ./...` / `go test ./...` 全绿；前端 `tsc -b` / `vite build` 全绿）。G8 新增「系统配置」分区与「项目归档源」卡片（可配置代码库地址 `repo_url`，默认空；非空时 reconciler 周期跑 `git ls-remote` 采集 `branch_pushed`/`branch_updated` 落地 `repo-trajectory.json`）；G9 修复 D6 死接口，新建 `web/src/hooks/useChatHistory.ts` 对齐 clowder 模块级常量，从 `GET /api/threads/{id}/messages` 游标分页水合历史 + scroll-up 增量；G10 前端新增「运维监控」分区（4 子 tab：总览/Traces/健康/评估，纯消费已有 `/api/ops/*` 与 `/api/evals`）+ 后端把 `EvalHandler` 依赖收口为端口（`transport.EvalStore` 接口，规避 `eval` 包循环）。G8 引入 git-ref 新数据源已登记于 §6「Code-Repo Trajectory」；G9/G10 行为不变、无新端点，未引入不可逆决策。详见 `docs/plans/2026-multi-agent-orchestration-g8g9g10-analysis.md`（状态：已实施）。
 
 ## 7. 路线图
 
@@ -201,6 +218,35 @@ Phase N merge → 碕头（不是"要不要继续"，是"方向对不对"）→ 
 | Skills 补充（5→25） | 完成 |
 | RAG on-demand 检索 | 规划中 |
 | SOP 基础门禁接入执行流 | 规划中 |
+| 编排能力完善（球权账本/托管持球/A2A worklist/简报轨迹/domains 迁移） | 已完成（2026-08-13，spec `docs/plans/2026-multi-agent-orchestration.md` 全阶段验收通过） |
+
+### 7.2 多 Agent 编排二期缺口（G1–G7，2026-08-13 完成）
+
+对 `docs/plans/2026-multi-agent-orchestration-gaps.md` 中一期交付后剩余的 7 个编排缺口，本期全部落地（代码 + 单测，`go build ./...` 与 `go test ./...` 全绿）。实现要点见 `docs/plans/2026-multi-agent-orchestration-gaps-implementation.md`。
+
+| 缺口 | 内容 | 落地位置 | 状态 |
+|------|------|----------|------|
+| **G1** | 精确处置守卫：条件写（per-thread 读-判-写锁），拒绝时写 `ball.disposition_rejected` 审计事件、不扭状态 | `internal/domains/custody/services/ball_ledger.go` `TryDispatchDispositioned` / `TryHoldDispositioned` | 完成 |
+| **G2** | 运行时动态 worklist + 乒乓/深度熔断：invID 预算（递归 handoff 共享、resume 新 mint）；warn@2, block@4；实质工作（输出≥200 runes 或工具调用）豁免 | `internal/domains/routing/services/worklist_registry.go` + `internal/transport/execution.go` / `ws_handler.go` | 完成 |
+| **G3** | webhook 唤醒鉴权：复用 `transport.AuthMiddleware`（`AUTH_TOKEN`，Bearer / X-Auth-Token）包裹唤醒端点 | `cmd/server/routes.go` `POST /api/custody/holds/` 经 `auth.WrapFunc` | 完成 |
+| **G4** | 事件集补齐：9 事件（handed_cvo / void_pass / hold_expired / wake_sent / frozen / degraded / abandoned / unblocked / idle_long），投影效应钉死，add-only | `internal/domains/custody/ports/ledger.go` + `internal/domains/custody/services/projector.go` | 完成 |
+| **G5** | 持球唤醒补全：定时 `FireAfterMs` + 命令 `Command`（ProcessManager 跑完自动唤醒）+ `Cancel` + `Tick` 自动唤醒/过期 | `internal/domains/custody/services/hold_scheduler.go` | 完成 |
+| **G6** | 跨线程 duty-briefing 聚合：needsUser / deadBalls / voidPasses / staleBlocked（staleBlocked 按 UpdatedAt 降序） | `internal/domains/custody/services/ball_ledger.go` `ProjectDutyBriefing` + `cmd/server/routes.go` `GET /api/custody/briefing` | 完成 |
+| **G7** | 跨 handoff 上下文消毒：来源溯源 `buildHandoffSourceNotice` + `telemetry.RedactSecrets`（HMAC 伪匿名 + 密钥掩码）+ `prompt.ProtectRecentPairs` 保护 Q→A 语义链 | `internal/transport/handoff_context.go` + `internal/telemetry/redactor.go` + `internal/prompt/context.go` | 完成 |
+
+> 注：G8（另立项）、G9/G10 **不在本期范围**——已于 2026-08-13 在 `2026-multi-agent-orchestration-g8g9g10-analysis.md` 中另立项并实现（见 §7.3）。本期 G1–G7 未触及前端（G6/G7 仅后端端点与消毒逻辑），前端 tsc/vite 无需改动。
+
+### 7.3 多 Agent 编排二期缺口（G8–G10，2026-08-13 完成）
+
+对 G1–G7 之后的剩余三缺口，本期全部落地（代码 + 单测，`go build ./...` 与 `go test ./...` 全绿；前端 `tsc -b` 与 `vite build` 全绿）。实现要点见 `docs/plans/2026-multi-agent-orchestration-g8g9g10-analysis.md`（状态：已实施）。
+
+| 缺口 | 内容 | 落地位置 | 状态 |
+|------|------|----------|------|
+| **G8** | 「系统配置」分区 + 项目归档源卡片（可配置代码库地址 `repo_url`，默认空）；非空时 reconciler 周期跑 `git ls-remote` 采集 `branch_pushed`/`branch_updated`，append-only 落盘 `repo-trajectory.json`（原子写） | `internal/settings/config_handler.go`（GET/PUT `/api/config/repo`）、`internal/domains/custody/services/git_ref_collector.go`、`internal/domains/custody/stores/repo_trajectory_store.go`、`internal/transport/repo_trajectory_handler.go`（GET `/api/repo/trajectory` + POST `/api/repo/test`）、`internal/platform/platform.go`（5min 周期采集）、`cmd/server/routes.go`、`web/src/components/settings/SystemPanel.tsx` | 完成 |
+| **G9** | 修复 D6 死接口 `loadThreadEvents` 零调用：新建 `useChatHistory.ts`（对齐 clowder 模块级常量 `HISTORY_PAGE_SIZE=50` 等），从 `GET /api/threads/{id}/messages?limit=&before=` 游标分页水合历史 + scroll-up 增量；WS 实时事件与历史按 `type:timestamp:content` 去重；`BreedResponseCompleteEvent` 加可选 `content` 使历史 assistant 文本可见 | `web/src/hooks/useChatHistory.ts`、`web/src/store/useChatStore.ts`（`prependHistory` 去重合并）、`web/src/components/workspace/StreamTimeline.tsx`（`onScroll` 触发 `loadOlder`）、`web/src/components/workspace/BreedResponseComplete.tsx`、`web/src/types/index.ts` | 完成 |
+| **G10** | 前端「运维监控」分区（4 子 tab：总览/Traces/健康/评估，纯消费已有 `/api/ops/*` 与 `/api/evals`）；后端把 `EvalHandler` 依赖收口为端口（`transport.EvalStore` 接口 = `ListVerdicts`/`GetVerdict`，`*eval.ResultStore` 结构满足，规避 `eval` 包循环），可注入 mock 单测 | `web/src/components/settings/OpsPanel.tsx`、`web/src/services/opsService.ts`、`web/src/components/settings/settings-nav-config.ts`、`SettingsContent.tsx`、`internal/transport/eval_handler.go`（EvalStore 端口 + 重写 `eval_handler_test.go`）、`internal/transport/eval_handler_test.go` | 完成 |
+
+> 注：G8 引入 git-ref 新数据源，已登记于 §6「Code-Repo Trajectory」；G9/G10 行为不变、无新端点，未引入不可逆决策。G8 默认 `repo_url` 为空 = 零影响（采集器不运行、端点返回空事件）。
 
 ## 8. 愿景合规
 

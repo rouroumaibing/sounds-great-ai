@@ -34,6 +34,7 @@ interface ChatStore {
   sendPrompt: () => void;
   sendHitlResponse: (requestId: string, approved: boolean, reason: string) => void;
   loadThreadEvents: (threadId: string, events: StreamEvent[]) => void;
+  prependHistory: (threadId: string, events: StreamEvent[]) => void;
   resolveEscalation: () => void;
   handleWsEvent: (event: WsEvent) => void;
 }
@@ -133,6 +134,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set((state) => {
       if (state.events[threadId]) return state; // already loaded
       return { events: { ...state.events, [threadId]: events } };
+    });
+  },
+
+  prependHistory: (threadId, incoming) => {
+    set((state) => {
+      const existing = state.events[threadId] ?? [];
+      // Dedup by content+timestamp so pagination boundaries don't double-render.
+      const keyOf = (e: StreamEvent) =>
+        `${e.type}:${(e as { timestamp?: string }).timestamp ?? ''}:${
+          'content' in e ? (e as { content?: string }).content : ''
+        }`;
+      const seen = new Set(existing.map(keyOf));
+      const merged = [...incoming, ...existing.filter((e) => !seen.has(keyOf(e)))];
+      return { events: { ...state.events, [threadId]: merged } };
     });
   },
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useChatStore } from '../../store/useChatStore';
+import { useChatHistory } from '../../hooks/useChatHistory';
 import { CvoMessage } from './CvoMessage';
 import { BreedCard } from './BreedCard';
 import { SopGate } from './SopGate';
@@ -20,6 +21,7 @@ const EMPTY_EVENTS: never[] = [];
 export function StreamTimeline() {
   const activeThreadId = useAppStore((s) => s.activeThreadId);
   const events = useChatStore((s) => s.events[activeThreadId] ?? EMPTY_EVENTS);
+  const { hasMore, loadOlder } = useChatHistory(activeThreadId);
 
   const streamRef = useRef<HTMLDivElement>(null);
 
@@ -29,9 +31,17 @@ export function StreamTimeline() {
     }
   }, [events.length]);
 
+  // Scroll-up hydration: when the user scrolls near the top and more history
+  // exists, load an earlier page (G9).
+  const onScroll = () => {
+    const el = streamRef.current;
+    if (!el || !hasMore) return;
+    if (el.scrollTop < 48) loadOlder();
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div ref={streamRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
+      <div ref={streamRef} onScroll={onScroll} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
         {events.map((event, idx) => {
           switch (event.type) {
             case 'cvo_message':

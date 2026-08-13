@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 // CredentialStore is the port interface for API key storage.
@@ -171,4 +174,39 @@ func (s *FileCredentialStore) Has(id string) bool {
 	}
 	_, ok := s.data[id]
 	return ok
+}
+
+// CredentialReady reports whether the given breed can actually run given the
+// bound account's credentials. It is a DERIVED status (never persisted):
+//   - api_key account: the secret exists in the credential store
+//     (~/.sounds-great-ai/credentials.json via FileCredentialStore.Has)
+//   - oauth account: the CLI binary is present on PATH (exec.LookPath)
+//   - no bound account, or unknown auth type: false
+//
+// Known limitation (per SG-MEM-002 §4.1.c): oauth only checks binary presence,
+// not login state — "installed CLI but not logged in" still reports ready and
+// fails only at first execution.
+func CredentialReady(b *pack.BreedConfig, acct *Account, cred CredentialStore) bool {
+	if b == nil || acct == nil {
+		return false
+	}
+	v := b.DefaultVariant()
+	if v == nil || v.AccountRef == "" || v.AccountRef != acct.ID {
+		return false
+	}
+	switch acct.AuthType {
+	case "api_key":
+		if cred == nil {
+			return false
+		}
+		return cred.Has(acct.ID)
+	case "oauth":
+		if acct.ClientID == "" {
+			return false
+		}
+		_, err := exec.LookPath(acct.ClientID)
+		return err == nil
+	default:
+		return false
+	}
 }

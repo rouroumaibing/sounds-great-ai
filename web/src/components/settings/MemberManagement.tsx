@@ -109,6 +109,7 @@ function breedToSettingsMember(b: BreedConfig, r?: RosterEntry): SettingsMember 
     maxMessages: variant?.context_budget?.max_messages,
     mcpSupport: variant?.mcp_support,
     strategy: variant?.strategy,
+    credentialReady: r?.credential_ready ?? false,
   };
 }
 
@@ -119,6 +120,18 @@ const MEMBER_FILTER_TABS = [
   { key: 'oauth', label: 'CLI（OAuth）' },
   { key: 'config', label: 'CLI（配置）' },
 ];
+
+// 三态派生（决策 D2）：有效可用性 = enabled ∧ credential_ready。
+//  - ready：已启用且密钥/CLI 就绪
+//  - needsConfig：已启用但缺密钥或 CLI
+//  - disabled：已停用
+type MemberStatus = { label: string; tone: 'emerald' | 'amber' | 'slate'; hint?: string };
+
+function memberStatus(m: SettingsMember): MemberStatus {
+  if (!m.enabled) return { label: '已停用', tone: 'slate' };
+  if (m.credentialReady) return { label: '就绪', tone: 'emerald' };
+  return { label: '待配置', tone: 'amber', hint: '缺密钥或 CLI' };
+}
 
 // ---------------------------------------------------------------------------
 // Sub-components (overview cards)
@@ -187,6 +200,7 @@ function MemberOverviewCard({
 }) {
   const title = [m.breed || m.name, m.nickname].filter(Boolean).join(' · ');
   const mentionPreview = formatMentionPreview(m.mentionPatterns);
+  const status = memberStatus(m);
   const connectionBadge = isOauthMember(m) ? (
     <SettingsBadge tone="blue" size="xxs" className="ml-1.5 inline-block">OAuth</SettingsBadge>
   ) : m.accountRef ? (
@@ -228,10 +242,13 @@ function MemberOverviewCard({
             <SettingsBadge tone={m.sessionChain ? 'emerald' : 'slate'} size="xxs" className="inline-block">
               {m.sessionChain ? 'Session Chain 已开启' : 'Session Chain 未开启'}
             </SettingsBadge>
+            {status.hint && (
+              <SettingsText tone="muted" className="text-micro">{status.hint}</SettingsText>
+            )}
           </span>
         </>
       }
-      badges={<SettingsBadge tone={m.enabled ? 'emerald' : 'slate'}>{m.enabled ? '已启用' : '已停用'}</SettingsBadge>}
+      badges={<SettingsBadge tone={status.tone}>{status.label}</SettingsBadge>}
       actions={
         <>
           <SettingsToggleSwitch
@@ -272,6 +289,7 @@ function DefaultDogSelector({
   fetchError,
   saveError,
   onRetry,
+  disabled,
 }: {
   breeds: BreedConfig[];
   currentDefaultDogId: string;
@@ -280,6 +298,7 @@ function DefaultDogSelector({
   fetchError?: boolean;
   saveError?: string | null;
   onRetry?: () => void;
+  disabled?: boolean;
 }) {
   const { t } = useI18n();
   const currentBreed = breeds.find((b) => b.id === currentDefaultDogId);
@@ -307,26 +326,56 @@ function DefaultDogSelector({
           <p className="mt-0.5 text-xs text-slate-400">{t('members.globalDefaultHint')}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {currentBreed && (
-            <span className="h-3 w-3 flex-shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
+          {disabled ? (
+            <span className="text-xs text-slate-500">{t('members.noDefaultHint')}</span>
+          ) : (
+            <>
+              {currentBreed && (
+                <span className="h-3 w-3 flex-shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
+              )}
+              <select
+                value={valueInList ? currentDefaultDogId : ''}
+                disabled={isLoading}
+                onChange={(e) => onSelect(e.target.value)}
+                className={`h-[34px] w-[220px] rounded-[10px] border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 ${isLoading ? 'cursor-wait opacity-50' : 'cursor-pointer'}`}
+              >
+                {!valueInList && (
+                  <option value="" disabled>
+                    {currentDefaultDogId ? t('members.selectDefault') : t('members.selectDefault')}
+                  </option>
+                )}
+                {breeds.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name} · {b.display_name}</option>
+                ))}
+              </select>
+            </>
           )}
-          <select
-            value={valueInList ? currentDefaultDogId : ''}
-            disabled={isLoading}
-            onChange={(e) => onSelect(e.target.value)}
-            className={`h-[34px] w-[220px] rounded-[10px] border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 ${isLoading ? 'cursor-wait opacity-50' : 'cursor-pointer'}`}
-          >
-            {!valueInList && (
-              <option value="" disabled>
-                {currentDefaultDogId ? t('members.selectDefault') : t('members.selectDefault')}
-              </option>
-            )}
-            {breeds.map((b) => (
-              <option key={b.id} value={b.id}>{b.name} · {b.display_name}</option>
-            ))}
-          </select>
         </div>
       </div>
+    </div>
+  );
+}
+
+// 首启空 catalog（决策 D1）：0 成员时不崩溃，给出强引导空态。
+function EmptyMembersState({ onAdd }: { onAdd: () => void }) {
+  const { t } = useI18n();
+  return (
+    <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-800 bg-slate-900/40 px-6 py-12 text-center">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-lg text-amber-300">
+        <i className="fa-solid fa-dog" aria-hidden="true" />
+      </div>
+      <h3 className="text-sm font-bold text-slate-100">{t('members.emptyTitle')}</h3>
+      <p className="mt-1.5 max-w-md text-xs leading-5 text-slate-400">
+        {t('members.emptyHint')}
+      </p>
+      <button
+        type="button"
+        onClick={onAdd}
+        className="mt-5 h-9 rounded-[10px] bg-amber-600 px-4 text-xs font-extrabold text-white transition hover:bg-amber-500"
+      >
+        + {t('members.emptyAdd')}
+      </button>
+      <p className="mt-2 text-micro text-slate-500">{t('members.emptyFromTemplate')}</p>
     </div>
   );
 }
@@ -504,6 +553,7 @@ export function MemberManagement() {
         fetchError={Boolean(breedsError)}
         saveError={saveError}
         onRetry={() => refetchBreeds()}
+        disabled={breeds.length === 0}
       />
 
       {/* leader / owner card */}
@@ -537,11 +587,13 @@ export function MemberManagement() {
       {/* loading / empty states */}
       {breedsLoading && <SettingsStatusStrip tone="muted">{t('common.loading')}</SettingsStatusStrip>}
       {!breedsLoading && localMembers.length === 0 && (
-        <SettingsStatusStrip tone="muted">{t('members.notFound')}</SettingsStatusStrip>
+        <EmptyMembersState onAdd={() => setShowAddMemberModal(true)} />
       )}
 
-      {/* drag hint */}
-      <SettingsStatusStrip tone="muted">{t('members.dragHint')}</SettingsStatusStrip>
+      {/* drag hint — 仅在有成员时显示 */}
+      {localMembers.length > 0 && (
+        <SettingsStatusStrip tone="muted">{t('members.dragHint')}</SettingsStatusStrip>
+      )}
 
       {/* disabled members */}
       {showDisabled && disabledMembers.length > 0 && (

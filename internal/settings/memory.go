@@ -25,6 +25,7 @@ type InMemorySettingsStore struct {
 	configs       []*SystemConfig
 	leader        *pack.Leader
 	deletedBreeds map[string]bool
+	seenTemplateBreeds map[string]bool
 }
 
 // NewInMemorySettingsStore creates a new in-memory settings store.
@@ -37,6 +38,7 @@ func NewInMemorySettingsStore() *InMemorySettingsStore {
 		configs:       defaultConfig(),
 		leader:        &l,
 		deletedBreeds: make(map[string]bool),
+		seenTemplateBreeds: make(map[string]bool),
 	}
 }
 
@@ -124,6 +126,35 @@ func (s *InMemorySettingsStore) ListDeletedBreeds() ([]string, error) {
 	sort.Strings(out)
 	return out, nil
 }
+
+// ListSeenTemplateBreeds returns the template breed IDs seen by this catalog.
+func (s *InMemorySettingsStore) ListSeenTemplateBreeds() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]string, 0, len(s.seenTemplateBreeds))
+	for id := range s.seenTemplateBreeds {
+		out = append(out, id)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// AddSeenTemplateBreeds marks template breed IDs as seen (in-memory).
+func (s *InMemorySettingsStore) AddSeenTemplateBreeds(ids []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, id := range ids {
+		if id != "" {
+			s.seenTemplateBreeds[id] = true
+		}
+	}
+	return nil
+}
+
+// CatalogFileExists reports whether a catalog file exists. The in-memory store
+// is non-persistent, so it always reports true (treated as an existing catalog;
+// the seen set governs add/no-add behavior the same way).
+func (s *InMemorySettingsStore) CatalogFileExists() bool { return true }
 
 func (s *InMemorySettingsStore) ReorderBreeds(order []string) error {
 	s.mu.Lock()
@@ -371,6 +402,20 @@ func (s *InMemorySettingsStore) UpdateConfig(key, value string) error {
 		}
 	}
 	return fmt.Errorf("config key %q not found", key)
+}
+
+// UpsertConfig creates or updates a config key (mirrors FileSettingsStore).
+func (s *InMemorySettingsStore) UpsertConfig(key, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, c := range s.configs {
+		if c.Key == key {
+			c.Value = value
+			return nil
+		}
+	}
+	s.configs = append(s.configs, &SystemConfig{Key: key, Value: value, Category: "system"})
+	return nil
 }
 
 func (s *InMemorySettingsStore) GetLeader() (*pack.Leader, error) {

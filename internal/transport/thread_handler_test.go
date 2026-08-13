@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"sounds-great-ai/internal/threadstore"
+	threadStores "sounds-great-ai/internal/domains/threads/stores"
 )
 
 func setupTestHandler(t *testing.T) (*ThreadHandler, string) {
 	t.Helper()
 	ts := threadstore.NewInMemoryThreadStore()
 	ms := threadstore.NewMemoryMessageStore()
-	h := NewThreadHandlerWithMessages(ts, ms)
+	h := NewThreadHandlerWithMessages(threadStores.NewThreadStoreAdapter(ts), threadStores.NewMessageStoreAdapter(ms))
 
 	thread, err := ts.CreateThread("Test Thread")
 	if err != nil {
@@ -165,7 +166,7 @@ func TestListMessages_WithCursor(t *testing.T) {
 
 func TestListMessages_NoMessageStore(t *testing.T) {
 	ts := threadstore.NewInMemoryThreadStore()
-	h := NewThreadHandler(ts) // no message store
+	h := NewThreadHandler(threadStores.NewThreadStoreAdapter(ts)) // no message store
 	mux := h.Routes()
 
 	thread, _ := ts.CreateThread("Test")
@@ -181,7 +182,7 @@ func TestListMessages_NoMessageStore(t *testing.T) {
 func TestUpdateThread(t *testing.T) {
 	ts := threadstore.NewInMemoryThreadStore()
 	ms := threadstore.NewMemoryMessageStore()
-	h := NewThreadHandlerWithMessages(ts, ms)
+	h := NewThreadHandlerWithMessages(threadStores.NewThreadStoreAdapter(ts), threadStores.NewMessageStoreAdapter(ms))
 	mux := h.Routes()
 
 	thread, err := ts.CreateThread("Original Title")
@@ -221,7 +222,7 @@ func TestUpdateThread(t *testing.T) {
 
 func TestUpdateThread_Validation(t *testing.T) {
 	ts := threadstore.NewInMemoryThreadStore()
-	h := NewThreadHandler(ts)
+	h := NewThreadHandler(threadStores.NewThreadStoreAdapter(ts))
 	mux := h.Routes()
 
 	thread, _ := ts.CreateThread("Original")
@@ -248,7 +249,7 @@ func TestUpdateThread_Validation(t *testing.T) {
 
 func TestAddThreadEvent(t *testing.T) {
 	ts := threadstore.NewInMemoryThreadStore()
-	h := NewThreadHandler(ts)
+	h := NewThreadHandler(threadStores.NewThreadStoreAdapter(ts))
 	mux := h.Routes()
 
 	thread, err := ts.CreateThread("Test Thread")
@@ -285,7 +286,7 @@ func TestAddThreadEvent(t *testing.T) {
 
 func TestAddThreadEvent_Validation(t *testing.T) {
 	ts := threadstore.NewInMemoryThreadStore()
-	h := NewThreadHandler(ts)
+	h := NewThreadHandler(threadStores.NewThreadStoreAdapter(ts))
 	mux := h.Routes()
 
 	thread, _ := ts.CreateThread("Test")

@@ -58,7 +58,7 @@ func (h *SettingsHandler) ListRoster(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	respondJSON(w, http.StatusOK, roster)
+	respondJSON(w, http.StatusOK, h.enrichRoster(roster))
 }
 
 func (h *SettingsHandler) GetRosterEntry(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,52 @@ func (h *SettingsHandler) GetRosterEntry(w http.ResponseWriter, r *http.Request)
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "roster entry not found"})
 		return
 	}
-	respondJSON(w, http.StatusOK, entry)
+	respondJSON(w, http.StatusOK, h.enrichRoster(map[string]pack.RosterEntry{id: entry})[id])
+}
+
+// rosterEntryView embeds the persisted RosterEntry and adds the derived
+// credential_ready status (decision D2): a breed is only truly usable when it
+// is Available AND its bound account's credentials are satisfied. The frontend
+// uses (available, credential_ready) to show the three states
+// 就绪 / 待配置 / 已停用.
+type rosterEntryView struct {
+	pack.RosterEntry
+	CredentialReady bool `json:"credential_ready"`
+}
+
+// enrichRoster computes credential_ready for each roster entry.
+func (h *SettingsHandler) enrichRoster(roster map[string]pack.RosterEntry) map[string]rosterEntryView {
+	breeds, _ := h.store.ListBreeds()
+	breedByID := make(map[string]*pack.BreedConfig, len(breeds))
+	for _, b := range breeds {
+		breedByID[b.ID] = b
+	}
+	accounts, _ := h.store.ListAccounts()
+	acctByID := make(map[string]*settings.Account, len(accounts))
+	for _, a := range accounts {
+		acctByID[a.ID] = a
+	}
+	out := make(map[string]rosterEntryView, len(roster))
+	for id, e := range roster {
+		v := rosterEntryView{RosterEntry: e}
+		if b := breedByID[id]; b != nil {
+			if a := defaultAccountForBreed(b, acctByID); a != nil {
+				v.CredentialReady = settings.CredentialReady(b, a, h.credStore)
+			}
+		}
+		out[id] = v
+	}
+	return out
+}
+
+// defaultAccountForBreed resolves the account bound to the breed's default
+// variant from the account index.
+func defaultAccountForBreed(b *pack.BreedConfig, acctByID map[string]*settings.Account) *settings.Account {
+	v := b.DefaultVariant()
+	if v == nil || v.AccountRef == "" {
+		return nil
+	}
+	return acctByID[v.AccountRef]
 }
 
 func (h *SettingsHandler) UpdateRosterEntry(w http.ResponseWriter, r *http.Request) {

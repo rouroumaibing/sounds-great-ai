@@ -4,6 +4,8 @@ import { SettingsPageHeader } from './primitives';
 
 const MemberManagement = lazy(() => import('./MemberManagement').then(m => ({ default: m.MemberManagement })));
 const AccountKeys = lazy(() => import('./AccountKeys').then(m => ({ default: m.AccountKeys })));
+const SystemPanel = lazy(() => import('./SystemPanel').then(m => ({ default: m.SystemPanel })));
+const OpsPanel = lazy(() => import('./OpsPanel').then(m => ({ default: m.OpsPanel })));
 
 function LoadingSpinner() {
   return (
@@ -16,6 +18,8 @@ function LoadingSpinner() {
 const SECTION_COMPONENTS: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
   members: MemberManagement,
   accounts: AccountKeys,
+  system: SystemPanel,
+  ops: OpsPanel,
 };
 
 interface SettingsContentProps {

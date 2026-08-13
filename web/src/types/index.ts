@@ -1,6 +1,6 @@
 // Navigation types
-export type PrimaryNavType = 'threads' | 'tasks' | 'memory' | 'settings' | 'about';
-export type SettingsTabType = 'members' | 'accounts' | 'personas' | 'im' | 'skills' | 'mcp' | 'plugins' | 'market' | 'marketplace' | 'ball' | 'concierge' | 'voice' | 'config' | 'rules' | 'notifications' | 'ops' | 'eval' | 'about';
+export type PrimaryNavType = 'threads' | 'tasks' | 'memory' | 'settings' | 'about' | 'custody';
+export type SettingsTabType = 'members' | 'accounts' | 'personas' | 'im' | 'skills' | 'mcp' | 'plugins' | 'market' | 'marketplace' | 'ball' | 'concierge' | 'voice' | 'config' | 'rules' | 'notifications' | 'system' | 'ops' | 'eval' | 'about';
 export type DrawerTabType = 'plan' | 'mcp' | 'memory' | 'files' | 'session-chain';
 export type ThreadFilterType = 'all' | 'escalated' | 'active';
 export type MemberFilterType = 'all' | 'enabled' | 'disabled' | 'oauth' | 'config';
@@ -109,6 +109,9 @@ export interface BreedResponseCompleteEvent {
   type: 'breed_response_complete';
   breed: string;
   steps: unknown[];
+  // content is populated by history hydration (G9) so assistant answers from
+  // the message store render as text. Live events omit it (rendered via steps).
+  content?: string;
 }
 
 export interface ErrorEvent {
@@ -196,6 +199,8 @@ export interface SettingsMember {
   maxMessages?: number;
   mcpSupport?: boolean;
   strategy?: string;
+  // 派生状态（决策 D2）：绑定账号的密钥/CLI 是否就绪。
+  credentialReady?: boolean;
 }
 
 // Settings Account

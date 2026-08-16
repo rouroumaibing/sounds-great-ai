@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"sounds-great-ai/pkg/pack"
 )
 
 // TestFileStore_CorruptAccountsTreatedAsEmpty verifies that a corrupt
@@ -145,5 +147,58 @@ func TestFileStore_EnvVarReservedPrefix(t *testing.T) {
 	}
 	if got["MY_CUSTOM_VAR"] != "ok" {
 		t.Fatalf("non-reserved key must be kept, got %v", got)
+	}
+}
+
+// TestBreedHistory_AuditTrail (P3-b): per-breed identity changes are recorded
+// with state snapshots and survive a restart, and can be purged.
+func TestBreedHistory_AuditTrail(t *testing.T) {
+	dir := t.TempDir()
+	s := NewFileSettingsStore(filepath.Join(dir, AccountsFileName), filepath.Join(dir, CatalogFileName), false)
+	b := &pack.BreedConfig{ID: "bianmu", Name: "bianmu", DisplayName: "Bianmu", Source: pack.BreedSourceUser}
+	if err := s.CreateBreed(b); err != nil {
+		t.Fatal(err)
+	}
+	b.DisplayName = "Border Collie"
+	if err := s.UpdateBreed("bianmu", b); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteBreed("bianmu"); err != nil {
+		t.Fatal(err)
+	}
+
+	hist, err := s.ReadBreedHistory("bianmu")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hist) != 3 {
+		t.Fatalf("expected 3 history entries (create/update/delete), got %d", len(hist))
+	}
+	if hist[0].Action != "create" || hist[1].Action != "update" || hist[2].Action != "delete" {
+		t.Fatalf("unexpected action sequence: %s/%s/%s", hist[0].Action, hist[1].Action, hist[2].Action)
+	}
+	if hist[1].Snapshot == nil || hist[1].Snapshot.DisplayName != "Border Collie" {
+		t.Errorf("update snapshot should reflect the new display name")
+	}
+	if hist[2].Snapshot == nil || hist[2].Snapshot.DisplayName != "Border Collie" {
+		t.Errorf("delete snapshot should capture the pre-delete state")
+	}
+
+	// Reload from disk proves the audit trail survives a restart.
+	s2 := NewFileSettingsStore(filepath.Join(dir, AccountsFileName), filepath.Join(dir, CatalogFileName), false)
+	hist2, err := s2.ReadBreedHistory("bianmu")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hist2) != 3 {
+		t.Fatalf("expected history to survive reload, got %d", len(hist2))
+	}
+
+	if err := s.ClearBreedHistory("bianmu"); err != nil {
+		t.Fatal(err)
+	}
+	hist3, _ := s.ReadBreedHistory("bianmu")
+	if len(hist3) != 0 {
+		t.Fatalf("expected cleared history, got %d", len(hist3))
 	}
 }

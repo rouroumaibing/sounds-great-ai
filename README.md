@@ -33,6 +33,16 @@ This isn't just another Agent invocation framework. It's a **Pack** — a squad 
 > *When the Agents perfectly complete a collaboration, the terminal lights up with green paw prints:*
 > **`Sounds Great!`**
 
+## Design Overview
+
+<div align="center">
+
+High-level architecture and dog-pack collaboration model.
+
+![Sounds Great AI Design](docs/design/images/sounds-great-ai.png)
+
+</div>
+
 ## Screenshots
 
 <div align="center">
@@ -75,7 +85,7 @@ Six dogs, six roles, each with its own specialty:
 
 > Users can create their own dogs — just one JSON file, select registered capabilities, define a workflow, and hot-reload takes effect instantly.
 
-> **Empty on first run, build your pack on demand**: a fresh install starts with an empty member list (Owner only); the six dogs are an optional *template menu*. Add a dog from **Member Management → Add from template**, bind an account and credentials, and it joins the runtime. Members without credentials show as "Needs config" rather than "Enabled". See `docs/VISION.md` §5.1 and `docs/decisions/ADR-001`.
+> **Empty on first run, build your pack on demand**: a fresh install starts with an empty member list (Owner only); the six dogs are an optional *template menu*. Add a dog from **Member Management → Add from template**, bind an account and credentials, and it joins the runtime. Members without credentials show as "Needs config" rather than "Enabled". See `docs/VISION.md` §5.1.
 
 ## Architecture
 
@@ -97,7 +107,7 @@ Six dogs, six roles, each with its own specialty:
                        ▼
 ┌───────────────────────────────────────────────────┐
 │            internal/adapter/ (CLI adapters)         │
-│   claude/    codex/    gemini/    opencode/         │
+│   claude/    codex/    gemini/    opencode/    kimi/     │
 │   unified/ (ProcessManager + NDJSON parser)         │
 └──────────────────────┬────────────────────────────┘
                        │ stdin/stdout pipe
@@ -130,7 +140,7 @@ Six dogs, six roles, each with its own specialty:
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-org/sounds-great-ai.git
+git clone https://github.com/sounds-great-ai/sounds-great-ai.git
 cd sounds-great-ai
 
 # 2. Install dependencies
@@ -222,7 +232,7 @@ We build in the open. Here's where we are.
 
 | Package | Description | Status |
 |---------|-------------|--------|
-| `internal/adapter/` | 4 CLI adapters (claude/codex/gemini/opencode) + ProcessManager | ✅ Shipped |
+| `internal/adapter/` | 5 CLI adapters (claude/codex/gemini/opencode/kimi) + ProcessManager | ✅ Shipped |
 | `pkg/pack/` | Breed config schema & loader (variants[] replaces capabilities[]+workflow[]) | ✅ Shipped |
 | `internal/skills/` | Skills framework (.md prompt pack loading + injection) | ✅ Shipped |
 | `internal/ragstore/` | RAG store (3 backends: Memory/SQLite/Eino) | ✅ Shipped |
@@ -231,7 +241,7 @@ We build in the open. Here's where we are.
 | `internal/capability/` | 6 pure-logic capabilities (safety guards + routing + context) | ✅ Shipped |
 | `internal/prompt/` | System Prompt Builder + Context Assembler (5-segment prompt, token budget) | ✅ Shipped |
 | `internal/threadstore/` | Thread + Message store (SQLite WAL + in-memory, factory pattern) | ✅ Shipped |
-| `internal/router/` | Dynamic routing engine + @mention multi-breed router | ✅ Shipped |
+| `internal/domains/routing/` + `internal/transport/` | @mention 动态路由 + 串行/并行执行 | ✅ Shipped |
 | `internal/a2a/` | A2A Hub + context compression | ✅ Minimal |
 | `internal/sop/` | SOP guardian + cross-model review | ✅ Minimal |
 | `internal/mcp/` | MCP registry | ✅ Minimal |
@@ -240,25 +250,25 @@ We build in the open. Here's where we are.
 
 **Multi-breed coordination — shipped:**
 
-| Feature | Description | clowder-ai ref |
-|---------|-------------|---------------|
-| System Prompt Builder | 5-segment prompt: identity + restrictions + roster + role + skills | SystemPromptBuilder |
-| Context Assembler | History to schema messages, token budget, truncation | ContextAssembler |
-| @mention Routing | Parse @mentions (Chinese + English), route by breed config patterns | AgentRouter |
-| Serial Execution | Multi-breed chain: each output feeds next breed's context | route-serial |
-| Parallel Execution | Goroutine concurrent + shared streamer + WaitGroup | route-parallel |
-| SQLite Persistence | WAL mode, factory pattern, close/reopen durability | ThreadStore + MessageStore |
+| Feature | Description |
+|---------|-------------|
+| System Prompt Builder | 5-segment prompt: identity + restrictions + roster + role + skills |
+| Context Assembler | History to schema messages, token budget, truncation |
+| @mention Routing | Parse @mentions (Chinese + English), route by breed config patterns |
+| Serial Execution | Multi-breed chain: each output feeds next breed's context |
+| Parallel Execution | Goroutine concurrent + shared streamer + WaitGroup |
+| SQLite Persistence | WAL mode, factory pattern, close/reopen durability |
 
 ### v2: Remaining Work
 
 > Phase 7 主体已完成。以下子项仍在进行中。
 
-| Work Item | Description | clowder-ai ref | Status |
-|-----------|-------------|---------------|--------|
-| 文档治理补全 | AGENTS.md 治理机制 + Skills 补充 + per-breed 身份 + memory-philosophy 补全 | clowder-ai shared-rules + 49 skills | Completed |
-| Hooks 内容充实 | D/L 系列 hook 模板补充实质内容 | clowder-ai prompt-hooks | Completed |
-| RAG on-demand retrieval | MCP `search_knowledge` tool → RAG store → agent on-demand query | domains/memory/ (on-demand, not default pre-step) | Planned |
-| SOP basic gates | SOPGuardian wired into execution flow (review trigger, safety check) | 5-axis risk routing (simplified) | Planned |
+| Work Item | Description | Status |
+|-----------|-------------|--------|
+| 文档治理补全 | AGENTS.md 治理机制 + Skills 补充 + per-breed 身份 + memory-philosophy 补全 | Completed |
+| Hooks 内容充实 | D/L 系列 hook 模板补充实质内容 | Completed |
+| RAG on-demand retrieval | MCP `search_knowledge` tool → RAG store → agent on-demand query | Planned |
+| SOP basic gates | SOPGuardian wired into execution flow (review trigger, safety check) | Planned |
 
 ## Security Audit
 
@@ -346,7 +356,7 @@ sounds-great-ai/
 │   ├── a2a/                 # A2A protocol types
 │   └── pack/                # Pack/Breed core system (breed.go schema + loader.go)
 ├── internal/
-│   ├── adapter/             # CLI adapters (claude/codex/gemini/opencode)
+│   ├── adapter/             # CLI adapters (claude/codex/gemini/opencode/kimi)
 │   ├── a2a/                 # A2A Hub + context compression
 │   ├── aspect/              # Safety guardrails (command_guard, approval, tracing)
 │   ├── capability/          # 6 pure-logic capabilities
@@ -357,10 +367,10 @@ sounds-great-ai/
 │   ├── packapi/             # REST API handler
 │   ├── platform/            # Platform composition root
 │   ├── ragstore/            # RAG store (Memory/SQLite/Eino backends)
-│   ├── router/              # Dynamic routing engine
+│   ├── domains/             # 六边形域（routing/threads/custody/sop 等）
 │   ├── skills/              # Skills framework (.md loading + injection)
 │   ├── sop/                 # SOP guardian
-│   ├── settings/            # Settings store
+│   ├── settings/            # 设置存储（文件落盘 + 热加载）
 │   ├── threadstore/         # Thread store
 │   ├── transport/           # WebSocket + HTTP transport layer
 │   ├── agent/               # Agent implementation (coder, skill_manager)

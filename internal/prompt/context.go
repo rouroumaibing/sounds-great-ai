@@ -136,6 +136,42 @@ func estimateTokens(s string) int {
 	return len([]rune(s)) / 3
 }
 
+// BoundContextByTokens drops the oldest messages until the estimated token
+// count of the remaining history fits within maxTokens (Persistent Identity
+// P2, homologous auto-compact budget). The most recent messages are
+// kept; only the head (oldest) is trimmed, mirroring the platform-side
+// compression driven from each cat's contextWindow. A non-positive
+// maxTokens is a no-op (no bound applied).
+func BoundContextByTokens(msgs []ContextMessage, maxTokens int) []ContextMessage {
+	if maxTokens <= 0 || len(msgs) == 0 {
+		return msgs
+	}
+	// Estimate total first; if already under budget, return as-is.
+	total := 0
+	for _, m := range msgs {
+		total += estimateTokens(m.Role + " " + m.Sender + " " + m.Content)
+	}
+	if total <= maxTokens {
+		return msgs
+	}
+	// Trim from the oldest (head) until within budget.
+	kept := make([]ContextMessage, 0, len(msgs))
+	used := 0
+	for i := len(msgs) - 1; i >= 0; i-- {
+		cost := estimateTokens(msgs[i].Role + " " + msgs[i].Sender + " " + msgs[i].Content)
+		if used+cost > maxTokens && len(kept) > 0 {
+			break
+		}
+		kept = append(kept, msgs[i])
+		used += cost
+	}
+	// Reverse back to chronological order.
+	for i, j := 0, len(kept)-1; i < j; i, j = i+1, j-1 {
+		kept[i], kept[j] = kept[j], kept[i]
+	}
+	return kept
+}
+
 // ToSchemaMessages converts ContextMessages to Eino schema.Message format
 // for use with CLI adapter ExecuteRequest.
 func ToSchemaMessages(messages []ContextMessage) []*schema.Message {

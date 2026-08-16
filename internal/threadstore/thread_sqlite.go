@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -16,6 +18,12 @@ type sqliteThreadStore struct {
 
 // NewSQLiteThreadStore creates a SQLite-backed ThreadStore.
 func NewSQLiteThreadStore(path string) (ThreadStore, error) {
+	// Ensure the parent directory exists (see NewSQLiteMessageStore for why).
+	if dir := filepath.Dir(path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, fmt.Errorf("create sqlite dir %q: %w", dir, err)
+		}
+	}
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)

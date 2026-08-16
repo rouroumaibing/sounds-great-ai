@@ -1,7 +1,7 @@
 ## 信号文章
 
-未读信号：{{.UnreadSignals}}
-信号 tier：{{.SignalTier}}
+未读信号：（待接入）
+信号 tier：（待接入）
 
 - T1 = critical/breaking
 - T2 = important

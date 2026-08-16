@@ -133,7 +133,7 @@ func (h *ConfigHandler) SetDefaultBreed(w http.ResponseWriter, r *http.Request) 
 }
 
 // knownBreedIDs returns the set of valid breed IDs as the union of the template
-// seeds and the runtime catalog (clowder-homologous merged registry). New
+// seeds and the runtime catalog (homologous merged registry). New
 // members created at runtime must be selectable as the default breed, so the
 // catalog breeds are included in the validation set.
 func (h *ConfigHandler) knownBreedIDs() (map[string]bool, error) {
@@ -154,7 +154,7 @@ func (h *ConfigHandler) knownBreedIDs() (map[string]bool, error) {
 }
 
 func (h *ConfigHandler) GetBreedOrder(w http.ResponseWriter, r *http.Request) {
-	// The catalog breeds[] order is the sort truth (clowder-homologous).
+	// The catalog breeds[] order is the sort truth (homologous).
 	breeds, _ := h.settingsStore.ListBreeds()
 	if len(breeds) > 0 {
 		order := make([]string, 0, len(breeds))
@@ -194,7 +194,7 @@ func (h *ConfigHandler) SetBreedOrder(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown breed IDs", "missing": missing})
 		return
 	}
-	// Reorder the persisted catalog breeds[] (clowder-homologous sort truth).
+	// Reorder the persisted catalog breeds[] (homologous sort truth).
 	if err := h.settingsStore.ReorderBreeds(body.Order); err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

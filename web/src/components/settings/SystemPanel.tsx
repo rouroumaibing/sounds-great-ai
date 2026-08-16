@@ -19,6 +19,18 @@ interface TestResult {
   branches_collected?: number;
 }
 
+interface RepoTrajectoryEvent {
+  kind: string;
+  branch: string;
+  head_sha: string;
+  at: number;
+}
+
+interface RepoTrajectory {
+  repo_url: string;
+  events: RepoTrajectoryEvent[];
+}
+
 export function SystemPanel() {
   const [repoURL, setRepoURL] = useState('');
   const [saved, setSaved] = useState('');
@@ -26,11 +38,19 @@ export function SystemPanel() {
   const [test, setTest] = useState<TestResult | null>(null);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState('');
+  const [repoEvents, setRepoEvents] = useState<RepoTrajectoryEvent[]>([]);
+
+  const loadTrajectory = () => {
+    apiGet<RepoTrajectory>('/api/repo/trajectory')
+      .then((t) => setRepoEvents(t.events ?? []))
+      .catch(() => setRepoEvents([]));
+  };
 
   useEffect(() => {
     apiGet<RepoConfig>('/api/config/repo')
       .then((cfg) => setRepoURL(cfg.repo_url ?? ''))
       .catch((e) => setError(String(e)));
+    loadTrajectory();
   }, []);
 
   const onSave = async () => {
@@ -40,6 +60,7 @@ export function SystemPanel() {
       const res = await apiPut<RepoConfig>('/api/config/repo', { repo_url: repoURL.trim() });
       setSaved(res.repo_url);
       setTest(null);
+      loadTrajectory();
     } catch (e) {
       setError(e instanceof ApiError ? `保存失败（${e.status}）` : String(e));
     } finally {
@@ -54,6 +75,7 @@ export function SystemPanel() {
     try {
       const res = await apiPost<TestResult>('/api/repo/test', {});
       setTest(res);
+      loadTrajectory();
     } catch (e) {
       setTest({ ok: false, error: String(e) });
     } finally {
@@ -114,6 +136,41 @@ export function SystemPanel() {
               </SettingsStatusStrip>
             </div>
           )}
+          {repoActive && (
+            <div className="mt-4">
+              <SettingsText variant="sm" tone="secondary" className="mb-2">
+                代码库活动（已并入每条线程的统一轨迹 unified）
+              </SettingsText>
+              {repoEvents.length === 0 ? (
+                <SettingsText variant="xs" tone="muted">
+                  暂无 git 分支事件。配置仓库地址后，平台每 5 分钟采集一次分支活动（branch_pushed / branch_updated），并自动并入对应线程的统一轨迹（GET /api/custody/threads/{'{id}'}/trail 的 unified 段）。
+                </SettingsText>
+              ) : (
+                <ul className="space-y-1.5">
+                  {repoEvents.slice(-8).reverse().map((ev, i) => (
+                    <li
+                      key={`${ev.branch}-${ev.at}-${i}`}
+                      className="flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-900/50 px-3 py-1.5 text-xs"
+                    >
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                          ev.kind === 'branch_pushed'
+                            ? 'bg-purple-500/20 text-purple-300'
+                            : 'bg-blue-500/20 text-blue-300'
+                        }`}
+                      >
+                        {ev.kind === 'branch_pushed' ? '新分支' : '分支更新'}
+                      </span>
+                      <span className="font-mono text-slate-200">{ev.branch}</span>
+                      <span className="ml-auto truncate font-mono text-[10px] text-slate-500">
+                        {ev.head_sha.slice(0, 8)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           {test && (
             <div className="mt-3">
               <SettingsStatusStrip tone={test.ok ? 'success' : 'error'}>
@@ -134,7 +191,7 @@ export function SystemPanel() {
       {/* 运行时总开关 */}
       <SettingsSection
         title="运行时总开关"
-        description="与 clowder「系统配置」分区同定位：默认行为与全局开关集中在此，不再混入账户分区。"
+        description="「系统配置」分区：默认行为与全局开关集中在此，不再混入账户分区。"
       >
         <div className="mt-1 space-y-2">
           <div className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-900/60 px-4 py-3">

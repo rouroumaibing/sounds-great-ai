@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -449,7 +450,7 @@ func TestAllPayloadsJSONRoundTrip(t *testing.T) {
 		data, _ := json.Marshal(in)
 		var out BarkErrorPayload
 		json.Unmarshal(data, &out)
-		if out != in {
+		if !reflect.DeepEqual(out, in) {
 			t.Errorf("mismatch: %+v vs %+v", out, in)
 		}
 	})

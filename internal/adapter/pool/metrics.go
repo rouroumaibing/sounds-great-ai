@@ -16,6 +16,12 @@ type PoolMetrics struct {
 	leaseReleaseCount  atomic.Int64
 	ttlEvictionCount   atomic.Int64
 	lruEvictionCount   atomic.Int64
+	// idleToActiveCount counts idle→active transitions (a first lease taken on a
+	// process). leaseToIdleCount counts active→idle transitions (last lease
+	// released, or a force-release). Mirrors the AcpProcessPool idle/active
+	// accounting (#992 / multiplexing bookkeeping).
+	idleToActiveCount  atomic.Int64
+	leaseToIdleCount   atomic.Int64
 }
 
 // NewPoolMetrics creates a new PoolMetrics.
@@ -41,6 +47,14 @@ func (m *PoolMetrics) LeaseAcquire() { m.leaseAcquireCount.Add(1) }
 // LeaseRelease records a lease release.
 func (m *PoolMetrics) LeaseRelease() { m.leaseReleaseCount.Add(1) }
 
+// idleToActive records an idle→active transition (first lease taken on a
+// process). Mirrors the AcpProcessPool idle→active accounting.
+func (m *PoolMetrics) idleToActive() { m.idleToActiveCount.Add(1) }
+
+// leaseToIdle records an active→idle transition (last lease released, or a
+// force-release). Mirrors the AcpProcessPool active→idle accounting.
+func (m *PoolMetrics) leaseToIdle() { m.leaseToIdleCount.Add(1) }
+
 // TTLEviction records a TTL-based eviction.
 func (m *PoolMetrics) TTLEviction() {
 	m.ttlEvictionCount.Add(1)
@@ -63,6 +77,8 @@ type MetricsSnapshot struct {
 	LeaseReleaseCount  int64     `json:"lease_release_count"`
 	TTLEvictionCount   int64     `json:"ttl_eviction_count"`
 	LRUEvictionCount   int64     `json:"lru_eviction_count"`
+	IdleToActiveCount  int64     `json:"idle_to_active_count"`
+	LeaseToIdleCount   int64     `json:"lease_to_idle_count"`
 	PoolSize           int       `json:"pool_size"`
 	ActiveLeases       int       `json:"active_leases"`
 	Timestamp          time.Time `json:"timestamp"`
@@ -79,6 +95,8 @@ func (m *PoolMetrics) Snapshot(poolSize, activeLeases int) MetricsSnapshot {
 		LeaseReleaseCount:  m.leaseReleaseCount.Load(),
 		TTLEvictionCount:   m.ttlEvictionCount.Load(),
 		LRUEvictionCount:   m.lruEvictionCount.Load(),
+		IdleToActiveCount:  m.idleToActiveCount.Load(),
+		LeaseToIdleCount:   m.leaseToIdleCount.Load(),
 		PoolSize:           poolSize,
 		ActiveLeases:       activeLeases,
 		Timestamp:          time.Now(),
@@ -95,6 +113,8 @@ func (m *PoolMetrics) Reset() {
 	m.leaseReleaseCount.Store(0)
 	m.ttlEvictionCount.Store(0)
 	m.lruEvictionCount.Store(0)
+	m.idleToActiveCount.Store(0)
+	m.leaseToIdleCount.Store(0)
 }
 
 // MetricsCollector provides thread-safe access to metrics for endpoint integration.

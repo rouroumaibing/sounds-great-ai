@@ -9,4 +9,4 @@
 - 串行：A→B→C 链式，每个输出作为下一个的上下文
 - 并行：goroutine 并发 + shared streamer + WaitGroup
 
-当前路由策略：{{.RoutingStrategy}}
+当前路由策略：（待接入）

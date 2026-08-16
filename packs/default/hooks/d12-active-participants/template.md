@@ -1,6 +1,6 @@
 ## 活跃参与者
 
-当前 thread 中的活跃狗狗：{{.ActiveParticipants}}
+当前 thread 中的活跃狗狗：（待接入）
 
 - 只有活跃狗狗可以接球
 - 不活跃的犬 @mention 不会触发路由

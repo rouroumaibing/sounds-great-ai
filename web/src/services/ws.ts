@@ -99,6 +99,21 @@ export class WsManager {
     }));
   }
 
+  // sendWakeHold releases a parked hold_ball manually (human click). The server
+  // re-dispatches the holder via ResumeHeldThread (transport/ws_handler.go).
+  sendWakeHold(sessionId: string, kind: string, token?: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('[WS] Cannot send WAKE_HOLD — WebSocket not open');
+      return;
+    }
+    this.ws.send(JSON.stringify({
+      type: 'WAKE_HOLD',
+      session_id: sessionId,
+      timestamp: 0,
+      payload: { session_id: sessionId, kind, token: token ?? '' },
+    }));
+  }
+
   onEvent(fn: EventHandler): () => void {
     this.listeners.add(fn);
     return () => { this.listeners.delete(fn); };

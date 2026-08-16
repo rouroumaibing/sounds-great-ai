@@ -214,3 +214,58 @@ func TestRouterTableDriven(t *testing.T) {
 }
 
 var _ = ports.RoutingDecision{}
+
+// TestRouterDefaultBreedFromProvider verifies that an un-@mentioned message is
+// routed to the configured global default breed (wired from /api/config/default-breed
+// by the platform), not hard-coded to bianmu.
+func TestRouterDefaultBreedFromProvider(t *testing.T) {
+	t.Parallel()
+	breeds := map[string]*pack.BreedConfig{
+		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
+		"jinmao": {ID: "jinmao", MentionPatterns: []string{"@金毛"}},
+	}
+	r := NewMentionRouterService(breeds)
+	r.SetDefaultBreedProvider(func() string { return "jinmao" })
+
+	decision, _ := r.Route(context.Background(), "帮我检索一下上下文")
+	if decision.Strategy != "single" || len(decision.TargetBreeds) != 1 || decision.TargetBreeds[0] != "jinmao" {
+		t.Fatalf("expected default jinmao, got %v", decision.TargetBreeds)
+	}
+	if decision.HasMentions {
+		t.Error("expected HasMentions=false for a config-driven default (no explicit @)")
+	}
+}
+
+// TestRouterDefaultBreedNilProviderFallsBack verifies backward compatibility:
+// without a provider the router still defaults to bianmu.
+func TestRouterDefaultBreedNilProviderFallsBack(t *testing.T) {
+	t.Parallel()
+	breeds := map[string]*pack.BreedConfig{
+		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
+	}
+	r := NewMentionRouterService(breeds)
+
+	decision, _ := r.Route(context.Background(), "no mention here")
+	if decision.TargetBreeds[0] != "bianmu" {
+		t.Errorf("expected bianmu fallback, got %s", decision.TargetBreeds[0])
+	}
+}
+
+// TestRouterDefaultBreedInvalidFallsBack verifies that a configured default
+// pointing at a removed/unknown breed never produces a broken route — it falls
+// back to bianmu rather than routing to a breed with no adapter.
+func TestRouterDefaultBreedInvalidFallsBack(t *testing.T) {
+	t.Parallel()
+	breeds := map[string]*pack.BreedConfig{
+		"bianmu": {ID: "bianmu", MentionPatterns: []string{"@边牧"}},
+		"jinmao": {ID: "jinmao", MentionPatterns: []string{"@金毛"}},
+	}
+	r := NewMentionRouterService(breeds)
+	r.SetDefaultBreedProvider(func() string { return "ghost_dog" })
+
+	decision, _ := r.Route(context.Background(), "stale default target")
+	if decision.TargetBreeds[0] != "bianmu" {
+		t.Errorf("expected bianmu fallback for unknown default, got %s", decision.TargetBreeds[0])
+	}
+}
+

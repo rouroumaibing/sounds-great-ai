@@ -2,7 +2,7 @@ package unified
 
 import (
 	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -46,8 +46,9 @@ func TestWriteMCPConfigFile_WithServers(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("config file not created: %v", err)
 	}
-	dir := filepath.Dir(path)
-	if dir != tmpDir {
-		t.Fatalf("expected file in %s, got %s", tmpDir, dir)
+	// G5: the ephemeral config must live OUTSIDE the provided workDir/repo to
+	// avoid leaking MCP server addresses/tokens into the project tree.
+	if strings.HasPrefix(path, tmpDir) {
+		t.Fatalf("MCP config must not be written inside workDir %s, got %s", tmpDir, path)
 	}
 }

@@ -5,7 +5,7 @@ import (
 )
 
 // guardError carries the specific rejected reason for the audit-only
-// ball.disposition_rejected event, mirroring clowder-ai's three-piece
+// ball.disposition_rejected event, mirroring the three-piece
 // assertion failures (assertCurrentHolder / assertLatestInvocation /
 // assertExactHandoffIsLive).
 type guardError struct{ reason string }
@@ -20,8 +20,8 @@ func guardReason(err error) string {
 	return "guard"
 }
 
-// assertCurrentHolder fails when `from` is no longer the projected holder
-// (clowder assertCurrentHolder). A newer handoff/hold has superseded it.
+// assertCurrentHolder fails when `from` is no longer the projected holder.
+// A newer handoff/hold has superseded it.
 func assertCurrentHolder(snap custodyPorts.BallSnapshot, from string) error {
 	if snap.Holder != from {
 		return &guardError{"holder"}
@@ -30,7 +30,7 @@ func assertCurrentHolder(snap custodyPorts.BallSnapshot, from string) error {
 }
 
 // assertLatestInvocation fails when a newer invocation (started by a different
-// breed) has since taken the ball (clowder assertLatestInvocation). A stale
+// breed) has since taken the ball. A stale
 // invocation's disposition callback must not converge a live ball.
 func assertLatestInvocation(events []custodyPorts.BallEvent, from string) error {
 	latest := ""
@@ -45,18 +45,20 @@ func assertLatestInvocation(events []custodyPorts.BallEvent, from string) error 
 	return nil
 }
 
-// assertExactHandoffIsLive fails when the tip of the custody log is a handoff
-// from a different breed than `from` (clowder assertExactHandoffIsLive). The
-// specific handoff being closed must still be the live tip, not one that was
-// superseded by a newer handoff. `to` is "" for hold dispositions (no target).
-func assertExactHandoffIsLive(events []custodyPorts.BallEvent, from, to string) error {
-	lastFrom := ""
+// assertExactHandoffIsLive fails when the disposer `from` is NOT the receiver of
+// the current live handoff. The specific
+// handoff being closed must still be the live tip: the most recent handoff's
+// `To` must equal `from`. A breed that never received the live handoff (e.g. a
+// superseded or duplicate sender) cannot dispose it. `to` is unused here (the
+// new target is chosen by this disposition).
+func assertExactHandoffIsLive(events []custodyPorts.BallEvent, from, _ string) error {
+	lastTo := ""
 	for _, e := range events {
 		if e.Type == custodyPorts.BallHanded || e.Type == custodyPorts.DispatchDispositioned {
-			lastFrom = e.From
+			lastTo = e.To
 		}
 	}
-	if lastFrom != "" && lastFrom != from {
+	if lastTo != "" && lastTo != from {
 		return &guardError{"handoff"}
 	}
 	return nil

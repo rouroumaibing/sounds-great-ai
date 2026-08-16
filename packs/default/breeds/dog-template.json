@@ -308,7 +308,7 @@
       "variants": [
         {
           "id": "bianmu-claude",
-          "client_id": "anthropic",
+          "client_id": "claude",
           "default_model": "claude-opus-4-6",
           "mcp_support": true,
           "cli": {
@@ -348,7 +348,7 @@
         },
         {
           "id": "bianmu-claude-sonnet",
-          "client_id": "anthropic",
+          "client_id": "claude",
           "default_model": "claude-sonnet-4-20250514",
           "mcp_support": true,
           "cli": {
@@ -399,7 +399,7 @@
         },
         {
           "id": "bianmu-codex",
-          "client_id": "openai",
+          "client_id": "codex",
           "default_model": "o3",
           "mcp_support": true,
           "cli": {
@@ -476,7 +476,7 @@
       "variants": [
         {
           "id": "jinmao-gemini",
-          "client_id": "google",
+          "client_id": "gemini",
           "default_model": "gemini-2.5-pro",
           "mcp_support": true,
           "cli": {
@@ -515,7 +515,7 @@
         },
         {
           "id": "jinmao-gemini-flash",
-          "client_id": "google",
+          "client_id": "gemini",
           "default_model": "gemini-2.5-flash",
           "mcp_support": true,
           "cli": {
@@ -610,7 +610,7 @@
       "variants": [
         {
           "id": "xigou-codex",
-          "client_id": "openai",
+          "client_id": "codex",
           "default_model": "o3",
           "mcp_support": true,
           "cli": {
@@ -649,7 +649,7 @@
         },
         {
           "id": "xigou-claude",
-          "client_id": "anthropic",
+          "client_id": "claude",
           "default_model": "claude-sonnet-4-20250514",
           "mcp_support": true,
           "cli": {
@@ -778,7 +778,7 @@
         },
         {
           "id": "demu-claude",
-          "client_id": "anthropic",
+          "client_id": "claude",
           "default_model": "claude-opus-4-6",
           "mcp_support": true,
           "cli": {
@@ -868,7 +868,7 @@
       "variants": [
         {
           "id": "zangao-claude",
-          "client_id": "anthropic",
+          "client_id": "claude",
           "default_model": "claude-opus-4-6",
           "mcp_support": true,
           "cli": {
@@ -907,7 +907,7 @@
         },
         {
           "id": "zangao-sonnet",
-          "client_id": "anthropic",
+          "client_id": "claude",
           "default_model": "claude-sonnet-4-20250514",
           "mcp_support": true,
           "cli": {
@@ -997,7 +997,7 @@
       "variants": [
         {
           "id": "zhonghuatianyuanquan-codex",
-          "client_id": "openai",
+          "client_id": "codex",
           "default_model": "o3",
           "mcp_support": true,
           "cli": {
@@ -1036,7 +1036,7 @@
         },
         {
           "id": "zhonghuatianyuanquan-spark",
-          "client_id": "openai",
+          "client_id": "codex",
           "default_model": "gpt-4o",
           "mcp_support": true,
           "cli": {

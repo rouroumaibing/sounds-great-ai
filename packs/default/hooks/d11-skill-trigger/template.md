@@ -1,7 +1,7 @@
 ## 技能触发
 
-当前匹配的 skill：{{.MatchedSkill}}
-触发原因：{{.TriggerReason}}
+当前匹配的 skill：（待接入）
+触发原因：（待接入）
 
 技能在 manifest ≠ 在认知路径。坏直觉 → 该用的 skill：
 - 想发一堆文字/日志/步骤 → rich-messaging

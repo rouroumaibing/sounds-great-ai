@@ -71,7 +71,7 @@ func (h *WSHandler) injectHooks(basePrompt, breedID, breedName, roleDesc, person
 	turnPrompt := hooks.AssemblePatches(turnResult.Patches)
 	breed := h.platform.GetBreed(breedID)
 	variant := breed.DefaultVariant()
-	if variant != nil && supportsNativeL0(variant.CLI.Command) {
+	if variant != nil && h.supportsNativeL0(variant) {
 		systemPromptL0 = initPrompt
 		if turnPrompt != "" {
 			systemPrompt = turnPrompt + "\n\n" + systemPrompt
@@ -113,15 +113,77 @@ func supportsNativeL0(cliCommand string) bool {
 	return cliCommand == "claude" || cliCommand == "codex"
 }
 
+// supportsNativeL0 resolves whether a breed's CLI supports a native,
+// compression-immune L0 system-prompt channel (G6). It is data-driven: the
+// decision comes from the registered adapter's AgentCapabilities (set per
+// provider), falling back to the legacy command-whitelist only if the executor
+// is unavailable. Keeping this in the adapter capabilities avoids hard-coding
+// CLI command strings in the transport layer.
+func (h *WSHandler) supportsNativeL0(variant *pack.Variant) bool {
+	if variant == nil {
+		return false
+	}
+	if h.platform != nil && h.platform.AgentExecutor != nil {
+		if h.platform.AgentExecutor.Capabilities(variant.ClientID).SupportsNativeL0 {
+			return true
+		}
+	}
+	return supportsNativeL0(variant.CLI.Command)
+}
+
 func convertStreamEvent(ev unified.StreamEvent, sessionID, breedID string) *protocol.Event {
 	switch ev.Type {
 	case "thinking":
 		return protocol.NewEvent(protocol.EventThinking, sessionID, &protocol.ThinkingPayload{Step: 1, Content: ev.Content})
+	case "text":
+		// G1: stream assistant text deltas live instead of dropping them. The
+		// frontend accumulates these into a running breed_response block.
+		return protocol.NewEvent(protocol.EventAgentMessage, sessionID, &protocol.AgentMessagePayload{
+			Breed: breedID, Content: ev.Content, Done: false,
+		})
 	case "tool_call":
 		toolName, _ := ev.Meta["tool"].(string)
 		return protocol.NewEvent(protocol.EventToolCall, sessionID, &protocol.ToolCallPayload{Tool: toolName, Params: ev.Content})
 	case "error":
-		return protocol.NewEvent(protocol.EventBarkError, sessionID, &protocol.BarkErrorPayload{Breed: breedID, Error: ev.Content})
+		// Surface structured diagnostics (cliDiagnostics) when
+		// the adapter populated StreamEvent.Meta. The server has already
+		// sanitized the excerpt (REDACTED-*) and classified the reason; the
+		// client additionally gates raw excerpt display by Source allowlist.
+		meta := map[string]string{}
+		if raw, ok := ev.Meta["meta"].(map[string]any); ok {
+			for k, v := range raw {
+				if s, ok := v.(string); ok {
+					meta[k] = s
+				}
+			}
+		}
+		str := func(k string) string {
+			if v, ok := ev.Meta[k].(string); ok {
+				return v
+			}
+			return ""
+		}
+		return protocol.NewEvent(protocol.EventBarkError, sessionID, &protocol.BarkErrorPayload{
+			Breed:   breedID,
+			Error:   ev.Content,
+			Reason:  str("reason"),
+			Summary: str("summary"),
+			Hint:    str("hint"),
+			Excerpt: str("excerpt"),
+			Source:  str("source"),
+			Meta:    meta,
+		})
+	case "stall_warning":
+		// R8: forward liveness-probe state changes to the client so a stalled
+		// (alive-but-silent) CLI is visible instead of failing silently.
+		state, _ := ev.Meta["state"].(string)
+		hard, _ := ev.Meta["hard"].(bool)
+		return protocol.NewEvent(protocol.EventAgentLiveness, sessionID, &protocol.LivenessPayload{
+			Breed:   breedID,
+			State:   state,
+			Hard:    hard,
+			Message: ev.Content,
+		})
 	default:
 		return nil
 	}

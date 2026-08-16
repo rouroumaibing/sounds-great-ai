@@ -103,6 +103,14 @@ const (
 	EventBarkStart  EventType = "BARK_START"
 	EventBarkResult EventType = "BARK_RESULT"
 	EventBarkError  EventType = "BARK_ERROR"
+	// EventAgentMessage streams assistant text deltas live (G1). The frontend
+	// accumulates Content into a running breed_response block; the terminal
+	// BARK_RESULT carries the final state.
+	EventAgentMessage EventType = "AGENT_MESSAGE"
+	// EventAgentLiveness surfaces liveness-probe state changes to the client
+	// (R8): soft/hard stalls (alive but silent) and recovery. The frontend
+	// renders a transient status bar instead of failing silently.
+	EventAgentLiveness EventType = "AGENT_LIVENESS"
 )
 
 // BarkStartPayload 是 BARK_START 事件的 payload
@@ -124,12 +132,42 @@ type BarkResultPayload struct {
 	Breed   string                `json:"breed"`
 	Success bool                  `json:"success"`
 	Steps   map[string]StepResult `json:"steps"`
+	// Content carries the final assistant text when available (G9), so the live
+	// end-state renders without waiting for REST history hydration. Optional.
+	Content string `json:"content,omitempty"`
+}
+
+// AgentMessagePayload 是 AGENT_MESSAGE 事件的 payload (G1)
+type AgentMessagePayload struct {
+	Breed   string `json:"breed"`
+	Content string `json:"content"` // incremental text delta
+	Done    bool   `json:"done"`    // reserved terminal marker
+}
+
+// LivenessPayload 是 AGENT_LIVENESS 事件的 payload (R8)
+type LivenessPayload struct {
+	Breed   string `json:"breed"`
+	State   string `json:"state"`   // "active" | "busy_silent" | "idle_silent" | "dead"
+	Hard    bool   `json:"hard"`    // true => hard stall (beyond ProbeStallWarnMs)
+	Message string `json:"message"` // safe, human-facing status hint
 }
 
 // BarkErrorPayload 是 BARK_ERROR 事件的 payload
 type BarkErrorPayload struct {
 	Breed string `json:"breed"`
 	Error string `json:"error"`
+	// Structured diagnostics (cliDiagnostics). All optional; the
+	// client falls back to Error when these are empty. Reason/Summary/Hint are
+	// classified + public-safe; Excerpt is already sanitized (REDACTED-*) on the
+	// server; Source tags where the excerpt came from (gated by a client
+	// allowlist before raw display); Meta carries redactable context (paths,
+	// cli command) shown in a meta bar.
+	Reason  string            `json:"reason,omitempty"`
+	Summary string            `json:"summary,omitempty"`
+	Hint    string            `json:"hint,omitempty"`
+	Excerpt string            `json:"excerpt,omitempty"`
+	Source  string            `json:"source,omitempty"`
+	Meta    map[string]string `json:"meta,omitempty"`
 }
 
 // System notice 事件类型
@@ -143,4 +181,21 @@ type SystemNoticePayload struct {
 	Title     string `json:"title"`
 	Message   string `json:"message"`
 	Timestamp string `json:"timestamp"` // ISO 8601
+}
+
+// Carrier health 事件类型 (T25 / R6)
+const (
+	EventCarrierHealth EventType = "CARRIER_HEALTH"
+)
+
+// CarrierHealthPayload 是 CARRIER_HEALTH 事件的 payload (T25 / R6): the
+// backend surfaces a carrier's health (quota/structural/transient degradation)
+// so the frontend ConnectionStatusBar can render upstream model health
+// directly instead of inferring it from raw stream events.
+type CarrierHealthPayload struct {
+	Carrier     string `json:"carrier"`
+	Transport   string `json:"transport,omitempty"`
+	Level       string `json:"level"` // "online" | "degraded" | "offline"
+	Reason      string `json:"reason,omitempty"`
+	RemainingMs int64  `json:"remaining_ms,omitempty"`
 }

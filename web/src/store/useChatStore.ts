@@ -4,7 +4,7 @@ import { WsManager } from '../services/ws';
 import { API_BASE } from '../services/http';
 import { useAppStore } from './useAppStore';
 import { useNoticeStore } from './useNoticeStore';
-import type { StreamEvent } from '../types';
+import type { StreamEvent, BreedResponseLiveEvent, BreedResponseCompleteEvent } from '../types';
 import { useI18n } from './useI18n';
 import type {
   WsEvent,
@@ -16,12 +16,27 @@ import type {
   HitlApprovalPayload,
   BarkResultPayload,
   BarkErrorPayload,
+  AgentMessagePayload,
   ErrorPayload,
   SystemNoticePayload,
+  LivenessPayload,
+  CarrierHealthPayload,
 } from '../types/api';
 
 // Re-export useShallow for components that select objects/arrays from this store
 export { useShallow };
+
+// Per-carrier health (T25 / R6): keyed by carrier id (e.g. "claude"). The
+// backend pushes CARRIER_HEALTH whenever a carrier degrades, recovers, or a
+// transport tier is skipped during fallback. `updatedAt` lets the UI show
+// staleness and lets us pick the freshest signal per carrier.
+export interface CarrierHealthState {
+  level: 'online' | 'degraded' | 'offline';
+  transport?: string;
+  reason?: string;
+  remainingMs?: number;
+  updatedAt: number;
+}
 
 interface ChatStore {
   wsManager: WsManager | null;
@@ -29,6 +44,8 @@ interface ChatStore {
   events: Record<string, StreamEvent[]>;
   isGenerating: Record<string, boolean>;
   lastSeq: Record<string, number>;
+  // T25 / R6: structured per-carrier upstream health from CARRIER_HEALTH events.
+  carrierHealth: Record<string, CarrierHealthState>;
 
   initWebSocket: () => void;
   sendPrompt: () => void;
@@ -67,6 +84,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   events: {},
   isGenerating: {},
   lastSeq: {},
+  carrierHealth: {},
 
   initWebSocket: () => {
     const existing = get().wsManager;
@@ -166,6 +184,31 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   handleWsEvent: (event) => {
+    // T25 / R6: CARRIER_HEALTH is a global event (no session_id) that reports
+    // per-carrier upstream health. Handle it before the thread-scoped
+    // resolution below, which would otherwise drop an event without a valid
+    // threadId. Stored by carrier id so ConnectionStatusBar can render it.
+    if (event.type === 'CARRIER_HEALTH') {
+      const p = event.payload as CarrierHealthPayload;
+      if (!p || !p.carrier) {
+        console.warn('[WS] Ignoring CARRIER_HEALTH without carrier:', event);
+        return;
+      }
+      set((state) => ({
+        carrierHealth: {
+          ...state.carrierHealth,
+          [p.carrier]: {
+            level: p.level,
+            transport: p.transport,
+            reason: p.reason,
+            remainingMs: p.remaining_ms,
+            updatedAt: Date.now(),
+          },
+        },
+      }));
+      return;
+    }
+
     const threadId = resolveThreadId(event);
     if (!threadId) return;
 
@@ -296,6 +339,49 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         break;
       }
 
+      case 'AGENT_MESSAGE': {
+        const p = payload as AgentMessagePayload;
+        if (!p.content) break;
+        set((state) => {
+          const threadEvents = state.events[threadId] ?? [];
+          const lastEvent = threadEvents[threadEvents.length - 1];
+          if (
+            lastEvent &&
+            lastEvent.type === 'breed_response_live' &&
+            lastEvent.breed === p.breed
+          ) {
+            const updated = [...threadEvents];
+            updated[updated.length - 1] = {
+              ...lastEvent,
+              content: lastEvent.content + p.content,
+            };
+            return { events: { ...state.events, [threadId]: updated } };
+          }
+          return {
+            events: appendEvent(state.events, threadId, {
+              type: 'breed_response_live',
+              breed: p.breed,
+              content: p.content,
+            } as BreedResponseLiveEvent),
+          };
+        });
+        break;
+      }
+
+      case 'AGENT_LIVENESS': {
+        const p = payload as LivenessPayload;
+        set((state) => ({
+          events: appendEvent(state.events, threadId, {
+            type: 'breed_stall_warning',
+            breed: p.breed,
+            state: p.state,
+            hard: p.hard,
+            message: p.message,
+          }),
+        }));
+        break;
+      }
+
       case 'BARK_RESULT': {
         const p = payload as BarkResultPayload;
         set((state) => {
@@ -305,15 +391,43 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               ? { ...e, status: 'success' as const }
               : e
           );
+          // Convert an in-flight live text block to the terminal complete
+          // event (G1+G9); otherwise append a fresh complete event carrying any
+          // final content supplied by the server.
+          let events2: StreamEvent[];
+          let liveIdx = -1;
+          for (let i = 0; i < updated.length; i++) {
+            const e = updated[i];
+            if (e.type === 'breed_response_live' && e.breed === p.breed) {
+              liveIdx = i;
+              break;
+            }
+          }
+          if (liveIdx >= 0) {
+            const live = updated[liveIdx] as BreedResponseLiveEvent;
+            const finalContent =
+              p.content && p.content.length > 0 ? p.content : live.content;
+            events2 = [...updated];
+            events2[liveIdx] = {
+              type: 'breed_response_complete',
+              breed: p.breed,
+              steps: p.steps ?? [],
+              content: finalContent,
+            } as BreedResponseCompleteEvent;
+          } else {
+            events2 = [
+              ...updated,
+              {
+                type: 'breed_response_complete',
+                breed: p.breed,
+                steps: p.steps ?? [],
+                content: p.content,
+              } as BreedResponseCompleteEvent,
+            ];
+          }
           return {
             isGenerating: { ...state.isGenerating, [threadId]: false },
-            events: {
-              ...state.events,
-              [threadId]: [
-                ...updated,
-                { type: 'breed_response_complete', breed: p.breed, steps: p.steps },
-              ],
-            },
+            events: { ...state.events, [threadId]: events2 },
           };
         });
         break;
@@ -334,7 +448,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               ...state.events,
               [threadId]: [
                 ...updated,
-                { type: 'error', breed: p.breed, error: p.error },
+                {
+                  type: 'error',
+                  breed: p.breed,
+                  error: p.error,
+                  reason: p.reason,
+                  summary: p.summary,
+                  hint: p.hint,
+                  excerpt: p.excerpt,
+                  source: p.source,
+                  meta: p.meta,
+                },
               ],
             },
           };

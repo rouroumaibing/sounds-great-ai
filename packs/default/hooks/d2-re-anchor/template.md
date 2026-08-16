@@ -6,7 +6,3 @@
 - 我还在我狗狗的职责范围内吗？（查限制声明表）
 - 我没有引入红旗模式吧？（查红旗模式表）
 - 我还在当前 Phase 内吗？（查 VISION.md §7）
-
-当前狗狗：{{.BreedName}}
-当前 Phase：{{.CurrentPhase}}
-连续工具调用数：{{.ToolCallCount}}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
 	custodyStores "sounds-great-ai/internal/domains/custody/stores"
 )
 
@@ -77,5 +78,48 @@ func TestProjectTrailEmpty(t *testing.T) {
 	}
 	if len(brief.Trail) != 0 {
 		t.Fatalf("Trail len = %d, want 0", len(brief.Trail))
+	}
+}
+
+// G14: MergeUnifiedTrail folds custody + repo events into one time-ordered axis,
+// filtering repo events to the thread's [first, last] custody timestamp window.
+func TestMergeUnifiedTrail(t *testing.T) {
+	b := custodyPorts.Briefing{
+		Trail: []custodyPorts.TrailEntry{
+			{Seq: 1, Type: "ball.handed", Holder: "a", Timestamp: 100},
+			{Seq: 2, Type: "ball.handed", Holder: "b", Timestamp: 300},
+		},
+	}
+	repo := []custodyStores.RepoEvent{
+		{Kind: "branch_pushed", Branch: "main", HeadSHA: "m1", At: 200}, // inside window
+		{Kind: "branch_pushed", Branch: "dev", HeadSHA: "d1", At: 50},  // before window -> dropped
+		{Kind: "branch_updated", Branch: "feat", HeadSHA: "f1", At: 400}, // after window -> dropped
+	}
+	out := MergeUnifiedTrail(b, repo)
+	if len(out) != 3 {
+		t.Fatalf("unified len = %d, want 3 (2 custody + 1 in-window repo)", len(out))
+	}
+	// time-ordered: 100 custody, 200 repo(main), 300 custody
+	if out[0].Timestamp != 100 || out[0].Source != "custody" {
+		t.Fatalf("out[0] = %+v", out[0])
+	}
+	if out[1].Timestamp != 200 || out[1].Source != "repo" || out[1].Branch != "main" {
+		t.Fatalf("out[1] = %+v", out[1])
+	}
+	if out[2].Timestamp != 300 || out[2].Source != "custody" {
+		t.Fatalf("out[2] = %+v", out[2])
+	}
+}
+
+// G14: with no repo events the unified timeline equals the custody trail.
+func TestMergeUnifiedTrailEmptyRepo(t *testing.T) {
+	b := custodyPorts.Briefing{
+		Trail: []custodyPorts.TrailEntry{
+			{Seq: 1, Type: "ball.handed", Holder: "a", Timestamp: 100},
+		},
+	}
+	out := MergeUnifiedTrail(b, nil)
+	if len(out) != 1 || out[0].Source != "custody" {
+		t.Fatalf("unified should be just custody trail, got %+v", out)
 	}
 }

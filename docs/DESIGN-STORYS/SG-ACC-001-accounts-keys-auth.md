@@ -36,6 +36,8 @@
 
 保存后列表刷新，显示「已配密钥」徽章。删除一个被成员绑定的账号时，后端返回 409，前端二次确认后可强制删除。
 
+> **先后关系（与「成员管理」`SG-MEM-001`）**：本分区是「成员管理」的**前置依赖**——用户必须先在此建立大模型凭证（OAuth / API Key 账户），再在「成员管理」创建 Agent 角色（犬），并通过 `variant.account_ref` 引用本分区的账户（校验见 §4.6，引用完整性见 §4.5）。成员页在账号缺失时会内联引导先建账号（见 `SG-MEM-001` §7.1）。删除被成员绑定的账户将被 409 拦截，保证不产生悬空引用。即「**先建凭证，再建关联 Agent 角色**」。
+
 ---
 
 ## 3. 前端处理逻辑
@@ -176,7 +178,7 @@
 | 文件 | 内容 | 权限 | 管理方 | 落盘根 |
 |---|---|---|---|---|
 | `accounts.json` | 账号元数据 | 0644 | `FileSettingsStore` | `ConfigRoot`（项目 `.sounds-great-ai`） |
-| `dog-catalog.json` | 成员 + leader + 系统配置 | 0644 | `FileSettingsStore` | `ConfigRoot`（项目 `.sounds-great-ai`） |
+| `dog-catalog.json` | 成员/roster/leader/系统配置等（完整字段见 `SG-MEM-001` §5.1） | 0644 | `FileSettingsStore` | `ConfigRoot`（项目 `.sounds-great-ai`） |
 | `credentials.json` | 密钥（明文） | **0600** | `FileCredentialStore` | `CredentialRoot`（**全局 home `~/.sounds-great-ai`**，独立于项目根） |
 
 密钥库与元数据文件物理隔离、权限不同；`maskKey` 仅在 list 响应里脱敏，密钥明文只存在于 `credentials.json`。**根目录已拆分（客户配置安全）**：`catalog/accounts` 走 `ConfigRoot(projectRoot)`（项目下 `.sounds-great-ai`）；`credentials` 单独走 `CredentialRoot()`（全局 home `~/.sounds-great-ai`，可被 `SOUNDS_GREAT_AI_CREDENTIAL_ROOT` 覆盖）。清项目配置**不会**误删密钥。
@@ -211,13 +213,13 @@ type Account struct {
 
 ### 5.4 客户配置安全三改动
 
-本分区与客户部署安全强相关，三项决策如下（详情见各子节；其中「升级追加同步」作用于成员 catalog，权威描述在《成员管理》设计 §7.3）。
+本分区与客户部署安全强相关，三项决策如下（详情见各子节；其中「升级追加同步」作用于成员 catalog，权威描述在《成员管理》设计 §6.2）。
 
 **(a) 凭证独立根（§5.1 / §5.2）** —— `credentials.json` 放在全局 home，与 catalog/accounts 物理隔离；清项目配置不丢密钥。
 
 **(b) 编辑时时间戳 .bak（§5.5）** —— 写盘前生成备份；加载期损坏仅告警当空，不自动备份。
 
-**(c) 升级追加同步（§5.6，作用于成员 catalog）** —— 新模板犬**追加**到老客户 catalog（老客户升级后能看到新预置犬），但客户删过的犬不复活。机制为 `settings.ListSeenTemplateBreeds()/AddSeenTemplateBreeds()` 与 `catalogDocument.SeenTemplateBreeds`（由 `internal/platform/breeds_merge.go` 的 `SyncTemplateBreeds` 驱动）。该集合同时支撑「首启空 catalog」（详见《成员管理》设计 §7）。
+**(c) 升级追加同步（作用于成员 catalog）** —— 新模板犬**追加**到老客户 catalog（老客户升级后能看到新预置犬），但客户删过的犬不复活。机制为 `settings.ListSeenTemplateBreeds()/AddSeenTemplateBreeds()` 与 `catalogDocument.SeenTemplateBreeds`（由 `internal/platform/breeds_merge.go` 的 `SyncTemplateBreeds` 驱动）。该集合同时支撑「首启空 catalog」（详见《成员管理》设计 §6.2）。
 
 ### 5.5 损坏处理与编辑时备份
 
@@ -365,6 +367,7 @@ DELETE /api/settings/accounts/{id}       → 200 nil          (?force=true 强�
 - **2026-08-12（账户与密钥）**：梳理 accounts 分区前后端；落实 F1–F6 修复（密钥落 credentials.json、回滚、api_key 全量字段、引用完整性 409、auth.Wrap、env_vars 前缀）。
 - **2026-08-12（客户配置安全）**：落实三项决策——① 凭证独立根 `CredentialRoot()`；② 编辑时时间戳 `.bak`（加载期损坏仅告警当空）；③ 追加式升级同步 `SyncTemplateBreeds` / `ListDeletedBreeds` / `deleted_breeds`。
 - **2026-08-13（合并与代码对齐）**：将 SG-ACC-001 与 SG-OPS-001 合并为本文件；按 2026-08-13 代码实况修正：`DEFAULT_SECTION='accounts'`、`RAW_SECTIONS` 顺序 accounts 在前、`routes.go` 中 `/api/settings/` 与 `credStore` 的实际装配位置、`dog-catalog.json` 含 `deleted_breeds`/`seen_template_breeds` 两集合。「升级追加同步」详述移至《成员管理》设计 §6.2，本文件仅保留决策级描述与跨参。
+- **2026-08-16（与 MEM 理清先后关系 + 交叉引用校正）**：明确本分区为「成员管理」的前置依赖（先凭证后角色，见 §2）；修正 §5.4(c) 对 `SG-MEM-001` 的错引（§7.3 / §7 → §6.2）；§5.1 catalog 行指向 `SG-MEM-001` §5.1 详字段，消除三文件表双写冗余。
 
 ---
 

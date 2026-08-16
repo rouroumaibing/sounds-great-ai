@@ -123,3 +123,47 @@ func TestWorklistRegisterIdempotent(t *testing.T) {
 		t.Fatalf("push3 should hit depth=2, ok=%v reason=%s", ok, reason)
 	}
 }
+
+// G11: PushToWorklist dynamically expands the running worklist with new targets,
+// records source attribution (a2aFrom), and dedups already-known/executed ones.
+func TestWorklistPushToWorklist(t *testing.T) {
+	r := NewWorklistRegistry()
+	inv := "fanout-inv"
+	r.Register(inv, 8)
+
+	// Pre-register a planned target via a normal push.
+	if ok, _, _ := r.Push(inv, "a", "b", routingPorts.SubstantiveActivity{}); !ok {
+		t.Fatal("planned push a->b rejected")
+	}
+	// Dynamic expansion: a pulls in c and d (c is new, b already known).
+	added := r.PushToWorklist(inv, []string{"c", "b", "d"}, "a")
+	if len(added) != 2 {
+		t.Fatalf("added = %v, want [c d]", added)
+	}
+	if r.A2AFrom(inv, "c") != "a" {
+		t.Fatalf("a2aFrom[c] = %q, want a", r.A2AFrom(inv, "c"))
+	}
+	if r.A2AFrom(inv, "d") != "a" {
+		t.Fatalf("a2aFrom[d] = %q, want a", r.A2AFrom(inv, "d"))
+	}
+	// Re-adding known targets yields nothing.
+	if again := r.PushToWorklist(inv, []string{"c", "d"}, "x"); len(again) != 0 {
+		t.Fatalf("re-add should be empty, got %v", again)
+	}
+}
+
+// G11: PushToWorklist caps the fan-out so a runaway expansion cannot grow
+// unbounded.
+func TestWorklistPushToWorklistCap(t *testing.T) {
+	r := NewWorklistRegistry()
+	inv := "cap-inv"
+	r.Register(inv, 8)
+	targets := make([]string, 0, maxWorklistFanout+5)
+	for i := 0; i < maxWorklistFanout+5; i++ {
+		targets = append(targets, "t"+string(rune('a'+i)))
+	}
+	added := r.PushToWorklist(inv, targets, "a")
+	if len(added) != maxWorklistFanout {
+		t.Fatalf("added = %d, want cap %d", len(added), maxWorklistFanout)
+	}
+}

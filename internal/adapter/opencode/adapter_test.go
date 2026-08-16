@@ -100,7 +100,7 @@ func TestAdapterBuildArgsTableDriven(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := a.buildArgs(tt.workDir, tt.mcp)
+			args, _ := a.buildArgs(tt.workDir, tt.mcp)
 			for _, want := range tt.wantContains {
 				if !argsContains(args, want) {
 					t.Errorf("args = %v, want to contain %q", args, want)

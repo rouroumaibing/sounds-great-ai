@@ -4,5 +4,5 @@
 - 状态描述不是球权声明
 - 持球超时：默认无超时，但 hold_ball 有 max 3 per (thread, breed) in ~1h
 
-当前持球者：{{.BallHolder}}
-球权凭据：{{.BallEvidence}}
+当前持球者：（待接入）
+球权凭据：（待接入）

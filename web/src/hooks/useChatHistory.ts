@@ -6,8 +6,8 @@ import type { StreamEvent } from '../types';
 // ---------------------------------------------------------------------------
 // 聊天历史水合（G9）。
 //
-// 与 clowder web/src/hooks/useChatHistory.ts 同位置（模块级常量）对齐分页与
-// 合并窗口；端点语义对齐 SG 的 GET /api/threads/{id}/messages?limit=&before=。
+// 对齐分页与合并窗口（模块级常量）；端点语义对齐 SG 的
+// GET /api/threads/{id}/messages?limit=&before=。
 // 刷新 / 切换线程时自动把落库的聊天消息水合进 useChatStore，scroll-up 按游标
 // 增量加载更早消息，与 WS 实时事件按内容+时间戳去重合并。
 // ---------------------------------------------------------------------------
@@ -16,14 +16,14 @@ import type { StreamEvent } from '../types';
 export const HISTORY_PAGE_SIZE = 50;
 // 导出时的最大消息数上限。
 export const EXPORT_LIMIT = 10000;
-// 草稿 / 实时事件合并窗口（对齐 clowder）。
+// 草稿 / 实时事件合并窗口。
 export const DRAFT_LIVE_MERGE_ACTIVITY_WINDOW_MS = 5 * 60 * 1000;
 // 滚动贴底阈值。
 export const SCROLL_BOTTOM_THRESHOLD_PX = 24;
 // 滚动恢复最大帧数。
 export const MAX_RESTORE_FRAMES = 90;
 
-// 模块级缓存（与 clowder 同位置）。
+// 模块级缓存（与后端实现同位置）。
 const scrollPositionsByThread = new Map<string, number>();
 const taskCacheByThread = new Map<string, unknown>();
 

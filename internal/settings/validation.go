@@ -43,7 +43,7 @@ func ValidateClientID(clientID string) bool {
 //   - otherwise         → must reference an existing account ID in the store.
 //
 // The lookup uses the same store instance that account writes go through, so it
-// can never resolve to a different data root — this avoids the clowder #1303
+// can never resolve to a different data root — this avoids the #1303
 // "account written under A, validated under B" split.
 func ValidateAccountRef(store SettingsStore, ref string) error {
 	if ref == "" || OAuthClientRefs[ref] {

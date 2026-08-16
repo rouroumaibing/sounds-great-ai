@@ -4,15 +4,21 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudwego/eino/components/embedding"
+	"github.com/redis/go-redis/v9"
 	"sounds-great-ai/internal/a2a"
 	"sounds-great-ai/internal/adapter/claude"
 	"sounds-great-ai/internal/adapter/codex"
 	"sounds-great-ai/internal/adapter/gemini"
+	"sounds-great-ai/internal/adapter/kimi"
 	"sounds-great-ai/internal/adapter/opencode"
+	"sounds-great-ai/internal/adapter/pool"
 	"sounds-great-ai/internal/adapter/unified"
 	"sounds-great-ai/internal/hooks"
 	"sounds-great-ai/internal/mcp"
@@ -49,6 +55,13 @@ import (
 type Platform struct {
 	// CLI Adapters
 	ProcessManager *unified.ProcessManager
+	// CarrierRegistry is the R1 multi-tier carrier registry (R2/R3/R6). Adapters
+	// route Execute through it; health-based fallback and the warm-pool
+	// transport hook in here. Nil-safe: when nil, adapters fall back to a direct
+	// one-shot pm.Spawn — behavior identical to pre-R2.
+	CarrierRegistry *unified.Registry
+	// carrierHealth backs the registry's R6 degradation state (default in-memory).
+	carrierHealth unified.CarrierHealth
 	// AgentExecutor is the agents domain port wrapping the 4 CLI adapters
 	// (claude/codex/gemini/opencode). execution.go consumes this port instead
 	// of reaching into internal/adapter directly (D4-3).
@@ -78,6 +91,31 @@ type Platform struct {
 	ThreadStore   threadPorts.IThreadStore
 	SettingsStore settings.SettingsStore
 	EvidenceStore memory.EvidenceStore
+	// Profiles persists relationship capsules (Persistent Identity P1,
+	// homologous F231). Kept separate from SettingsStore on purpose:
+	// capsules live in their own directory, never in dog-catalog.json.
+	Profiles *settings.ProfileRepository
+	// Continuity persists the last-session digest per breed (Persistent
+	// Identity P3, homologous F211 continuity bootstrap). Separate
+	// directory, never in dog-catalog.json.
+	Continuity *settings.ContinuityStore
+	// PeopleMemory persists owner-private third-party people & relationship
+	// memory (Persistent Identity F276, homologous). Multi-operator:
+	// every operator's data is partitioned by operatorID. File-backed by
+	// default (zero-dependency); when SG_REDIS_URL is set it is Redis-backed
+	// (operator-keyed keyspace + Lua-guarded deferred-receipt lifecycle).
+	PeopleMemory settings.PeopleMemoryStore
+	// PeopleMemoryHub is the in-process event bus powering the people-memory
+	// SSE endpoint for cross-tab live sync. Nil only in tests that skip wiring.
+	PeopleMemoryHub *settings.PeopleMemoryEventHub
+
+	// SessionBreed maps an active session id to the breed (dog) running it.
+	// It lets the autonomous-distill endpoint derive the distiller from the
+	// CURRENT session (homologous: the cat distills its own primer),
+	// instead of a hardcoded default. Populated best-effort on each spawn and
+	// read on distill. Guarded by SessionBreedMu.
+	SessionBreed   map[string]string
+	SessionBreedMu sync.RWMutex
 
 	// Infrastructure
 	WorkspaceDir string
@@ -116,6 +154,18 @@ type Config struct {
 	MaxA2ADepth  int
 	WorkspaceDir string
 	SQLitePath   string // empty = in-memory
+	RedisURL     string // empty = in-memory carrier health; set to enable RedisHealth
+}
+
+// maskRedisURL hides credentials in a Redis URL before logging.
+func maskRedisURL(u string) string {
+	if i := strings.Index(u, "://"); i >= 0 {
+		rest := u[i+3:]
+		if j := strings.Index(rest, "@"); j >= 0 {
+			return u[:i+3] + "***" + rest[j:]
+		}
+	}
+	return u
 }
 
 // New initializes the full platform layer.
@@ -127,7 +177,68 @@ func New(cfg Config) (*Platform, error) {
 		"claude":   claude.New(pm),
 		"codex":    codex.New(pm),
 		"gemini":   gemini.New(pm),
+		"kimi":     kimi.New(pm),
 		"opencode": opencode.New(pm),
+	}
+
+	// R1/R2/R3/R6 carrier registry. The default carrier chain is per-provider:
+	// claude leads with bg_daemon (long-session tier, live only when a warm pool
+	// is wired via WireClaudeWarmPool under -tags pty; otherwise it transparently
+	// falls back to print_sdk), and the other four CLIs stay one-shot (print_sdk).
+	// R2 warm-pool and R3 PTY tiers are reserved/opt-in and only enter claude's
+	// chain when explicitly enabled. R6: RedisHealth is compiled in by default
+	// but only activated when a Redis URL is configured; otherwise we keep the
+	// zero-dependency in-memory store.
+	var carrierHealth unified.CarrierHealth = unified.NewMemoryHealth()
+	var rclient *redis.Client
+	if cfg.RedisURL != "" {
+		rclient = redis.NewClient(&redis.Options{Addr: cfg.RedisURL})
+		carrierHealth = unified.NewRedisHealth(rclient)
+		log.Printf("carrier health: Redis-backed (url=%s)", maskRedisURL(cfg.RedisURL))
+	} else {
+		log.Printf("carrier health: in-memory (set SG_REDIS_URL to enable Redis)")
+	}
+	registry := unified.NewRegistry(carrierHealth)
+	registry.RegisterTransport(unified.NewProcessTransport(pm))
+	registry.RegisterTransport(unified.NewPtyTransport()) // R3 reserved; not in default chain
+	for name, a := range adapters {
+		switch v := a.(type) {
+		case *claude.Adapter:
+			v.SetRegistry(registry, name)
+		case *codex.Adapter:
+			v.SetRegistry(registry, name)
+		case *gemini.Adapter:
+			v.SetRegistry(registry, name)
+		case *kimi.Adapter:
+			v.SetRegistry(registry, name)
+		case *opencode.Adapter:
+			v.SetRegistry(registry, name)
+		}
+	}
+	// Per-provider default carrier chain (claude-first). claude PREFERS the
+	// bg_daemon (warm-pool)
+	// long-session tier; the other four CLIs stay one-shot (print_sdk). When the
+	// bg_daemon transport is not wired (default build, or WireClaudeWarmPool
+	// never called), the registry transparently falls back to print_sdk —
+	// behavior identical to pre-R2. This is the "gating/standby" the user asked
+	// for: claude-first intent, but the long-session tier is only live when its
+	// warm pool + PTY runner are compiled in (see WireClaudeWarmPool, -tags pty).
+	for name := range adapters {
+		chain := []unified.TransportKind{unified.TransportPrintSDK}
+		// Per-provider long session: claude/codex/gemini lead with bg_daemon
+		// (warm pool), falling back to one-shot print_sdk. opencode/kimi stay
+		// one-shot. The bg_daemon tier is only live when WireWarmPools (-tags pty)
+		// registers a transport for that provider; otherwise the registry finds
+		// none and transparently falls back to print_sdk.
+		switch name {
+		case "claude", "codex", "gemini":
+			chain = []unified.TransportKind{unified.TransportBgDaemon, unified.TransportPrintSDK}
+		}
+		registry.RegisterCarrier(&unified.Carrier{
+			ID:         name,
+			Provider:   name,
+			Transports: chain,
+		})
 	}
 
 	// Initialize stores (port/factory pattern) — created before the breed
@@ -167,7 +278,12 @@ func New(cfg Config) (*Platform, error) {
 	}
 	sopGuardian := sop.NewGuardian(nil, maxDepth)
 
-	memStore := memory.NewMemoryStore()
+	// Persistent Identity (P0): experience
+	// memory survives restarts. Stored next to dog-catalog.json under the same
+	// ConfigRoot so a single directory holds all durable identity state.
+	memStore := memory.NewMemoryStoreAt(
+		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), "memory.json"),
+	)
 
 	compressor := a2a.NewContextCompressor()
 
@@ -179,7 +295,9 @@ func New(cfg Config) (*Platform, error) {
 		return nil, fmt.Errorf("create thread store: %w", err)
 	}
 	threadStorePort := threadStores.NewThreadStoreAdapter(threadStore)
-	evidenceStore := memory.NewEvidenceStore()
+	evidenceStore := memory.NewEvidenceStoreAt(
+		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), "evidence.json"),
+	)
 
 	promptBuilder := prompt.NewBuilder(breeds, skillMgr)
 	contextAssembler := prompt.NewContextAssembler()
@@ -212,6 +330,23 @@ func New(cfg Config) (*Platform, error) {
 	ballLedger := custodyServices.NewBallLedger(ballStore)
 	holdScheduler := custodyServices.NewHoldScheduler(ballLedger, pm)
 	mentionRouter := routingServices.NewMentionRouterService(breeds)
+	// Wire the live default-breed resolver so the member-management "全局默认犬"
+	// selector (persisted via /api/config/default-breed) actually drives which
+	// dog executes an un-@mentioned conversation. Mirrors GetDefaultBreed:
+	// the DEFAULT_BREED_ID env override wins, otherwise the persisted config.
+	mentionRouter.SetDefaultBreedProvider(func() string {
+		if id := os.Getenv("DEFAULT_BREED_ID"); id != "" {
+			return id
+		}
+		if configs, err := settingsStore.ListConfig(); err == nil {
+			for _, c := range configs {
+				if c.Key == "default_breed" {
+					return c.Value
+				}
+			}
+		}
+		return ""
+	})
 	worklist := routingServices.NewWorklistRegistry()
 
 	// Project archive source (G8): file-backed repo trajectory store + git-ref
@@ -228,8 +363,52 @@ func New(cfg Config) (*Platform, error) {
 		leaderCfg = *stored
 	}
 
-	return &Platform{
+	// Persistent Identity (P1): relationship capsules persist in their own
+	// directory (NOT dog-catalog.json), honoring the cell-boundary discipline
+	// (relationship ≠ breed config). Single-operator
+	// form: the operator namespace is the leader name — the one human operator
+	// in SG. The repository is injected into the prompt builder so each spawn
+	// re-binds the dog to its long-term relationship with the operator.
+	operator := leaderCfg.Name
+	if operator == "" {
+		operator = "operator"
+	}
+	profiles := settings.NewProfileRepository(settings.ConfigRoot(cfg.WorkspaceDir), operator)
+	promptBuilder.SetProfiles(profiles)
+
+	// Persistent Identity (P3): a per-breed last-session digest survives restarts
+	// and separate one-shot spawns. The
+	// prompt builder injects it as a "续接上下文" section so the dog resumes
+	// awareness of what it was last doing (continuity bootstrap). In one-shot
+	// mode the rebuilt identity block already covers "who am I"; this adds
+	// "what I was working on".
+	continuity := settings.NewContinuityStore(settings.ConfigRoot(cfg.WorkspaceDir))
+	promptBuilder.SetContinuity(continuity)
+
+	// Persistent Identity (F276): owner-private
+	// third-party people & relationship memory. Multi-operator: every operator's
+	// data is partitioned by operatorID. File-backed by default (zero-dependency);
+	// when SG_REDIS_URL is set we use the Redis-backed store (operator-keyed
+	// keyspace + Lua-guarded deferred-receipt lifecycle), reusing the same rclient.
+	var peopleMemory settings.PeopleMemoryStore
+	// In-process event hub for cross-tab live sync (SSE). Shared between the
+	// broadcasting store decorator and the HTTP SSE handler.
+	pmHub := settings.NewPeopleMemoryEventHub()
+	if rclient != nil {
+		peopleMemory = settings.NewRedisPeopleMemoryStore(rclient)
+		log.Printf("people-memory: Redis-backed (operator-partitioned)")
+	} else {
+		peopleMemory = settings.NewFilePeopleMemoryStore(settings.ConfigRoot(cfg.WorkspaceDir))
+		log.Printf("people-memory: file-backed (operator-partitioned, set SG_REDIS_URL for Redis)")
+	}
+	// Decorating here means EVERY mutation path broadcasts (handler calls AND
+	// the daily clerk), so any open people-memory tab refreshes on a change.
+	peopleMemory = settings.NewBroadcastingPeopleMemoryStore(peopleMemory, pmHub)
+
+	pl := &Platform{
 		ProcessManager: pm,
+		CarrierRegistry: registry,
+		carrierHealth:  carrierHealth,
 		AgentExecutor:  agentsServices.NewAgentExecutor(adapters),
 		Breeds:         breeds,
 		Loader:         loader,
@@ -244,6 +423,10 @@ func New(cfg Config) (*Platform, error) {
 		ThreadStore:   threadStorePort,
 		SettingsStore: settingsStore,
 		EvidenceStore: evidenceStore,
+		Profiles:      profiles,
+		Continuity:    continuity,
+		PeopleMemory:  peopleMemory,
+		PeopleMemoryHub: pmHub,
 
 		WorkspaceDir: cfg.WorkspaceDir,
 
@@ -266,7 +449,16 @@ func New(cfg Config) (*Platform, error) {
 
 		RepoTrajectoryStore: repoTrajectoryStore,
 		GitRefCollector:     gitRefCollector,
-	}, nil
+	}
+
+	// Start the daily deferred-receipt clerk (homologous F276 dual path):
+	// aligned to "30 4 * * *" (04:30 local), it promotes ready deferred receipts
+	// into rejectable candidates. The goroutine is cancelled when the process
+	// exits (context.Background is fine for a long-lived daemon; it never
+	// silently materializes truth).
+	settings.StartPeopleMemoryClerk(context.Background(), pl.PeopleMemory, pl.peopleMemoryClerkDeps())
+
+	return pl, nil
 }
 
 // GetAdapter returns the CLI adapter for a given CLI name. It delegates to the
@@ -276,9 +468,93 @@ func (p *Platform) GetAdapter(cliName string) (unified.AgentExecutor, error) {
 	return p.AgentExecutor.Get(cliName)
 }
 
+// SetHealthBroadcaster wires a client-facing health broadcaster (the WebSocket
+// hub) into the carrier registry so CARRIER_HEALTH events reach the frontend
+// (T25 / R6). Safe to call with nil (defaults to a no-op broadcaster).
+func (p *Platform) SetHealthBroadcaster(b unified.HealthBroadcaster) {
+	if p.CarrierRegistry != nil && b != nil {
+		p.CarrierRegistry.SetBroadcaster(b)
+	}
+}
+
+// RegisterWarmPool enables the R2 warm-pool transport for claude only
+// (per-provider claude-first). It registers the BgDaemonTransport backed by
+// the given warm pool + claude-specific runner, and ensures claude's carrier
+// chain leads with bg_daemon. Other providers stay one-shot regardless — the
+// warm pool's PtyWarmSpawnFunc is claude-specific, so wiring it for codex/
+// gemini/etc would spawn the wrong CLI. Called from WireClaudeWarmPool
+// (compiled only under -tags pty). When bg_daemon is not wired (default build,
+// or this is never called), claude's default chain still references bg_daemon
+// but the registry finds no bg_daemon transport and falls back to print_sdk.
+func (p *Platform) RegisterWarmPool(wp *pool.WarmPool, runner unified.WarmRunner) {
+	if p.CarrierRegistry == nil || wp == nil || runner == nil {
+		return
+	}
+	p.CarrierRegistry.RegisterTransport(unified.NewBgDaemonTransport(wp, runner, p.carrierHealth))
+	const claudeProvider = "claude"
+	p.CarrierRegistry.RegisterCarrier(&unified.Carrier{
+		ID:         claudeProvider,
+		Provider:   claudeProvider,
+		Transports: []unified.TransportKind{unified.TransportBgDaemon, unified.TransportPrintSDK},
+	})
+}
+
+// RegisterWarmPoolForProviders enables the R2 warm-pool (bg_daemon) transport
+// for a set of providers (claude/codex/gemini long-session tiers), each with
+// its own warm pool (per-provider spawn func). It registers a single
+// BgDaemonTransport that routes to the correct per-provider pool by provider id
+// and sets each provider's carrier chain to lead with bg_daemon, falling back
+// to print_sdk. This is the homologous "claude/codex/gemini 都能长会话"
+// wiring; providers not in the map (opencode/kimi) stay one-shot. Called from
+// WireWarmPools (compiled only under -tags pty). Safe to call when bg_daemon is
+// not wired: the carriers still reference bg_daemon but the registry finds no
+// transport and falls back to one-shot — zero new dependency.
+func (p *Platform) RegisterWarmPoolForProviders(providers []string, pools map[string]*pool.WarmPool, runner unified.WarmRunner) {
+	if p.CarrierRegistry == nil || runner == nil || len(pools) == 0 {
+		return
+	}
+	p.CarrierRegistry.RegisterTransport(unified.NewBgDaemonTransportMulti(pools, runner, p.carrierHealth))
+	for _, prov := range providers {
+		if _, ok := pools[prov]; !ok {
+			continue
+		}
+		p.CarrierRegistry.RegisterCarrier(&unified.Carrier{
+			ID:         prov,
+			Provider:   prov,
+			Transports: []unified.TransportKind{unified.TransportBgDaemon, unified.TransportPrintSDK},
+		})
+	}
+}
+
 // GetBreed returns a breed config by ID.
 func (p *Platform) GetBreed(id string) *pack.BreedConfig {
 	return p.Breeds[id]
+}
+
+// RecordSessionBreed notes which breed (dog) is running a session. Best-effort:
+// a missed record only degrades distill's session-derived resolution (it falls
+// back to requiring an explicit ?client_id). The map is lazily allocated.
+func (p *Platform) RecordSessionBreed(sessionID, breedID string) {
+	if sessionID == "" || breedID == "" {
+		return
+	}
+	p.SessionBreedMu.Lock()
+	if p.SessionBreed == nil {
+		p.SessionBreed = make(map[string]string)
+	}
+	p.SessionBreed[sessionID] = breedID
+	p.SessionBreedMu.Unlock()
+}
+
+// BreedForSession returns the breed running a session, if known.
+func (p *Platform) BreedForSession(sessionID string) (string, bool) {
+	if sessionID == "" {
+		return "", false
+	}
+	p.SessionBreedMu.RLock()
+	defer p.SessionBreedMu.RUnlock()
+	b, ok := p.SessionBreed[sessionID]
+	return b, ok
 }
 
 // BuildMCPConfig returns MCP server configurations for CLI agents.
@@ -317,8 +593,8 @@ const repoCollectInterval = 5 * time.Minute
 
 // StartReconciler runs the ball-custody zombie sweep until ctx is cancelled.
 // It heals dangling invocations (started but never ended) into died/zombie so
-// the projected custody state never hangs in "active" forever. Mirrors
-// clowder-ai's reconcileZombies. Call once at process startup (main.go).
+	// the projected custody state never hangs in "active" forever. Mirrors the
+	// zombie-reconciliation sweep. Call once at process startup (main.go).
 func (p *Platform) StartReconciler(ctx context.Context) {
 	if p.BallLedger == nil {
 		return

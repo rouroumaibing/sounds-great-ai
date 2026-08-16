@@ -130,6 +130,9 @@ func (h *ThreadHandler) UpdateThread(w http.ResponseWriter, r *http.Request) {
 // ListMessages handles GET /api/threads/{id}/messages — cursor-paginated message history.
 func (h *ThreadHandler) ListMessages(w http.ResponseWriter, r *http.Request) {
 	if h.messageStore == nil {
+		// The message store is wired by the platform at startup. If it is absent
+		// the server is running in legacy/reduced mode and history is genuinely
+		// unavailable; report that honestly rather than masking it as empty.
 		respondJSON(w, http.StatusNotImplemented, map[string]string{"error": "message store not configured"})
 		return
 	}

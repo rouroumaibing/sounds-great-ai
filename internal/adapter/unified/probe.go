@@ -24,6 +24,31 @@ type LivenessProbe struct {
 	stopCh       chan struct{}
 	lastCPUTime  time.Duration
 	silentSince  time.Time
+	// hardStallNotified guards against spamming the hard-stall warning on every
+	// poll once the child has been silent beyond StallWarnMs. Reset on recovery.
+	hardStallNotified bool
+	// OnStall is invoked when the probe transitions into a stalled
+	// (alive-but-silent) state or recovers. The hard flag distinguishes a soft
+	// warning (beyond SoftWarnMs) from a hard stall (beyond StallWarnMs).
+	OnStall func(state ProbeState, hard bool)
+}
+
+// LivenessMessage renders a human-facing, safe message for a probe state change
+// (R8). It never includes process internals — only a status hint for the UI.
+func LivenessMessage(state ProbeState, hard bool) string {
+	switch state {
+	case ProbeIdleSilent:
+		if hard {
+			return "CLI 长时间无响应（疑似卡死），仍在等待输出…"
+		}
+		return "CLI 响应较慢，正在等待输出…"
+	case ProbeActive:
+		return "CLI 已恢复响应"
+	case ProbeBusySilent:
+		return "CLI 正在处理（高 CPU，但无文本输出）"
+	default:
+		return "CLI 状态：" + string(state)
+	}
 }
 
 func NewLivenessProbe(pid int, pollInterval time.Duration, softWarnMs, stallWarnMs int) *LivenessProbe {
@@ -78,17 +103,33 @@ func (p *LivenessProbe) pollOnce() {
 	case ProbeActive:
 		if !cpuGrowing && silentDuration > p.SoftWarnMs {
 			p.State = ProbeIdleSilent
+			if p.OnStall != nil {
+				p.OnStall(p.State, false) // soft stall warning
+			}
 		} else if cpuGrowing && silentDuration > p.SoftWarnMs {
 			p.State = ProbeBusySilent
 		}
 	case ProbeBusySilent:
 		if !cpuGrowing {
 			p.State = ProbeIdleSilent
+			if p.OnStall != nil {
+				p.OnStall(p.State, false) // soft stall warning
+			}
 		}
 	case ProbeIdleSilent:
+		if silentDuration > p.StallWarnMs && !p.hardStallNotified {
+			p.hardStallNotified = true
+			if p.OnStall != nil {
+				p.OnStall(p.State, true) // hard stall warning (once)
+			}
+		}
 		if cpuGrowing {
 			p.State = ProbeActive
 			p.silentSince = time.Time{}
+			p.hardStallNotified = false
+			if p.OnStall != nil {
+				p.OnStall(p.State, false) // recovered
+			}
 		}
 	}
 }
@@ -101,6 +142,6 @@ func processAlive(pid int) bool {
 	return proc.Signal(syscall.Signal(0)) == nil
 }
 
-func getProcessCPUTime(pid int) time.Duration {
-	return 0
-}
+// getProcessCPUTime returns the total CPU time consumed by pid. It is provided
+// per-platform: probe_linux.go (Linux /proc), probe_darwin.go (macOS ps), and
+// probe_other.go (fallback) — exactly one is compiled per target.

@@ -85,7 +85,7 @@ type SystemConfig struct {
 
 // SettingsStore is the port interface for settings storage.
 type SettingsStore interface {
-	// Deprecated: members are stored as breeds (clowder-homologous). These
+	// Deprecated: members are stored as breeds (homologous). These
 	// methods remain only to keep the legacy /api/settings/members endpoint
 	// working until it is removed in favor of /api/breeds.
 	ListMembers() ([]*Member, error)
@@ -93,7 +93,7 @@ type SettingsStore interface {
 	UpdateMember(id string, updates map[string]any) error
 	DeleteMember(id string) error
 
-	// Breeds (runtime member catalog; clowder-homologous structure).
+	// Breeds (runtime member catalog; homologous structure).
 	ListBreeds() ([]*pack.BreedConfig, error)
 	CreateBreed(b *pack.BreedConfig) error
 	UpdateBreed(id string, b *pack.BreedConfig) error
@@ -116,7 +116,7 @@ type SettingsStore interface {
 	// from an existing customer catalog.
 	CatalogFileExists() bool
 	// ReorderBreeds reorders the persisted catalog breeds[] array to match the
-	// given order (clowder-homologous: the array order is the sort truth).
+	// given order (homologous: the array order is the sort truth).
 	// IDs not present in the catalog are ignored; catalog breeds missing from
 	// order keep their previous relative position appended at the end.
 	ReorderBreeds(order []string) error

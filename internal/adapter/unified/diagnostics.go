@@ -20,6 +20,12 @@ const (
 	ReasonSilentCompletion      ErrorReasonCode = "silent_completion"
 	ReasonMissingRollout        ErrorReasonCode = "missing_rollout"
 	ReasonInvalidThinkingSig    ErrorReasonCode = "invalid_thinking_signature"
+	// R7: align reasonCode vocabulary. stall_timeout is driven by
+	// the liveness probe (set on the SpawnHandle); response_timeout and
+	// policy_reject are classifier-derived from stderr/stream error text.
+	ReasonStallTimeout         ErrorReasonCode = "cli_stall_timeout"
+	ReasonResponseTimeout      ErrorReasonCode = "cli_response_timeout"
+	ReasonUpstreamPolicyReject ErrorReasonCode = "upstream_policy_reject"
 )
 
 type CliDiagnostics struct {
@@ -46,6 +52,8 @@ var classifierPatterns = []struct {
 	{ReasonToolCallParseFailed, regexp.MustCompile(`(?i)(tool\s+call.*parse|invalid\s+tool\s+call)`)},
 	{ReasonInvalidThinkingSig, regexp.MustCompile(`(?i)(invalid.*thinking.*signature)`)},
 	{ReasonMissingRollout, regexp.MustCompile(`(?i)(missing\s+rollout|rollout\s+not\s+found)`)},
+	{ReasonResponseTimeout, regexp.MustCompile(`(?i)(timeout|timed out|deadline exceeded|504|408|request timeout)`)},
+	{ReasonUpstreamPolicyReject, regexp.MustCompile(`(?i)(policy|reject|not allowed|forbidden|403|upstream.*reject)`)},
 }
 
 func ClassifyError(stderr string) ErrorReasonCode {
@@ -93,15 +101,37 @@ var reasonSummaries = map[ErrorReasonCode]struct{ Summary, Hint string }{
 	ReasonToolCallParseFailed:   {"Tool call parse failure", "Check tool call format"},
 	ReasonInvalidThinkingSig:    {"Invalid thinking signature", "Internal error, retry the request"},
 	ReasonMissingRollout:        {"Missing rollout", "The rollout file was not found"},
+	ReasonStallTimeout:          {"CLI stalled (no response)", "The CLI is alive but not producing output; check for long-running operations or kill and retry"},
+	ReasonResponseTimeout:       {"Response timeout", "The CLI did not respond in time; retry or increase the timeout"},
+	ReasonUpstreamPolicyReject:  {"Upstream policy rejected", "The upstream provider rejected the request per its policy"},
 }
 
+// BuildDiagnostics classifies a failure from captured stderr only. See
+// BuildDiagnosticsFrom for the dual-source variant (R5).
 func BuildDiagnostics(stderr string, exitCode *int, signal string) CliDiagnostics {
+	return BuildDiagnosticsFrom(stderr, "", exitCode, signal)
+}
+
+// BuildDiagnosticsFrom classifies a CLI failure from one or two sources (R5):
+// the captured stderr (priority) and, when stderr is empty, the NDJSON
+// stream-level error text recorded during streaming. This mirrors the
+// maybeCollectStreamError so that failures which only surface in the stream
+// protocol (and not stderr) still get a classified, sanitized diagnosis.
+func BuildDiagnosticsFrom(stderr, streamErr string, exitCode *int, signal string) CliDiagnostics {
 	d := CliDiagnostics{ExitCode: exitCode, Signal: signal}
-	if stderr == "" {
+	classifySrc := stderr
+	excerptSrc := stderr
+	if classifySrc == "" {
+		classifySrc = streamErr
+	}
+	if excerptSrc == "" {
+		excerptSrc = streamErr
+	}
+	if excerptSrc == "" {
 		return d
 	}
-	d.ReasonCode = ClassifyError(stderr)
-	safe := SanitizeStderr(stderr)
+	d.ReasonCode = ClassifyError(classifySrc)
+	safe := SanitizeStderr(excerptSrc)
 	if len(safe) > 200 {
 		safe = safe[:200] + "..."
 	}
@@ -114,4 +144,65 @@ func BuildDiagnostics(stderr string, exitCode *int, signal string) CliDiagnostic
 		d.PublicHint = "Check logs for details"
 	}
 	return d
+}
+
+// FormatDiagnostics renders a CliDiagnostics as a human-facing, safe message.
+// It never includes raw stderr — only the classified public summary + hint, and
+// falls back to the sanitized excerpt (already redacted) only for unclassified
+// failures. This is what adapters forward to the client as an error event.
+func FormatDiagnostics(d CliDiagnostics) string {
+	msg := d.PublicSummary
+	if msg == "" {
+		msg = "CLI process failed"
+	}
+	if d.PublicHint != "" {
+		msg += "\n提示: " + d.PublicHint
+	} else if d.ReasonCode == "" && d.SafeExcerpt != "" {
+		msg += ": " + d.SafeExcerpt
+	}
+	return msg
+}
+
+// EmitDiagnosticsIfNeeded waits for the spawned process to exit and, if it
+// failed (non-zero exit or a classified stderr reason), sends a single
+// sanitized error StreamEvent — unless an error was already surfaced during
+// streaming. Adapters call this at the end of their streamEvents goroutine,
+// before the channel is closed.
+func EmitDiagnosticsIfNeeded(h *SpawnHandle, ch chan<- StreamEvent, sawError bool) {
+	h.Wait()
+	exitCode, signal := h.ExitInfo()
+	diag := BuildDiagnosticsFrom(h.StderrString(), h.streamErrTextSafe(), exitCode, signal)
+	if h.stalledFlag() {
+		// A stall was observed while the child was running. If it ended in a
+		// failure (or without a clear reason), classify as a stall timeout (R7)
+		// rather than leaving it unclassified.
+		if diag.ReasonCode == "" || (exitCode != nil && *exitCode != 0) {
+			diag.ReasonCode = ReasonStallTimeout
+			if info, ok := reasonSummaries[ReasonStallTimeout]; ok {
+				diag.PublicSummary = info.Summary
+				diag.PublicHint = info.Hint
+			}
+		}
+	}
+	if (exitCode != nil && *exitCode != 0) || diag.ReasonCode != "" {
+		if !sawError {
+			// Forward structured diagnostics (cliDiagnostics-style)
+			// as event Meta so the client's CliDiagnosticsPanel can render a
+			// tier-colored, path-redacted, allowlist-gated panel. The excerpt
+			// is already sanitized server-side (REDACTED-*) via
+			// BuildDiagnosticsFrom; Source tags where the excerpt came from
+			// so the client can gate raw display by an allowlist.
+			ch <- StreamEvent{
+				Type:    "error",
+				Content: FormatDiagnostics(diag),
+				Meta: map[string]any{
+					"reason":  string(diag.ReasonCode),
+					"summary": diag.PublicSummary,
+					"hint":    diag.PublicHint,
+					"excerpt": diag.SafeExcerpt,
+					"source":  "cli_stderr",
+				},
+			}
+		}
+	}
 }

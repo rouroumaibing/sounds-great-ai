@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useChatStore } from '../../store/useChatStore';
 import { useBreeds } from '../../hooks/useBreeds';
 import { useCustodyTrail } from '../../hooks/useCustodyTrail';
@@ -64,6 +64,19 @@ export function CustodyTrail({ threadId }: { threadId: string }) {
   const getName = (id: string) => resolveBreedDisplayName(id, (bid) => breeds.find((b) => b.id === bid));
 
   const { briefing, loading, error, refresh } = useCustodyTrail(threadId);
+  const wsManager = useChatStore((s) => s.wsManager);
+  const [waking, setWaking] = useState(false);
+
+  const handleWake = () => {
+    if (!wsManager) return;
+    setWaking(true);
+    wsManager.sendWakeHold(threadId, 'manual');
+    // Give the server a moment to re-dispatch the holder, then refresh.
+    setTimeout(() => {
+      setWaking(false);
+      refresh();
+    }, 600);
+  };
 
   // Re-fetch the trail when the orchestration emits new events for this thread
   // (BarkStart/BarkResult append to the chat store) so the audit trail stays live.
@@ -104,6 +117,16 @@ export function CustodyTrail({ threadId }: { threadId: string }) {
         >
           <i className={`fa-solid fa-rotate ${loading ? 'animate-spin' : ''}`}></i>
         </button>
+        {(state === 'parked' || state === 'blocked') && (
+          <button
+            onClick={handleWake}
+            disabled={waking}
+            className="text-[10px] font-mono px-2 py-0.5 rounded border border-sky-500/40 text-sky-300 hover:bg-sky-600/20 transition-colors disabled:opacity-50"
+            title="手动唤醒持球挂起的线程"
+          >
+            <i className={`fa-solid fa-bell ${waking ? 'animate-pulse' : ''}`}></i> 唤醒
+          </button>
+        )}
       </div>
 
       {error && (

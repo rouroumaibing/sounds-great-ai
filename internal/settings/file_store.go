@@ -23,6 +23,22 @@ const (
 	CatalogFileName     = "dog-catalog.json"
 	RepoTrajectoryFileName = "repo-trajectory.json"
 	CredentialsFileName = "credentials.json"
+	// BreedHistoryFileName holds the per-breed identity audit trail (P3-b,
+	// homologous identity history). Kept separate from dog-catalog.json
+	// on purpose: breed identity changes are an audit concern, not member data,
+	// and must never bloat or risk the runtime catalog.
+	BreedHistoryFileName = "breed-history.json"
+
+	// PeopleMemoryFileName holds the owner-private third-party people & relationship
+	// memory (Persistent Identity F276, homologous). Kept as a single
+	// document under ConfigRoot so all six logical objects (person / claim /
+	// relationship / interaction / candidate / card) share one atomic-write
+	// transaction and one owner-private keyspace — no Redis, no parallel store.
+	PeopleMemoryFileName = "people-memory.json"
+
+	// maxBreedHistoryPerBreed caps retained audit entries per breed so the
+	// history file cannot grow without bound (most-recent wins).
+	maxBreedHistoryPerBreed = 50
 
 	// maxBackups is the number of timestamped .bak files kept per config file
 	// (most recent wins); older snapshots are pruned to avoid unbounded growth.
@@ -78,7 +94,7 @@ const EnvCredentialRoot = "SOUNDS_GREAT_AI_CREDENTIAL_ROOT"
 //  1. SOUNDS_GREAT_AI_CREDENTIAL_ROOT (env, "~" expanded per-OS)
 //  2. {home}/.sounds-great-ai            (global home, the customer-safe default)
 //
-// Per the customer-safety layout (aligned with clowder-ai), secrets live in a
+// Per the customer-safety layout (aligned with the upstream design), secrets live in a
 // GLOBAL home directory independent of the project-local config root, so that
 // clearing the project config never wipes API keys.
 func CredentialRoot() string {
@@ -97,7 +113,7 @@ type accountsDocument struct {
 }
 
 // catalogDocument is the on-disk envelope for the runtime member catalog.
-// It is clowder-homologous: breeds + roster + review_policy + leader + configs.
+// It is homologous: breeds + roster + review_policy + leader + configs.
 // The legacy `members` array is migrated to `breeds`+`roster` on first load.
 type catalogDocument struct {
 	Version      int                          `json:"version"`
@@ -116,6 +132,24 @@ type catalogDocument struct {
 	SeenTemplateBreeds []string `json:"seen_template_breeds,omitempty"`
 }
 
+// breedHistoryDocument is the on-disk envelope for the per-breed identity
+// audit trail (P3-b). It records create/update/delete actions per breed with a
+// state snapshot, so catalog breed identity changes are reconstructable across
+// restarts. It is intentionally NOT merged into catalogDocument — breed history
+// is an audit ledger, not member data (cell-boundary discipline:
+// identity history ≠ breed config).
+type breedHistoryDocument struct {
+	Entries map[string][]BreedChangeEntry `json:"entries"`
+}
+
+// BreedChangeEntry records one identity-affecting mutation of a breed.
+type BreedChangeEntry struct {
+	Action   string            `json:"action"` // create | update | delete
+	At       int64             `json:"at"`     // unix millis
+	BreedID  string            `json:"breed_id"`
+	Snapshot *pack.BreedConfig `json:"snapshot,omitempty"` // state after (create/update) or before (delete)
+}
+
 // FileSettingsStore implements SettingsStore with JSON files on disk:
 //   - accounts.json    : account metadata (0644, atomic write)
 //   - dog-catalog.json : breeds + roster + review_policy + leader + configs (0644, atomic write)
@@ -126,6 +160,7 @@ type catalogDocument struct {
 type FileSettingsStore struct {
 	accountsPath  string
 	catalogPath   string
+	breedHistoryPath string
 	mu            sync.RWMutex
 	breeds        map[string]*pack.BreedConfig
 	breedOrder    []string
@@ -138,6 +173,10 @@ type FileSettingsStore struct {
 	// seenTemplateBreeds records template breed IDs already exposed to this
 	// catalog (see SeenTemplateBreeds in catalogDocument).
 	seenTemplateBreeds map[string]bool
+	// breedHistory is the per-breed identity audit trail (P3-b). Loaded from
+	// disk on every ensureLoaded so external edits are visible; appended and
+	// persisted atomically on each identity-affecting mutation.
+	breedHistory map[string][]BreedChangeEntry
 	loaded              bool
 	reload              *HotReloader
 }
@@ -154,12 +193,14 @@ func NewFileSettingsStore(accountsPath, catalogPath string, watch bool) *FileSet
 	s := &FileSettingsStore{
 		accountsPath:  accountsPath,
 		catalogPath:   catalogPath,
+		breedHistoryPath: filepath.Join(filepath.Dir(catalogPath), BreedHistoryFileName),
 		breeds:        make(map[string]*pack.BreedConfig),
 		roster:        make(map[string]pack.RosterEntry),
 		accounts:      make(map[string]*Account),
 		configs:       defaultConfig(),
 		deletedBreeds: make(map[string]bool),
 		seenTemplateBreeds: make(map[string]bool),
+		breedHistory:  make(map[string][]BreedChangeEntry),
 	}
 	if watch {
 		s.reload = NewHotReloader([]string{accountsPath, catalogPath}, func() {
@@ -170,6 +211,29 @@ func NewFileSettingsStore(accountsPath, catalogPath string, watch bool) *FileSet
 		s.reload.Start()
 	}
 	return s
+}
+
+// legacyClientIDMap maps deprecated provider-style client identifiers to the
+// current CLI client identifiers that drive them in SG. Older catalogs (and
+// pre-migration backups) used the underlying API vendor name (anthropic/openai/
+// google) as the client_id; SG's adapter registry is keyed by the CLI binary
+// (claude/codex/gemini), so those values must be normalized on load or the
+// breed fails to spawn (GetAdapter returns not-found). See SG-ORC-001 §迁移风险.
+var legacyClientIDMap = map[string]string{
+	"anthropic": "claude",
+	"openai":    "codex",
+	"google":    "gemini",
+}
+
+// normalizeClientID maps a legacy client_id to its current CLI equivalent.
+// Unknown or empty values pass through unchanged so callers still get ordinary
+// validation (e.g. ValidateClientID). Idempotent: passing an already-current
+// value returns it unchanged.
+func normalizeClientID(id string) string {
+	if mapped, ok := legacyClientIDMap[id]; ok {
+		return mapped
+	}
+	return id
 }
 
 // ensureLoaded loads both files on first access. Callers must hold s.mu.
@@ -198,6 +262,7 @@ func (s *FileSettingsStore) reloadFromDisk() error {
 		} else {
 			for _, a := range doc.Accounts {
 				if a != nil && a.ID != "" {
+					a.ClientID = normalizeClientID(a.ClientID)
 					s.accounts[a.ID] = a
 				}
 			}
@@ -240,10 +305,23 @@ func (s *FileSettingsStore) reloadFromDisk() error {
 		} else {
 			for i := range doc.Breeds {
 				b := &doc.Breeds[i]
-				if b.ID != "" {
-					s.breeds[b.ID] = b
-					s.breedOrder = append(s.breedOrder, b.ID)
+				if b.ID == "" {
+					continue
 				}
+				// Normalize legacy provider-style client_ids (anthropic/openai/
+				// google) to the CLI clients that drive them, so a restored old
+				// catalog or backup does not route a breed to a non-existent
+				// adapter. Self-healing on every load (incl. hot-reload).
+				for vi := range b.Variants {
+					legacy := b.Variants[vi].ClientID
+					if mapped, ok := legacyClientIDMap[legacy]; ok {
+						log.Printf("WARN: catalog breed %q variant %q has legacy client_id %q; normalizing to %q",
+							b.ID, b.Variants[vi].ID, legacy, mapped)
+						b.Variants[vi].ClientID = mapped
+					}
+				}
+				s.breeds[b.ID] = b
+				s.breedOrder = append(s.breedOrder, b.ID)
 			}
 			for k, r := range doc.Roster {
 				s.roster[k] = r
@@ -269,7 +347,56 @@ func (s *FileSettingsStore) reloadFromDisk() error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
+
+	// breed-history.json (per-breed identity audit trail, P3-b). Loaded fresh
+	// on every ensureLoaded so external edits are reflected; recordBreedChange
+	// persists immediately, so this stays consistent even after a hot-reload.
+	s.breedHistory = make(map[string][]BreedChangeEntry)
+	if raw, err := os.ReadFile(s.breedHistoryPath); err == nil {
+		var hd breedHistoryDocument
+		if err := json.Unmarshal(raw, &hd); err != nil {
+			log.Printf("WARN: breed-history file %s is corrupt; starting empty", s.breedHistoryPath)
+			s.breedHistory = make(map[string][]BreedChangeEntry)
+		} else if hd.Entries != nil {
+			s.breedHistory = hd.Entries
+		}
+	} else if !os.IsNotExist(err) {
+		log.Printf("WARN: breed-history file %s unreadable; starting empty", s.breedHistoryPath)
+	}
+
 	return nil
+}
+
+// recordBreedChange appends an identity-affecting mutation to the audit trail
+// for the given breed and persists it atomically. It is a best-effort side
+// effect of the catalog mutations: a persistence failure is logged but never
+// aborts the originating mutation. Callers must hold s.mu.
+func (s *FileSettingsStore) recordBreedChange(id, action string, snapshot *pack.BreedConfig) {
+	if id == "" {
+		return
+	}
+	entry := BreedChangeEntry{
+		Action:   action,
+		At:       time.Now().UnixMilli(),
+		BreedID:  id,
+		Snapshot: snapshot,
+	}
+	s.breedHistory[id] = append(s.breedHistory[id], entry)
+	if len(s.breedHistory[id]) > maxBreedHistoryPerBreed {
+		s.breedHistory[id] = s.breedHistory[id][len(s.breedHistory[id])-maxBreedHistoryPerBreed:]
+	}
+	if err := s.flushBreedHistory(); err != nil {
+		log.Printf("WARN: persist breed-history for %q failed: %v", id, err)
+	}
+}
+
+// flushBreedHistory writes the full audit ledger atomically. Callers must hold s.mu.
+func (s *FileSettingsStore) flushBreedHistory() error {
+	doc := breedHistoryDocument{Entries: s.breedHistory}
+	if doc.Entries == nil {
+		doc.Entries = map[string][]BreedChangeEntry{}
+	}
+	return writeAtomic(s.breedHistoryPath, doc, 0o644)
 }
 
 // migrateLegacyMembers converts a legacy `members`-based catalog into the new
@@ -411,6 +538,16 @@ func writeAtomic(path string, v any, perm os.FileMode) error {
 	return os.Rename(tmp, path)
 }
 
+// writeAtomicRaw writes raw bytes atomically (temp file + rename). Used for
+// non-JSON payloads such as relationship-capsule markdown files.
+func writeAtomicRaw(path string, data []byte, perm os.FileMode) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, perm); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
 // ---------------------------------------------------------------------------
 // Breeds (runtime member catalog)
 // ---------------------------------------------------------------------------
@@ -454,7 +591,11 @@ func (s *FileSettingsStore) CreateBreed(b *pack.BreedConfig) error {
 	if _, ok := s.roster[b.ID]; !ok {
 		s.roster[b.ID] = pack.RosterEntry{Available: b.Enabled}
 	}
-	return s.flushCatalog()
+	if err := s.flushCatalog(); err != nil {
+		return err
+	}
+	s.recordBreedChange(b.ID, "create", b)
+	return nil
 }
 
 func (s *FileSettingsStore) UpdateBreed(id string, b *pack.BreedConfig) error {
@@ -471,7 +612,11 @@ func (s *FileSettingsStore) UpdateBreed(id string, b *pack.BreedConfig) error {
 	if _, ok := s.roster[id]; !ok {
 		s.roster[id] = pack.RosterEntry{Available: b.Enabled}
 	}
-	return s.flushCatalog()
+	if err := s.flushCatalog(); err != nil {
+		return err
+	}
+	s.recordBreedChange(id, "update", b)
+	return nil
 }
 
 func (s *FileSettingsStore) DeleteBreed(id string) error {
@@ -483,6 +628,7 @@ func (s *FileSettingsStore) DeleteBreed(id string) error {
 	if _, ok := s.breeds[id]; !ok {
 		return fmt.Errorf("breed %q: %w", id, ErrBreedNotFound)
 	}
+	old := s.breeds[id]
 	delete(s.breeds, id)
 	delete(s.roster, id)
 	s.deletedBreeds[id] = true
@@ -492,7 +638,39 @@ func (s *FileSettingsStore) DeleteBreed(id string) error {
 			break
 		}
 	}
-	return s.flushCatalog()
+	if err := s.flushCatalog(); err != nil {
+		return err
+	}
+	s.recordBreedChange(id, "delete", old)
+	return nil
+}
+
+// ReadBreedHistory returns the identity-audit trail for a breed (P3-b):
+// the sequence of create/update/delete entries with state snapshots, in
+// chronological order. An empty slice (no error) means the breed has no
+// recorded history.
+func (s *FileSettingsStore) ReadBreedHistory(breedID string) ([]BreedChangeEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if err := s.ensureLoaded(); err != nil {
+		return nil, err
+	}
+	return s.breedHistory[breedID], nil
+}
+
+// ClearBreedHistory removes all audit entries for a breed (ops/GDPR-style
+// purge). It is a no-op for a breed with no history.
+func (s *FileSettingsStore) ClearBreedHistory(breedID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ensureLoaded(); err != nil {
+		return err
+	}
+	if _, ok := s.breedHistory[breedID]; !ok {
+		return nil
+	}
+	delete(s.breedHistory, breedID)
+	return s.flushBreedHistory()
 }
 
 // ListDeletedBreeds returns the IDs of breeds the customer has explicitly

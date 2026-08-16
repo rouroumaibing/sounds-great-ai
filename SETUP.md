@@ -8,9 +8,9 @@
 
 | Tool | Version | Install |
 |------|---------|---------|
-| **Go** | >= 1.22 | [go.dev](https://go.dev/dl/) |
+| **Go** | >= 1.26 | [go.dev](https://go.dev/dl/) |
 | **Node.js** | >= 20.0.0 | [nodejs.org](https://nodejs.org/) (for web frontend) |
-| **Redis** | >= 7.0 | `brew install redis` (macOS) — *optional: use `--memory` flag to skip* |
+| **Redis** | >= 7.0 | `brew install redis` (macOS) — *可选，仅当设置 `SG_REDIS_URL`（或 `REDIS_URL`）环境变量时启用，默认关闭* |
 | **Git** | any recent | Comes with most systems |
 
 ## Quick Start
@@ -52,6 +52,6 @@ See `docs/cli.md` for installing and configuring Claude Code, Gemini CLI, Codex,
 
 ## Troubleshooting
 
-- **Port already in use**: Change port with `--port` flag
+- **Port already in use**: 用 `PORT` 环境变量改端口，例如 `PORT=9090 go run cmd/server/main.go`（默认 8080）
 - **CLI not found**: Ensure CLI tools are installed globally (see `docs/cli.md`)
 - **Breed config not loading**: Check `packs/default/breeds/dog-template.json` syntax

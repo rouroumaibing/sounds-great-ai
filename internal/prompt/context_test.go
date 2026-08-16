@@ -126,3 +126,41 @@ func TestEstimateTokens(t *testing.T) {
 		t.Error("expected positive token count for CJK")
 	}
 }
+
+// TestBoundContextByTokens verifies Persistent Identity P2: the breed's
+// auto-compact budget drops the OLDEST messages first and keeps the most
+// recent ones (homologous auto-compact at the orchestration layer).
+func TestBoundContextByTokens(t *testing.T) {
+	t.Parallel()
+	base := time.Now()
+	msgs := []ContextMessage{
+		{Role: "user", Content: "old message one", Sender: "user", Timestamp: base},
+		{Role: "assistant", Content: "old reply one", Sender: "边牧", Timestamp: base},
+		{Role: "user", Content: "middle message", Sender: "user", Timestamp: base},
+		{Role: "assistant", Content: "recent reply", Sender: "金毛", Timestamp: base},
+		{Role: "user", Content: "newest message", Sender: "user", Timestamp: base},
+	}
+
+	// Budget of 0 is a no-op.
+	if got := BoundContextByTokens(msgs, 0); len(got) != len(msgs) {
+		t.Errorf("budget 0 should be a no-op, got %d", len(got))
+	}
+
+	// Tight budget: only the most recent message survives, and it must be the
+	// newest one (order preserved, oldest dropped).
+	got := BoundContextByTokens(msgs, 5)
+	if len(got) == 0 {
+		t.Fatal("expected at least one message to survive")
+	}
+	if got[len(got)-1].Content != "newest message" {
+		t.Errorf("most recent message should survive, got %q", got[len(got)-1].Content)
+	}
+	if got[0].Content == "old message one" {
+		t.Error("oldest message should have been dropped")
+	}
+
+	// Generous budget: everything fits.
+	if got := BoundContextByTokens(msgs, 100000); len(got) != len(msgs) {
+		t.Errorf("generous budget should keep all, got %d", len(got))
+	}
+}

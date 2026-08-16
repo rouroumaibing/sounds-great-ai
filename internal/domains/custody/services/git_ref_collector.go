@@ -48,7 +48,7 @@ func (execGitRunner) LsRemote(ctx context.Context, repoURL string) (map[string]s
 }
 
 // GitRefCollector collects git branch events into the repo trajectory store.
-// It is the SG homologue of clowder's GitRefSnapshotCollector, but limited to
+// It is the SG homologue of GitRefSnapshotCollector, but limited to
 // signals available without a GitHub API (branch presence + head SHA change).
 type GitRefCollector struct {
 	store  *stores.RepoTrajectoryStore

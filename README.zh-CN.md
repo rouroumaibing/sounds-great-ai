@@ -33,6 +33,16 @@
 > *当 Agent 们完美完成一次协同，终端亮起绿色的爪印：*
 > **`Sounds Great!`**
 
+## 架构设计
+
+<div align="center">
+
+犬队协作与系统架构全景图。
+
+![Sounds Great AI 架构设计](docs/design/images/sounds-great-ai.png)
+
+</div>
+
 ## 截图
 
 <div align="center">
@@ -75,7 +85,7 @@
 
 > 用户可以创建自己的狗狗 —— 在设置页填写身份与 variants 即可，无需写代码，保存落盘 `dog-catalog.json`，热加载立即生效。
 
-> **首启为空、按需组队**：全新安装首次启动时成员列表为空（仅有 Owner），六犬仅是可选「模板菜单」；在「成员管理 → 从模板添加」把犬加入团队、绑定账号与密钥后，犬才进入运行时。未配置凭据的成员显示为「待配置」而非「已启用」。详见 `docs/VISION.md` §5.1 与 `docs/decisions/ADR-001`。
+> **首启为空、按需组队**：全新安装首次启动时成员列表为空（仅有 Owner），六犬仅是可选「模板菜单」；在「成员管理 → 从模板添加」把犬加入团队、绑定账号与密钥后，犬才进入运行时。未配置凭据的成员显示为「待配置」而非「已启用」。详见 `docs/VISION.md` §5.1。
 
 ## Architecture
 
@@ -97,7 +107,7 @@
                        ▼
 ┌───────────────────────────────────────────────────┐
 │            internal/adapter/ (CLI 适配器)           │
-│   claude/    codex/    gemini/    opencode/         │
+│   claude/    codex/    gemini/    opencode/    kimi/     │
 │   unified/ (ProcessManager + NDJSON 解析)           │
 └──────────────────────┬────────────────────────────┘
                        │ stdin/stdout pipe
@@ -130,7 +140,7 @@
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-org/sounds-great-ai.git
+git clone https://github.com/sounds-great-ai/sounds-great-ai.git
 cd sounds-great-ai
 
 # 2. Install dependencies
@@ -221,7 +231,7 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 
 | 包 | 说明 | 状态 |
 |---|------|------|
-| `internal/adapter/` | 4 个 CLI 适配器 + ProcessManager | ✅ Shipped |
+| `internal/adapter/` | 5 个 CLI 适配器（含 kimi）+ ProcessManager | ✅ Shipped |
 | `pkg/pack/` | 品种配置 schema 与加载器（variants[] 格式） | ✅ Shipped |
 | `internal/skills/` | 技能框架（.md 加载 + 注入） | ✅ Shipped |
 | `internal/ragstore/` | RAG 存储（3 后端：Memory/SQLite/Eino） | ✅ Shipped |
@@ -230,7 +240,7 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 | `internal/capability/` | 6 个纯逻辑能力（安全护栏 + 路由 + 上下文） | ✅ Shipped |
 | `internal/prompt/` | System Prompt Builder + Context Assembler（5 段提示，token 预算） | ✅ Shipped |
 | `internal/threadstore/` | 线程 + 消息存储（SQLite WAL + 内存，工厂模式） | ✅ Shipped |
-| `internal/router/` | 动态路由引擎 + @mention 多狗狗路由 | ✅ Shipped |
+| `internal/domains/routing/` + `internal/transport/` | @mention 动态路由 + 串行/并行执行 | ✅ Shipped |
 | `internal/a2a/` | A2A Hub + 上下文压缩 | ✅ 最小实现 |
 | `internal/sop/` | SOP 门控 + 跨模型審查 | ✅ 最小实现 |
 | `internal/mcp/` | MCP 注册表 | ✅ 最小实现 |
@@ -239,25 +249,25 @@ curl -X POST http://localhost:8080/api/breeds/mydog/bark \
 
 **多狗狗协作 — 已完成：**
 
-| 功能 | 说明 | clowder-ai 参考 |
-|------|------|----------------|
-| System Prompt Builder | 5 段提示：身份 + 限制 + 队友名册 + 角色 + 技能 | SystemPromptBuilder |
-| Context Assembler | 历史转 schema 消息，token 预算，截断 | ContextAssembler |
-| @mention 路由 | 解析 @mention（中文+英文），按 breed config 模式路由 | AgentRouter |
-| 串行执行 | 多狗狗链式：每个输出作为下一个的上下文 | route-serial |
-| 并行执行 | goroutine 并发 + 共享 streamer + WaitGroup | route-parallel |
-| SQLite 持久化 | WAL 模式，工厂模式，close/reopen 持久性 | ThreadStore + MessageStore |
+| 功能 | 说明 |
+|------|------|
+| System Prompt Builder | 5 段提示：身份 + 限制 + 队友名册 + 角色 + 技能 |
+| Context Assembler | 历史转 schema 消息，token 预算，截断 |
+| @mention 路由 | 解析 @mention（中文+英文），按 breed config 模式路由 |
+| 串行执行 | 多狗狗链式：每个输出作为下一个的上下文 |
+| 并行执行 | goroutine 并发 + 共享 streamer + WaitGroup |
+| SQLite 持久化 | WAL 模式，工厂模式，close/reopen 持久性 |
 
 ### v2: 剩余工作
 
 > Phase 7 主体已完成。以下子项仍在进行中。
 
-| 工作项 | 说明 | clowder-ai 参考 | 状态 |
-|--------|------|----------------|------|
-| 文档治理补全 | AGENTS.md 治理机制 + Skills 补充 + per-breed 身份 + memory-philosophy 补全 | clowder-ai shared-rules + 49 skills | 进行中 |
-| Hooks 内容充实 | D/L 系列 hook 模板补充实质内容 | clowder-ai prompt-hooks | 进行中 |
-| RAG 按需检索 | MCP `search_knowledge` tool → RAG store → agent 按需查询 | domains/memory/（按需，非默认前置） | 规划中 |
-| SOP 基础门禁 | SOPGuardian 接入执行流（review 触发、安全检查） | 五轴风险路由（简化版） | 规划中 |
+| 工作项 | 说明 | 状态 |
+|--------|------|------|
+| 文档治理补全 | AGENTS.md 治理机制 + Skills 补充 + per-breed 身份 + memory-philosophy 补全 | 进行中 |
+| Hooks 内容充实 | D/L 系列 hook 模板补充实质内容 | 进行中 |
+| RAG 按需检索 | MCP `search_knowledge` tool → RAG store → agent 按需查询 | 规划中 |
+| SOP 基础门禁 | SOPGuardian 接入执行流（review 触发、安全检查） | 规划中 |
 
 ## Security Audit（安全扫描）
 
@@ -345,7 +355,7 @@ sounds-great-ai/
 │   ├── a2a/                 # A2A 协议类型
 │   └── pack/                # Pack/Breed 核心系统 (breed.go schema + loader.go)
 ├── internal/
-│   ├── adapter/             # CLI 适配器 (claude/codex/gemini/opencode)
+│   ├── adapter/             # CLI 适配器 (claude/codex/gemini/opencode/kimi)
 │   ├── a2a/                 # A2A Hub + 上下文压缩
 │   ├── aspect/              # 安全护栏
 │   ├── capability/          # 6 个纯逻辑能力
@@ -356,10 +366,10 @@ sounds-great-ai/
 │   ├── packapi/             # REST API handler
 │   ├── platform/            # 平台组合根
 │   ├── ragstore/            # RAG 存储 (Memory/SQLite/Eino)
-│   ├── router/              # 动态路由引擎
+│   ├── domains/             # 六边形域（routing/threads/custody/sop 等）
 │   ├── skills/              # 技能框架
 │   ├── sop/                 # SOP 门控
-│   ├── settings/            # 设置存储
+│   ├── settings/            # 设置存储（文件落盘 + 热加载）
 │   ├── threadstore/         # 线程存储
 │   ├── transport/           # WebSocket + HTTP 传输层
 │   ├── agent/               # Agent 实现

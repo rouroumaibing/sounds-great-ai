@@ -119,3 +119,76 @@ func TestGuardHoldDispositionSupersededByHandoff(t *testing.T) {
 		t.Fatalf("ball should remain with b, got holder=%s state=%s", snap.Holder, snap.State)
 	}
 }
+
+// G13: the three-piece invariant assertions are individually correct.
+func TestGuardAssertionFunctions(t *testing.T) {
+	if err := assertCurrentHolder(custodyPorts.BallSnapshot{Holder: "a"}, "a"); err != nil {
+		t.Fatalf("current holder match should pass: %v", err)
+	}
+	if err := assertCurrentHolder(custodyPorts.BallSnapshot{Holder: "b"}, "a"); err == nil {
+		t.Fatal("current holder mismatch should fail")
+	}
+
+	evs := []custodyPorts.BallEvent{
+		{Type: custodyPorts.InvocationStarted, Holder: "a"},
+		{Type: custodyPorts.InvocationStarted, Holder: "b"},
+	}
+	if err := assertLatestInvocation(evs, "b"); err != nil {
+		t.Fatalf("latest invocation b should pass: %v", err)
+	}
+	if err := assertLatestInvocation(evs, "a"); err == nil {
+		t.Fatal("stale invocation a should fail")
+	}
+
+	hevs := []custodyPorts.BallEvent{
+		{Type: custodyPorts.BallHanded, From: "a", To: "b"},
+	}
+	// The receiver of the live handoff (b) may dispose it; a non-receiver (a) may not.
+	if err := assertExactHandoffIsLive(hevs, "b", "c"); err != nil {
+		t.Fatalf("receiver disposing live handoff should pass: %v", err)
+	}
+	if err := assertExactHandoffIsLive(hevs, "a", "c"); err == nil {
+		t.Fatal("non-receiver disposing live handoff should fail")
+	}
+}
+
+// G13: the three-piece guard must NOT over-reject a normal onward chain
+// (a->b->c). Each step's disposer is the receiver of the live handoff.
+func TestGuardOnwardDispatchAccepted(t *testing.T) {
+	l, _ := newGuardTestLedger()
+	ctx := context.Background()
+	l.RecordHanded(ctx, "t1", "", "a") // holder a, live handoff To=a
+	ok, _ := l.TryDispatchDispositioned(ctx, "t1", "a", "b")
+	if !ok {
+		t.Fatal("a->b should be accepted")
+	}
+	ok, _ = l.TryDispatchDispositioned(ctx, "t1", "b", "c")
+	if !ok {
+		t.Fatal("b->c should be accepted (guards must not over-reject onward chain)")
+	}
+	snap, _ := l.Snapshot(ctx, "t1")
+	if snap.Holder != "c" {
+		t.Fatalf("holder = %s, want c", snap.Holder)
+	}
+}
+
+// G13: a disposition from a breed that is the holder but NOT the receiver of the
+// live handoff is rejected by assertExactHandoffIsLive (reason "handoff").
+func TestGuardNonReceiverDispositionRejected(t *testing.T) {
+	l, store := newGuardTestLedger()
+	ctx := context.Background()
+	l.RecordHanded(ctx, "t1", "", "a") // live handoff To=a
+	l.RecordHanded(ctx, "t1", "a", "b") // now live handoff To=b (holder b)
+	// "a" is no longer the receiver of the live handoff; its redirect is rejected.
+	ok, _ := l.TryDispatchDispositioned(ctx, "t1", "a", "c")
+	if ok {
+		t.Fatal("a->c should be rejected (a is not the live-handoff receiver)")
+	}
+	snap, _ := l.Snapshot(ctx, "t1")
+	if snap.Holder != "b" {
+		t.Fatalf("holder should stay b, got %s", snap.Holder)
+	}
+	if lastEventType(t, store, "t1") != custodyPorts.BallDispositionRejected {
+		t.Fatalf("expected ball.disposition_rejected audit event")
+	}
+}

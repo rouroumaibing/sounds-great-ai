@@ -1,7 +1,7 @@
 package ports
 
 // SubstantiveActivity describes whether a handoff carried real work, used by the
-// worklist ping-pong breaker (G2). Mirrors clowder-ai's isSubstantiveActivity:
+// worklist ping-pong breaker (G2). Mirrors the isSubstantiveActivity rule:
 // a long output or a real tool call breaks the "language inertia" that the
 // breaker is designed to stop.
 type SubstantiveActivity struct {
@@ -13,15 +13,15 @@ type SubstantiveActivity struct {
 	HadToolCall bool
 }
 
-// Ping-pong breaker thresholds (G2). Hardcoded per clowder-ai F167 ("Hardcoded
+// Ping-pong breaker thresholds (G2). Hardcoded per F167 ("Hardcoded
 // per KD (YAGNI — no config)"): warn at 2 consecutive same-pair handoffs, block
 // (terminate the chain) at 4. A block still allows 3 normal back-and-forths.
 const (
 	PingPongWarnThreshold  = 2
 	PingPongBlockThreshold = 4
 	// SubstantiveOutputLenT is the output-length cutoff (runes) above which a
-	// handoff is treated as substantive work and resets the streak (clowder
-	// OUTPUT_LEN_T = 200).
+	// handoff is treated as substantive work and resets the streak
+	// (OUTPUT_LEN_T = 200).
 	SubstantiveOutputLenT = 200
 )
 
@@ -42,4 +42,10 @@ type IWorklist interface {
 	// Done releases the worklist state for invID (called after the invocation
 	// and all its recursive handoffs complete).
 	Done(invID string)
+	// PushToWorklist dynamically appends new targets to a running worklist at
+	// runtime (G11: pushToWorklist fan-out). It returns the subset of
+	// targets actually added (new, not already present, within the fan-out cap),
+	// recording each addition's fromRef for attribution and dedup. A target that
+	// has already been executed is not re-added.
+	PushToWorklist(invID string, targets []string, fromRef string) []string
 }

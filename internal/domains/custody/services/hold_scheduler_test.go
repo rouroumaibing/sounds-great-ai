@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -71,6 +72,45 @@ func TestHoldSchedulerWakeManual(t *testing.T) {
 	snap, _ := ledger.Snapshot(ctx, "t1")
 	if snap.State != custodyPorts.BallStateActive {
 		t.Fatalf("state = %s, want active", snap.State)
+	}
+}
+
+// G15: a timed (FireAfterMs) hold without wait_source_ref is rejected — a timed
+// wake must declare what it is waiting on before it is permitted.
+func TestHoldTimedRequiresWaitSourceRef(t *testing.T) {
+	s, _ := newTestScheduler()
+	ctx := context.Background()
+
+	err := s.Hold(ctx, "t1", "bianmu", custodyPorts.WakeCondition{
+		Kind:        custodyPorts.WakeManual,
+		FireAfterMs: 5000, // timed wake without grounding
+	}, "ask")
+	if err == nil {
+		t.Fatal("timed hold without wait_source_ref should be rejected")
+	}
+	if !errors.Is(err, ErrWaitSourceRefRequired) {
+		t.Fatalf("err = %v, want ErrWaitSourceRefRequired", err)
+	}
+
+	// With a wait_source_ref it is accepted.
+	if err := s.Hold(ctx, "t2", "bianmu", custodyPorts.WakeCondition{
+		Kind:          custodyPorts.WakeManual,
+		FireAfterMs:   5000,
+		WaitSourceRef: "wait-for-ci-pipeline",
+	}, "ask"); err != nil {
+		t.Fatalf("timed hold with wait_source_ref should be accepted: %v", err)
+	}
+}
+
+// G15: a command wake is self-grounded and does NOT require wait_source_ref.
+func TestHoldCommandWakeNoWaitSourceRef(t *testing.T) {
+	s, _ := newTestScheduler()
+	ctx := context.Background()
+	if err := s.Hold(ctx, "t1", "bianmu", custodyPorts.WakeCondition{
+		Kind:    custodyPorts.WakeCommand,
+		Command: "echo done",
+	}, "ask"); err != nil {
+		t.Fatalf("command wake without wait_source_ref should be accepted: %v", err)
 	}
 }
 
@@ -167,8 +207,13 @@ func TestHoldSchedulerTickAutoWake(t *testing.T) {
 	s.SetOnWake(func(_ context.Context, threadID, _ /*holder*/, _ /*resumeMsg*/ string) {
 		woken <- threadID
 	})
-	// Park with a timed wake 1s out.
-	_ = s.Hold(ctx, "t1", "bianmu", custodyPorts.WakeCondition{Kind: custodyPorts.WakeManual, FireAfterMs: 1000}, "ask")
+	// Park with a timed wake 1s out. G15: a timed hold must declare its
+	// wait_source_ref grounding, so the test supplies one.
+	_ = s.Hold(ctx, "t1", "bianmu", custodyPorts.WakeCondition{
+		Kind:          custodyPorts.WakeManual,
+		FireAfterMs:   1000,
+		WaitSourceRef: "wait-for-deploy",
+	}, "ask")
 	snap, _ := ledger.Snapshot(ctx, "t1")
 	if snap.State != custodyPorts.BallStateParked {
 		t.Fatalf("state = %s, want parked", snap.State)

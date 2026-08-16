@@ -8,7 +8,7 @@ import (
 
 // Project is a pure function: it folds an ordered event log into the current
 // ball custody snapshot. It performs no IO and is fully deterministic, mirroring
-// clowder-ai's ball-custody-state-machine transition() pure function.
+// the ball-custody-state-machine transition() pure function.
 func Project(events []custodyPorts.BallEvent) custodyPorts.BallSnapshot {
 	snap := custodyPorts.BallSnapshot{State: custodyPorts.BallStateNew}
 

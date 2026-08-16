@@ -53,12 +53,20 @@ func main() {
 	breedsDir := GetenvDefault("BREEDS_DIR", "packs/default/breeds")
 	skillsDir := GetenvDefault("SKILLS_DIR", "packs/default/skills")
 	sqlitePath := GetenvDefault("SQLITE_PATH", "data/sounds-great.db")
+	redisURL := GetenvDefault("SG_REDIS_URL", "")
 
 	pl, err := platform.New(platform.Config{
-		BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: workspaceDir, SQLitePath: sqlitePath,
+		BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: workspaceDir, SQLitePath: sqlitePath, RedisURL: redisURL,
 	})
 	if err != nil {
 		log.Printf("Warning: platform init failed (server runs in legacy mode): %v", err)
+	}
+
+	// Per-provider long session: under -tags pty this wires warm pools
+	// (bg_daemon) for claude/codex/gemini; under the default build it is a
+	// no-op stub and all three transparently fall back to one-shot print_sdk.
+	if pl != nil {
+		pl.WireWarmPools()
 	}
 
 	p, registry, embedder, cleaner, _ := SetupPack()

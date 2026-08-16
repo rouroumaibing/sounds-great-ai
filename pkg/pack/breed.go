@@ -63,7 +63,7 @@ type Variant struct {
 	SessionChain          string        `json:"session_chain,omitempty"`
 	Strategy              string        `json:"strategy,omitempty"`
 	AutoCompactTokenLimit int           `json:"auto_compact_token_limit,omitempty"`
-	// cat-style per-variant overrides (mirrors clowder cat-template.json):
+	// cat-style per-variant overrides:
 	// allow a variant to diverge from its breed for identity/linkage fields.
 	Name            string   `json:"name,omitempty"`
 	DisplayName     string   `json:"display_name,omitempty"`
@@ -100,7 +100,7 @@ type BreedConfig struct {
 	Enabled          bool               `json:"enabled,omitempty"`
 }
 
-// BreedFeatures mirrors clowder's per-breed `features` block: optional
+// BreedFeatures mirrors per-breed `features` block: optional
 // capability flags that tune runtime behavior (session chaining, mission
 // self-claim scope, etc.).
 type BreedFeatures struct {

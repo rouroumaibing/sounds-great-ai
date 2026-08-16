@@ -14,12 +14,12 @@ import (
 
 func TestProcessManagerSpawnAndRead(t *testing.T) {
 	pm := NewProcessManager()
-	r, err := pm.Spawn(context.Background(), "echo", []string{"hello"}, "")
+	h, err := pm.Spawn(context.Background(), "echo", []string{"hello"}, "")
 	if err != nil {
 		t.Fatalf("Spawn: %v", err)
 	}
 	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
+	if _, err := buf.ReadFrom(h.Stdout); err != nil {
 		t.Fatalf("Read: %v", err)
 	}
 	if !strings.Contains(buf.String(), "hello") {
@@ -29,12 +29,12 @@ func TestProcessManagerSpawnAndRead(t *testing.T) {
 
 func TestProcessManagerStdinInjection(t *testing.T) {
 	pm := NewProcessManager()
-	r, err := pm.Spawn(context.Background(), "cat", nil, "injected-via-stdin")
+	h, err := pm.Spawn(context.Background(), "cat", nil, "injected-via-stdin")
 	if err != nil {
 		t.Fatalf("Spawn: %v", err)
 	}
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	buf.ReadFrom(h.Stdout)
 	if !strings.Contains(buf.String(), "injected-via-stdin") {
 		t.Fatalf("expected stdin content in output, got %q", buf.String())
 	}
@@ -84,12 +84,12 @@ governanceTier: immutable
 	pipeline := hooks.NewPipeline(reg, hooks.DefaultResolvers())
 	input := &hooks.AssemblerInput{BreedID: "bianmu", BreedName: "Border Collie"}
 
-	r, err := pm.SpawnWithHooks(context.Background(), "cat", nil, "original-input", pipeline, input)
+	h, err := pm.SpawnWithHooks(context.Background(), "cat", nil, "original-input", pipeline, input)
 	if err != nil {
 		t.Fatalf("SpawnWithHooks: %v", err)
 	}
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	buf.ReadFrom(h.Stdout)
 	output := buf.String()
 	if !strings.Contains(output, "INJECTED_HOOK_CONTENT") {
 		t.Errorf("output missing hook content, got %q", output)

@@ -176,11 +176,47 @@ export interface BarkResultPayload {
   breed: string;
   success: boolean;
   steps: unknown[];
+  // Final assistant text when available (G9); lets the terminal render without
+  // waiting for REST history hydration.
+  content?: string;
+}
+
+export interface AgentMessagePayload {
+  breed: string;
+  content: string; // incremental text delta
+  done: boolean; // reserved terminal marker
+}
+
+// Liveness payload (R8): CLI stall/recovery status surfaced to the client.
+export interface LivenessPayload {
+  breed: string;
+  state: string; // "active" | "busy_silent" | "idle_silent" | "dead"
+  hard: boolean; // true => hard stall (beyond ProbeStallWarnMs)
+  message: string;
 }
 
 export interface BarkErrorPayload {
   breed: string;
   error: string;
+  // Structured diagnostics (cliDiagnostics). Optional.
+  reason?: string;
+  summary?: string;
+  hint?: string;
+  excerpt?: string;
+  source?: string;
+  meta?: Record<string, string>;
+}
+
+// Carrier health payload (T25 / R6): the backend surfaces a carrier's health
+// (quota / structural / transient degradation) so the frontend can render
+// upstream model health directly instead of inferring it from raw stream
+// events. Keyed in the store by `carrier` (e.g. "claude").
+export interface CarrierHealthPayload {
+  carrier: string;
+  transport?: string; // transport tier that emitted/skipped (e.g. "bg_daemon")
+  level: 'online' | 'degraded' | 'offline';
+  reason?: string;
+  remaining_ms?: number; // ms until the degradation TTL expires
 }
 
 export interface SystemNoticePayload {

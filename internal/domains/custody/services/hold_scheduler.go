@@ -21,6 +21,11 @@ var (
 	// ErrDispositionRejected is returned by Wake when the ledger guard (G1)
 	// refuses to converge the ball (it was superseded by a newer handoff/hold).
 	ErrDispositionRejected = errors.New("custody: disposition rejected by ledger guard")
+	// ErrWaitSourceRefRequired is returned by Hold when a timed (FireAfterMs)
+	// wake is requested without a wait_source_ref grounding. A timed wake must
+	// declare WHAT it is waiting on before a time-based wake is permitted.
+	// Command wakes are self-grounded and exempt.
+	ErrWaitSourceRefRequired = errors.New("custody: timed hold requires wait_source_ref grounding")
 )
 
 // G5 tuning constants.
@@ -43,7 +48,7 @@ const (
 // the ball-custody ledger (guarded by G1) and returns the HoldRecord so the
 // caller can re-dispatch the holder breed.
 //
-// It mirrors clowder-ai's hold_ball: a cat parks the ball and the orchestrator
+// It mirrors the hold_ball primitive: a cat parks the ball and the orchestrator
 // waits for the wake condition before dispositioning and continuing the worklist.
 // The secret webhook token lives ONLY here (in memory); it is never written to
 // the append-only ledger.
@@ -75,6 +80,13 @@ func (s *HoldScheduler) Hold(ctx context.Context, threadID, holder string, cond 
 	if _, ok := s.holds[threadID]; ok {
 		s.mu.Unlock()
 		return fmt.Errorf("custody: thread %s already held", threadID)
+	}
+	// G15: a timed hold (FireAfterMs) must declare what it is waiting on. A
+	// wait_source_ref grounds the wake so the ball is not auto-released into the
+	// void. Command wakes are self-grounded (they wait on a process exit).
+	if cond.FireAfterMs > 0 && cond.WaitSourceRef == "" {
+		s.mu.Unlock()
+		return fmt.Errorf("%w (thread %s)", ErrWaitSourceRefRequired, threadID)
 	}
 	now := time.Now().Unix()
 	rec := &custodyPorts.HoldRecord{
@@ -248,14 +260,14 @@ func (s *HoldScheduler) expire(threadID, holder string) {
 func (s *HoldScheduler) runCommandWake(threadID, holder, resumeMsg, command string) {
 	ctx, cancel := context.WithTimeout(context.Background(), commandWakeTimeout)
 	defer cancel()
-	reader, err := s.processMgr.Spawn(ctx, "sh", []string{"-c", command}, "")
+	handle, err := s.processMgr.Spawn(ctx, "sh", []string{"-c", command}, "")
 	if err != nil {
 		s.expire(threadID, holder)
 		return
 	}
 	// Drain until the process exits (the pipe closes on c.Wait).
-	if reader != nil {
-		_, _ = io.Copy(io.Discard, reader)
+	if handle != nil && handle.Stdout != nil {
+		_, _ = io.Copy(io.Discard, handle.Stdout)
 	}
 	// Context cancellation (timeout) also routes here via expire; the guard
 	// inside autoWake/expire makes a double-call harmless.

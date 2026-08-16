@@ -42,6 +42,11 @@ type ExecuteRequest struct {
 	WorkDir string
 	// MaxTokens is the response budget (0 = CLI default).
 	MaxTokens int
+	// AutoCompactTokenLimit is the breed's configured context-compaction budget
+	// (Persistent Identity P2, homologous auto-compact). When > 0 the
+	// orchestration bounds the assembled history to this token budget and the
+	// transport forwards it to the CLI process env. 0 = platform default.
+	AutoCompactTokenLimit int
 	// ThreadID / SessionID identify the orchestration thread (ball-custody).
 	ThreadID  string
 	SessionID string

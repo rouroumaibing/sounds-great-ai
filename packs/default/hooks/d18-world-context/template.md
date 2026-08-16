@@ -1,9 +1,9 @@
 ## 世界上下文
 
-项目路径：{{.ProjectPath}}
-Worktree：{{.WorktreePath}}
-Git 分支：{{.GitBranch}}
-Git 状态：{{.GitStatus}}
+项目路径：（待接入）
+Worktree：（待接入）
+Git 分支：（待接入）
+Git 状态：（待接入）
 
 - 项目路径决定工作目录
 - Worktree 隔离代码变更

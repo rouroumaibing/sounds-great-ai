@@ -1,5 +1,5 @@
 // Navigation types
-export type PrimaryNavType = 'threads' | 'tasks' | 'memory' | 'settings' | 'about' | 'custody';
+export type PrimaryNavType = 'threads' | 'tasks' | 'memory' | 'settings' | 'about' | 'custody' | 'profiles' | 'people';
 export type SettingsTabType = 'members' | 'accounts' | 'personas' | 'im' | 'skills' | 'mcp' | 'plugins' | 'market' | 'marketplace' | 'ball' | 'concierge' | 'voice' | 'config' | 'rules' | 'notifications' | 'system' | 'ops' | 'eval' | 'about';
 export type DrawerTabType = 'plan' | 'mcp' | 'memory' | 'files' | 'session-chain';
 export type ThreadFilterType = 'all' | 'escalated' | 'active';
@@ -109,15 +109,44 @@ export interface BreedResponseCompleteEvent {
   type: 'breed_response_complete';
   breed: string;
   steps: unknown[];
-  // content is populated by history hydration (G9) so assistant answers from
-  // the message store render as text. Live events omit it (rendered via steps).
+  // content is populated by history hydration (G9) or by the live terminal
+  // BARK_RESULT so assistant answers render as text.
   content?: string;
+}
+
+// Live streaming assistant text (G1). Accumulated from AGENT_MESSAGE deltas
+// during a run; converted to breed_response_complete on BARK_RESULT.
+export interface BreedResponseLiveEvent {
+  type: 'breed_response_live';
+  breed: string;
+  content: string;
+}
+
+// Liveness status bar (R8). Surfaces CLI stall (alive-but-silent) / recovery
+// so a hanging agent is visible instead of failing silently.
+export interface BreedStallWarningEvent {
+  type: 'breed_stall_warning';
+  breed: string;
+  state: string; // "active" | "busy_silent" | "idle_silent" | "dead"
+  hard: boolean; // true => hard stall (beyond ProbeStallWarnMs)
+  message: string;
 }
 
 export interface ErrorEvent {
   type: 'error';
   breed?: string;
   error: string;
+  // Optional structured reason code. When present the UI
+  // color-codes by tier; otherwise a keyword heuristic is used.
+  reason?: string;
+  // Structured diagnostics (cliDiagnostics), populated by the
+  // backend from ClassifyError/SanitizeStderr. All optional; the UI degrades
+  // gracefully when absent.
+  summary?: string; // public-safe one-line classification
+  hint?: string; // actionable hint
+  excerpt?: string; // already server-sanitized (REDACTED-*) stderr excerpt
+  source?: string; // where the excerpt came from (gated by allowlist before raw display)
+  meta?: Record<string, string>; // redactable context (paths, cli command) for the meta bar
 }
 
 export interface Toast {
@@ -138,6 +167,8 @@ export type StreamEvent =
   | ApprovalRequestEvent
   | BreedResponseStartEvent
   | BreedResponseCompleteEvent
+  | BreedResponseLiveEvent
+  | BreedStallWarningEvent
   | ErrorEvent;
 
 // Task Plan Step

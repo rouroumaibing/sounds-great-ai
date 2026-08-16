@@ -3,7 +3,6 @@ package gemini
 import (
 	"context"
 	"fmt"
-	"io"
 	"os/exec"
 	"strings"
 
@@ -14,6 +13,16 @@ import (
 type Adapter struct {
 	BinaryPath string
 	pm         *unified.ProcessManager
+	registry   *unified.Registry
+	carrierID  string
+}
+
+// SetRegistry wires the carrier registry so Execute routes through the R1
+// multi-tier fallback chain. When registry is nil (tests / legacy), Execute
+// falls back to a direct one-shot pm.Spawn — behavior unchanged.
+func (a *Adapter) SetRegistry(r *unified.Registry, id string) {
+	a.registry = r
+	a.carrierID = id
 }
 
 func New(pm *unified.ProcessManager) *Adapter {
@@ -22,10 +31,11 @@ func New(pm *unified.ProcessManager) *Adapter {
 
 func (a *Adapter) Capabilities() unified.AgentCapabilities {
 	return unified.AgentCapabilities{
-		SupportsMCP:     false,
-		SupportsTools:   true,
-		SupportsFileOps: true,
-		OutputFormat:    "stream-json",
+		SupportsMCP:      false,
+		SupportsTools:    true,
+		SupportsFileOps:  true,
+		OutputFormat:     "stream-json",
+		SupportsNativeL0: false, // no native L0 flag wired in this adapter yet
 	}
 }
 
@@ -42,12 +52,30 @@ func (a *Adapter) Execute(ctx context.Context, req unified.ExecuteRequest) (<-ch
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
 	}
+	// Persistent Identity P2 (CLI-native auto-compact):
+	// gemini's CLI auto-compresses in-session, so no explicit flag is injected
+	// (the CLI only injects the flag for codex). req.AutoCompactTokenLimit is
+	// still consumed at the orchestration layer (history bounding).
 	stdinInput := a.buildStdin(req)
-	reader, err := a.pm.Spawn(ctx, a.BinaryPath, args, stdinInput)
+	if a.registry != nil {
+		// R1: same-invocation mid-stream fallback across the carrier's
+		// transport chain. On a fatal mid-stream error the current tier's
+		// output is abandoned and the prompt is re-run on the next transport.
+		return unified.RunCarrierFallback(ctx, a.registry, a.carrierID, &unified.SpawnSpec{
+			Command:    a.BinaryPath,
+			Args:       args,
+			WorkDir:    req.WorkDir,
+			StdinInput: stdinInput,
+			SessionID:  a.carrierID,
+		}, func(h *unified.SpawnHandle) <-chan unified.StreamEvent {
+			return a.streamEvents(h)
+		})
+	}
+	handle, err := a.pm.Spawn(ctx, a.BinaryPath, args, stdinInput)
 	if err != nil {
 		return nil, err
 	}
-	return a.streamEvents(reader), nil
+	return a.streamEvents(handle), nil
 }
 
 func (a *Adapter) buildStdin(req unified.ExecuteRequest) string {
@@ -63,19 +91,33 @@ func (a *Adapter) buildStdin(req unified.ExecuteRequest) string {
 	return sb.String()
 }
 
-func (a *Adapter) streamEvents(r io.Reader) <-chan unified.StreamEvent {
+func (a *Adapter) streamEvents(h *unified.SpawnHandle) <-chan unified.StreamEvent {
 	ch := make(chan unified.StreamEvent, 64)
+	h.SetOnStall(func(state unified.ProbeState, hard bool) {
+		select {
+		case ch <- unified.StreamEvent{
+			Type:    "stall_warning",
+			Meta:    map[string]any{"state": string(state), "hard": hard},
+			Content: unified.LivenessMessage(state, hard),
+		}:
+		default:
+		}
+	})
 	go func() {
 		defer close(ch)
-		for evt := range unified.ParseNDJSON(r) {
+		sawError := false
+		for evt := range unified.ParseNDJSON(h.Stdout) {
 			if unified.IsParseError(evt) {
 				pe := evt.(unified.ParseError)
+				sawError = true
+				h.SetStreamError(pe.Line)
 				ch <- unified.StreamEvent{Type: "error", Content: pe.Line}
 				continue
 			}
 			obj := evt.(map[string]any)
 			ch <- parseGeminiEvent(obj)
 		}
+		unified.EmitDiagnosticsIfNeeded(h, ch, sawError)
 	}()
 	return ch
 }

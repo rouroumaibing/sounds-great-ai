@@ -18,6 +18,21 @@ type MentionRouterService struct {
 	// patterns sorted by length descending (longest-first) so that "@边牧"
 	// matches before "@边" when both are registered mention patterns.
 	patterns []mentionPattern
+	// breedIDs is the set of breeds known to this router (for validating the
+	// configured default before falling back to "bianmu").
+	breedIDs map[string]bool
+	// defaultBreedProvider resolves the configured global default breed at
+	// route time (runtime: reflects /api/config/default-breed + DEFAULT_BREED_ID
+	// env). Nil → the hard-coded "bianmu" fallback is used. Wired by the
+	// platform so the member-management "全局默认犬" selector actually changes
+	// which dog executes an un-@mentioned conversation.
+	defaultBreedProvider func() string
+}
+
+// SetDefaultBreedProvider wires the live default-breed resolver. Call after
+// construction (e.g. from the platform) so reads stay runtime-fresh.
+func (s *MentionRouterService) SetDefaultBreedProvider(fn func() string) {
+	s.defaultBreedProvider = fn
 }
 
 type mentionPattern struct {
@@ -28,7 +43,9 @@ type mentionPattern struct {
 // NewMentionRouterService builds a router from breed configs.
 func NewMentionRouterService(breeds map[string]*pack.BreedConfig) *MentionRouterService {
 	var patterns []mentionPattern
+	breedIDs := make(map[string]bool, len(breeds))
 	for breedID, breed := range breeds {
+		breedIDs[breedID] = true
 		for _, p := range breed.MentionPatterns {
 			patterns = append(patterns, mentionPattern{pattern: p, breedID: breedID})
 		}
@@ -36,7 +53,7 @@ func NewMentionRouterService(breeds map[string]*pack.BreedConfig) *MentionRouter
 	sort.Slice(patterns, func(i, j int) bool {
 		return len(patterns[i].pattern) > len(patterns[j].pattern)
 	})
-	return &MentionRouterService{patterns: patterns}
+	return &MentionRouterService{patterns: patterns, breedIDs: breedIDs}
 }
 
 // Route parses @mentions from a message and returns a routing decision.
@@ -84,8 +101,14 @@ func (s *MentionRouterService) Route(_ context.Context, message string) (ports.R
 
 	switch len(targets) {
 	case 0:
+		// No @mention: route to the configured global default breed. The member
+		// management panel persists this via /api/config/default-breed (and an
+		// operator may override it with the DEFAULT_BREED_ID env var). Fall back
+		// to "bianmu" only when unset or when the configured value is not a
+		// known breed (stale catalog / removed member).
+		def := s.resolveDefaultBreed()
 		return ports.RoutingDecision{
-			TargetBreeds: []string{"bianmu"},
+			TargetBreeds: []string{def},
 			Strategy:     "single",
 		}, nil
 	case 1:
@@ -111,9 +134,30 @@ func (s *MentionRouterService) Route(_ context.Context, message string) (ports.R
 	}
 }
 
+// resolveDefaultBreed returns the configured global default breed, falling back
+// to "bianmu" when unset or invalid. The default is supplied by
+// defaultBreedProvider (wired by the platform from runtime config + env), so it
+// always reflects the current /api/config/default-breed value and the
+// DEFAULT_BREED_ID override.
+func (s *MentionRouterService) resolveDefaultBreed() string {
+	const fallback = "bianmu"
+	if s.defaultBreedProvider == nil {
+		return fallback
+	}
+	if id := s.defaultBreedProvider(); id != "" {
+		// Guard against routing to a breed that no longer exists (e.g. member
+		// was removed after the default was set). Execution would 404 on an
+		// unknown adapter, so fall back instead.
+		if s.breedIDs[id] {
+			return id
+		}
+	}
+	return fallback
+}
+
 // serialMarkers are tokens that signal a serial pipeline intent when multiple
 // breeds are mentioned in one message. Without any of these the default is a
-// parallel fan-out (clowder-ai parity: route-serial vs route-parallel).
+// parallel fan-out (route-serial vs route-parallel parity).
 var serialMarkers = []string{
 	"串联", "串行", "serial", "依次", "顺序",
 	"→", "->", ">>",

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -29,21 +30,28 @@ func ResolveCLICommand(command string) (string, error) {
 			resolveCacheMu.RUnlock()
 			return cached, nil
 		}
+		// Cached path is stale (binary moved/removed): drop it so we re-resolve
+		// from PATH/known dirs instead of repeatedly hitting a dead path.
+		resolveCacheMu.RUnlock()
+		InvalidateCLICache(command)
+	} else {
+		resolveCacheMu.RUnlock()
 	}
-	resolveCacheMu.RUnlock()
 
 	if path, err := exec.LookPath(command); err == nil {
 		cacheResolved(command, path)
 		return path, nil
 	}
 
-	home, err := os.UserHomeDir()
+		home, err := os.UserHomeDir()
 	if err == nil {
 		for _, dir := range knownCLIDirs {
-			fullPath := filepath.Join(home, dir, command)
-			if isExecutable(fullPath) {
-				cacheResolved(command, fullPath)
-				return fullPath, nil
+			for _, name := range candidateNames(command) {
+				fullPath := filepath.Join(home, dir, name)
+				if isExecutable(fullPath) {
+					cacheResolved(command, fullPath)
+					return fullPath, nil
+				}
 			}
 		}
 
@@ -53,10 +61,12 @@ func ResolveCLICommand(command string) (string, error) {
 				if !entry.IsDir() {
 					continue
 				}
-				fullPath := filepath.Join(nvmDir, entry.Name(), "bin", command)
-				if isExecutable(fullPath) {
-					cacheResolved(command, fullPath)
-					return fullPath, nil
+				for _, name := range candidateNames(command) {
+					fullPath := filepath.Join(nvmDir, entry.Name(), "bin", name)
+					if isExecutable(fullPath) {
+						cacheResolved(command, fullPath)
+						return fullPath, nil
+					}
 				}
 			}
 		}
@@ -64,10 +74,12 @@ func ResolveCLICommand(command string) (string, error) {
 
 	if brewPath, err := exec.LookPath("brew"); err == nil {
 		brewDir := filepath.Dir(filepath.Dir(brewPath))
-		fullPath := filepath.Join(brewDir, "bin", command)
-		if isExecutable(fullPath) {
-			cacheResolved(command, fullPath)
-			return fullPath, nil
+		for _, name := range candidateNames(command) {
+			fullPath := filepath.Join(brewDir, "bin", name)
+			if isExecutable(fullPath) {
+				cacheResolved(command, fullPath)
+				return fullPath, nil
+			}
 		}
 	}
 
@@ -86,6 +98,19 @@ func cacheResolved(command, path string) {
 	resolveCacheMu.Unlock()
 }
 
+// candidateNames returns the base command plus platform-specific executable
+// extensions (Windows) so known-directory resolution can find e.g. claude.cmd
+// / claude.exe (R9). On non-Windows it returns just the command.
+func candidateNames(command string) []string {
+	names := []string{command}
+	if runtime.GOOS == "windows" {
+		for _, ext := range []string{".exe", ".cmd", ".bat", ".ps1"} {
+			names = append(names, command+ext)
+		}
+	}
+	return names
+}
+
 func isExecutable(path string) bool {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -93,6 +118,11 @@ func isExecutable(path string) bool {
 	}
 	if info.IsDir() {
 		return false
+	}
+	if runtime.GOOS == "windows" {
+		// Windows determines executability by extension (PATHEXT), not Unix
+		// permission bits — which Go reports as 0 there.
+		return true
 	}
 	return info.Mode().Perm()&0o111 != 0
 }

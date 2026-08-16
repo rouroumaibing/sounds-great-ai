@@ -11,6 +11,7 @@ import (
 
 	routingPorts "sounds-great-ai/internal/domains/routing/ports"
 	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
+	"sounds-great-ai/internal/adapter/unified"
 	"sounds-great-ai/internal/platform"
 	"sounds-great-ai/pkg/pack"
 	"sounds-great-ai/pkg/protocol"
@@ -25,16 +26,27 @@ type WSHandler struct {
 	upgrader    websocket.Upgrader
 	mu          sync.RWMutex
 	streamers   map[string]*Streamer
+	allConns    map[*websocket.Conn]struct{} // every live connection (global broadcast)
 	pack        *pack.Pack
 	platform    *platform.Platform // optional, nil = legacy mode
 	sem         chan struct{}
 	rateMonitor *RateMonitor
+	// profiles optionally enables the on-session-seal autonomous distill
+	// trigger (KD-10 F276 maturity). Nil = disabled (no-op on seal).
+	profiles *ProfilesHandler
+}
+
+// SetProfilesHandler wires the capsule handler so session seal can fire a
+// best-effort autonomous distill. Safe to call once at startup; nil disables.
+func (h *WSHandler) SetProfilesHandler(p *ProfilesHandler) {
+	h.profiles = p
 }
 
 func NewWSHandler(p *pack.Pack) *WSHandler {
 	return &WSHandler{
 		upgrader:    newUpgrader(),
 		streamers:   make(map[string]*Streamer),
+		allConns:    make(map[*websocket.Conn]struct{}),
 		pack:        p,
 		sem:         make(chan struct{}, maxConcurrentBark),
 		rateMonitor: NewRateMonitor(nil),
@@ -63,6 +75,7 @@ func NewWSHandlerWithPlatform(p *pack.Pack, pl *platform.Platform) *WSHandler {
 	h := &WSHandler{
 		upgrader:    newUpgrader(),
 		streamers:   make(map[string]*Streamer),
+		allConns:    make(map[*websocket.Conn]struct{}), // global broadcast registry (T25)
 		pack:        p,
 		platform:    pl,
 		sem:         make(chan struct{}, maxConcurrentBark),
@@ -76,6 +89,11 @@ func NewWSHandlerWithPlatform(p *pack.Pack, pl *platform.Platform) *WSHandler {
 			go h.resumeHeld(ctx, threadID, holder, resumeMsg)
 		})
 	}
+	// T25: wire the carrier-health broadcaster so CARRIER_HEALTH events reach
+	// every connected client. WSHandler implements unified.HealthBroadcaster.
+	if pl != nil {
+		pl.SetHealthBroadcaster(h)
+	}
 	return h
 }
 
@@ -86,6 +104,8 @@ func (h *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+	h.addConn(conn)
+	defer h.removeConn(conn)
 
 	streamer := NewStreamer(conn)
 	sessionID := ""
@@ -292,5 +312,41 @@ func (h *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 		delete(h.streamers, sessionID)
 		h.mu.Unlock()
 		h.rateMonitor.RemoveSession(sessionID)
+	}
+}
+
+// addConn registers a live connection for global broadcasts.
+func (h *WSHandler) addConn(conn *websocket.Conn) {
+	h.mu.Lock()
+	h.allConns[conn] = struct{}{}
+	h.mu.Unlock()
+}
+
+// removeConn deregisters a connection.
+func (h *WSHandler) removeConn(conn *websocket.Conn) {
+	h.mu.Lock()
+	delete(h.allConns, conn)
+	h.mu.Unlock()
+}
+
+// BroadcastCarrierHealth implements unified.HealthBroadcaster: it pushes a
+// CARRIER_HEALTH event to every connected client so the frontend
+// ConnectionStatusBar can render upstream model health directly (T25 / R6).
+func (h *WSHandler) BroadcastCarrierHealth(_ context.Context, ev unified.CarrierHealthEvent) {
+	event := protocol.NewEvent(protocol.EventCarrierHealth, "", &protocol.CarrierHealthPayload{
+		Carrier:     ev.Carrier,
+		Transport:   ev.Transport,
+		Level:       ev.Level,
+		Reason:      ev.Reason,
+		RemainingMs: ev.RemainingMs,
+	})
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for conn := range h.allConns {
+		if err := conn.WriteJSON(event); err != nil {
+			// A broken connection will be cleaned up by HandleWS's defer; do
+			// not let one bad socket block the broadcast.
+			continue
+		}
 	}
 }

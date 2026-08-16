@@ -1,7 +1,7 @@
 ## 引导候选
 
-匹配的 guide：{{.MatchedGuide}}
-Guide 状态：{{.GuideStatus}}
+匹配的 guide：（待接入）
+Guide 状态：（待接入）
 
 - offered → 用户可选择开始
 - awaiting_choice → 等待用户选择

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +43,24 @@ func worklistMaxDepth(sopMax int) int {
 	return 8
 }
 
+// summarizeForContinuity turns a user query into a short, persisted note of
+// "what the breed was working on" for the continuity store (Persistent Identity
+// P3). It keeps only the leading content so the digest stays compact.
+func summarizeForContinuity(query string) string {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return "(空查询)"
+	}
+	// Collapse internal newlines for a single-line summary.
+	q = strings.Join(strings.Fields(q), " ")
+	const maxLen = 200
+	runes := []rune(q)
+	if len(runes) > maxLen {
+		return string(runes[:maxLen]) + "…"
+	}
+	return q
+}
+
 // recordBall writes a ball-custody ledger event without affecting orchestration
 // control flow. The ledger is a passive observer during P0 ("只写不读"): any error
 // is swallowed so a ledger failure can never break a dog run.
@@ -50,6 +69,37 @@ func (h *WSHandler) recordBall(ctx context.Context, fn func(l custodyPorts.IBall
 		return
 	}
 	_ = fn(h.platform.BallLedger)
+}
+
+// fireProfileDistillationTrigger emits the KD-10 eval counter when a session
+// run completes — the homologous "session seal" for SG's one-shot
+// model (ProfileDistillationTrigger.onSessionSealed). Beyond the observability
+// counter it ALSO performs a best-effort autonomous distill: the accumulated
+// evidence for the session's dog relationship key is aggregated into a pending
+// capsule proposal (never auto-applied). Reasoning stays in the CLI agent /
+// operator — the platform only aggregates what it already holds (VISION §4.1).
+// Both steps are fail-closed and non-blocking: a distill failure can never
+// break a dog run.
+func (h *WSHandler) fireProfileDistillationTrigger(sessionID, breedID, reason string) {
+	if telemetry.IsInitialized() && telemetry.ProfileDistillationTriggered != nil {
+		telemetry.ProfileDistillationTriggered.Add(context.Background(), 1, metric.WithAttributes(
+			attribute.String("agent.id", breedID),
+			attribute.String("seal.reason", reason),
+		))
+	}
+	// Real distill on seal: fire-and-forget so the session result is never
+	// delayed by the (optional) proposal write.
+	h.maybeAutoDistill(sessionID, breedID)
+}
+
+// maybeAutoDistill triggers an on-session-seal autonomous distill when the
+// capsule handler is wired. It is intentionally fire-and-forget: any error or
+// missing wiring degrades to a no-op (the session result is unaffected).
+func (h *WSHandler) maybeAutoDistill(sessionID, breedID string) {
+	if h.profiles == nil {
+		return
+	}
+	go h.profiles.AutoDistillSession(context.Background(), sessionID, breedID)
 }
 
 // tryDispatch performs a guarded dispatch disposition (G1): it converges the
@@ -104,6 +154,31 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 	}
 	systemPrompt, systemPromptL0 := h.injectHooks(systemPrompt, breedID, breed.DisplayName, breed.RoleDescription, breed.Personality, sessionID)
 
+	// Persistent Identity F276 (homologous recall injection): when the
+	// user's message references a known third-party person, inject a token-bounded
+	// relationship card into the dog's context so it "remembers" them (anchor-first
+	// context entry, F236). The block is budgeted in settings so it never
+	// bloats the prompt.
+	if h.platform != nil && h.platform.PeopleMemory != nil {
+		pmOp := "operator"
+		if h.platform.Leader != nil && h.platform.Leader.Name != "" {
+			pmOp = h.platform.Leader.Name
+		}
+		if block, rerr := h.platform.PeopleMemory.RecallContextForQuery(pmOp, query); rerr == nil && block != "" {
+			systemPrompt = systemPrompt + "\n" + block
+		}
+	}
+
+	// Persistent Identity P2 (homologous auto-compact budget): the
+	// breed's configured compaction threshold bounds the history the platform
+	// feeds the CLI. In SG's one-shot model the platform controls context
+	// (not the CLI's in-session compaction), so this is the real consumer of
+	// auto_compact_token_limit. Fall back to ContextBudget.MaxContextTokens.
+	compactBudget := variant.AutoCompactTokenLimit
+	if compactBudget <= 0 {
+		compactBudget = variant.ContextBudget.MaxContextTokens
+	}
+
 	var messages []*schema.Message
 	if h.platform.MessageStore != nil {
 		sender := ""
@@ -123,6 +198,11 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 				Role: msg.Role, Content: msg.Content, Sender: msg.Sender, Timestamp: msg.Timestamp,
 			})
 		}
+		// Enforce the breed's auto-compact budget on the assembled history
+		// (oldest messages dropped first) before it reaches the CLI.
+		if compactBudget > 0 {
+			contextMsgs = prompt.BoundContextByTokens(contextMsgs, compactBudget)
+		}
 		messages = prompt.ToSchemaMessages(contextMsgs)
 	}
 	// G7 step 3: never let burst-window truncation orphan the most recent Q→A
@@ -130,17 +210,38 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 	messages = prompt.ProtectRecentPairs(messages, 4)
 	messages = append(messages, schema.UserMessage(query))
 
+	// Persistent Identity P3 (homologous F211 continuity bootstrap):
+	// record this spawn as a NEW rotation so the NEXT spawn injects a
+	// "续接上下文" section (what it was working on). We advance the rotation
+	// index per spawn (RecordNextRotation) instead of hardcoding 0: in one-shot
+	// mode each task is its own rotation, and once a long (warm) session exists
+	// the ring already holds per-rotation checkpoints (see continuity.go).
+	// Best-effort — a failure to persist must never block execution.
+	if h.platform.Continuity != nil {
+		if _, err := h.platform.Continuity.RecordNextRotation(breedID, summarizeForContinuity(query), sessionID); err != nil {
+			log.Printf("WARN: continuity record failed for breed %s: %v", breedID, err)
+		}
+	}
+
+	// Persistent Identity (homologous distill): note which breed runs
+	// this session so the autonomous-distill endpoint can derive the distiller
+	// from the CURRENT session instead of a hardcoded default dog. Best-effort.
+	if h.platform != nil {
+		h.platform.RecordSessionBreed(sessionID, breedID)
+	}
+
 	req := agentsPorts.ExecuteRequest{
-		ClientID:      variant.ClientID,
-		Messages:      messages,
-		SystemPrompt:  systemPrompt,
-		SystemPromptL0: systemPromptL0,
-		Model:         variant.DefaultModel,
-		WorkDir:       h.platform.WorkspaceDir,
-		MCPConfig:     h.platform.BuildMCPConfig(),
-		ThreadID:      sessionID,
-		SessionID:     sessionID,
-		Context:       ctx,
+		ClientID:             variant.ClientID,
+		Messages:             messages,
+		SystemPrompt:         systemPrompt,
+		SystemPromptL0:       systemPromptL0,
+		Model:                variant.DefaultModel,
+		WorkDir:              h.platform.WorkspaceDir,
+		MCPConfig:            h.platform.BuildMCPConfig(),
+		ThreadID:             sessionID,
+		SessionID:            sessionID,
+		Context:              ctx,
+		AutoCompactTokenLimit: compactBudget,
 	}
 
 	execCtx := ctx
@@ -179,7 +280,7 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 
 	// Heartbeat: keep the ball-custody ledger alive while this invocation runs.
 	// The reconciler sweep (Platform.StartReconciler) marks invocations that stop
-	// heartbeating as died→zombie, mirroring clowder-ai's invocation.heartbeat.
+	// heartbeating as died→zombie, mirroring invocation.heartbeat.
 	heartbeatStop := make(chan struct{})
 	go func() {
 		hb := time.NewTicker(ballHeartbeatInterval)
@@ -263,6 +364,8 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 		h.recordBall(ctx, func(l custodyPorts.IBallLedger) error {
 			return l.RecordHeld(ctx, sessionID, breedID)
 		})
+		// Session seal (held): fire the distillation trigger counter.
+		h.fireProfileDistillationTrigger(sessionID, breedID, "held")
 		if h.platform != nil && h.platform.HoldScheduler != nil {
 			_ = h.platform.HoldBall(ctx, sessionID, breedID, cond, query)
 		}
@@ -272,7 +375,10 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 			})
 		}
 		streamer.SendEvent(ctx, protocol.NewEvent(protocol.EventBarkResult, sessionID, &protocol.BarkResultPayload{
-			Breed: breedID, Success: true, Steps: make(map[string]protocol.StepResult),
+			Breed:   breedID,
+			Success: true,
+			Steps:   make(map[string]protocol.StepResult),
+			Content: cleaned, // G9
 		}))
 		h.SendSystemNotice("info", "线程已挂起", "狗狗已持球等待（hold_ball），满足条件后将自动继续。")
 		return cleaned
@@ -287,9 +393,14 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 	h.recordBall(ctx, func(l custodyPorts.IBallLedger) error {
 		return l.RecordTaskDone(ctx, sessionID, breedID)
 	})
+	// Session seal (task done): fire the distillation trigger counter.
+	h.fireProfileDistillationTrigger(sessionID, breedID, "task_done")
 
 	resultEvent := protocol.NewEvent(protocol.EventBarkResult, sessionID, &protocol.BarkResultPayload{
-		Breed: breedID, Success: true, Steps: make(map[string]protocol.StepResult),
+		Breed:   breedID,
+		Success: true,
+		Steps:   make(map[string]protocol.StepResult),
+		Content: cleaned, // G9: carry final text so the terminal render needs no REST hydration
 	})
 	streamer.SendEvent(ctx, resultEvent)
 
@@ -535,6 +646,13 @@ func (h *WSHandler) executeParallel(ctx context.Context, breedIDs []string, sess
 				h.sendBarkError(sessionID, bid, "no variant configured")
 				return
 			}
+			// Persistent Identity P2: carry the breed's auto-compact budget on
+			// the request (the shared broadcast history is bounded once on the
+			// main spawn path; here the contract field is populated per-breed).
+			compactBudget := variant.AutoCompactTokenLimit
+			if compactBudget <= 0 {
+				compactBudget = variant.ContextBudget.MaxContextTokens
+			}
 			systemPrompt := variant.SystemPrompt
 			ragContext := h.retrieveRAGContext(ctx, bid, query)
 			if h.platform.PromptBuilder != nil {
@@ -544,16 +662,17 @@ func (h *WSHandler) executeParallel(ctx context.Context, breedIDs []string, sess
 			}
 			systemPrompt, systemPromptL0 := h.injectHooks(systemPrompt, bid, breed.DisplayName, breed.RoleDescription, breed.Personality, sessionID)
 			req := agentsPorts.ExecuteRequest{
-				ClientID:       variant.ClientID,
-				Messages:       sharedSchemaMsgs,
-				SystemPrompt:   systemPrompt,
-				SystemPromptL0: systemPromptL0,
-				Model:          variant.DefaultModel,
-				WorkDir:        h.platform.WorkspaceDir,
-				MCPConfig:      h.platform.BuildMCPConfig(),
-				ThreadID:       sessionID,
-				SessionID:      sessionID,
-				Context:        ctx,
+				ClientID:             variant.ClientID,
+				Messages:             sharedSchemaMsgs,
+				SystemPrompt:         systemPrompt,
+				SystemPromptL0:       systemPromptL0,
+				Model:                variant.DefaultModel,
+				WorkDir:              h.platform.WorkspaceDir,
+				MCPConfig:            h.platform.BuildMCPConfig(),
+				ThreadID:             sessionID,
+				SessionID:            sessionID,
+				Context:              ctx,
+				AutoCompactTokenLimit: compactBudget,
 			}
 			eventCh, err := h.platform.AgentExecutor.Execute(ctx, req)
 			if err != nil {
@@ -577,6 +696,14 @@ func (h *WSHandler) executeParallel(ctx context.Context, breedIDs []string, sess
 	}
 	wg.Wait()
 
+	var respParts []string
+	for _, resp := range responses {
+		if resp.text != "" {
+			respParts = append(respParts, resp.text)
+		}
+	}
+	content := strings.Join(respParts, "\n\n")
+
 	if h.platform.MessageStore != nil {
 		for _, resp := range responses {
 			if resp.text != "" {
@@ -591,7 +718,10 @@ func (h *WSHandler) executeParallel(ctx context.Context, breedIDs []string, sess
 	h.mu.RUnlock()
 	if streamer != nil {
 		streamer.SendEvent(ctx, protocol.NewEvent(protocol.EventBarkResult, sessionID, &protocol.BarkResultPayload{
-			Breed: breedIDs[0], Success: true, Steps: make(map[string]protocol.StepResult),
+			Breed:   breedIDs[0],
+			Success: true,
+			Steps:   make(map[string]protocol.StepResult),
+			Content: content, // G9
 		}))
 	}
 }
@@ -608,15 +738,16 @@ func (h *WSHandler) handleA2AHandoff(ctx context.Context, thread *a2a.Thread, fr
 			"从 "+fromBreed+" 到 "+toBreed+" 的传球已被更新的状态顶替，跳过本次 handoff。")
 		return
 	}
-	// G7 step 1: tag the next dog with the handoff source so it knows who called
-	// it and why (context-transport.a2aFrom / a2aTriggerMessageId parity).
-	enriched := artifact
-	if src := buildHandoffSourceNotice(fromBreed); src != "" {
-		enriched = src + "\n\n" + artifact
-	}
-	// G7 step 2: scrub sensitive payloads from the artifact before it crosses the
-	// breed boundary (reuses telemetry.RedactorInstance + secret-pattern redaction).
-	enriched = scrubHandoffContext(enriched)
+	// G7+G12: enrich the artifact with the full context-transport envelope —
+	// source notice (a2aFrom), continuity capsule, tombstone (on burst),
+	// coverage map, importance anchors, and secret/tool-payload scrubbing —
+	// before it crosses the breed boundary.
+	enriched := buildEnrichedHandoffContext(HandoffTransportContext{
+		FromBreed:    fromBreed,
+		ToBreed:      toBreed,
+		Artifact:     artifact,
+		RecentBreeds: thread.Participants,
+	})
 	// G2: consult the per-invocation worklist before recursing. Reject the
 	// handoff on depth overflow or ping-pong break (record task.blocked, stop
 	// the chain); inject a warning when the streak is building.
@@ -638,6 +769,10 @@ func (h *WSHandler) handleA2AHandoff(ctx context.Context, thread *a2a.Thread, fr
 		if warn {
 			enriched = "[系统] 警告：你与对方已连续多次互相 @ 调用，请尝试推进任务或换一种协作方式，否则将在 2 轮后自动熔断。\n\n" + enriched
 		}
+		// G11: record this accepted handoff target + its source into the dynamic
+		// worklist so the fan-out set stays accurate for later expansion dedup
+		// (pushToWorklist's entry.list.push + a2aFrom parity).
+		h.platform.Worklist.PushToWorklist(invID, []string{toBreed}, fromBreed)
 	}
 	h.platform.A2AHub.Handoff(ctx, thread, a2a.Handoff{FromBreed: fromBreed, ToBreed: toBreed, Artifact: enriched})
 	if action := h.platform.SOP.CheckA2ADepth(thread); action == sopPorts.EscalateToCVO {

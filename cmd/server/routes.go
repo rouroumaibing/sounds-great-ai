@@ -148,6 +148,33 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	memoryHandler := transport.NewMemoryHandler(evidenceStore)
 	mux.Handle("/api/memory/", memoryHandler.Routes())
 
+	// Persistent Identity P1-b (relationship capsule CRUD + Approval Hub) and
+	// P3 rotation-aware continuity inspection. Both depend on the platform's
+	// on-disk stores, so they are mounted only when the platform is initialized.
+	if pl != nil && pl.Profiles != nil {
+		profilesHandler := transport.NewProfilesHandler(pl.Profiles, pl.Continuity, pl.EvidenceStore, pl.AgentExecutor, pl.WorkspaceDir, pl)
+		mux.Handle("/api/profiles", auth.Wrap(profilesHandler.Routes()))
+		mux.Handle("/api/profiles/", auth.Wrap(profilesHandler.Routes()))
+		// Wire the capsule handler into the WS handler so session seal can fire
+		// a best-effort autonomous distill (KD-10 F276 maturity trigger).
+		wsHandler.SetProfilesHandler(profilesHandler)
+	}
+	if pl != nil && pl.Continuity != nil {
+		continuityHandler := transport.NewContinuityHandler(pl.Continuity)
+		mux.Handle("/api/continuity", continuityHandler.Routes())
+		mux.Handle("/api/continuity/", continuityHandler.Routes())
+	}
+	if pl != nil && pl.PeopleMemory != nil {
+		pmOperator := "operator"
+		if pl.Leader != nil && pl.Leader.Name != "" {
+			pmOperator = pl.Leader.Name
+		}
+		peopleHandler := transport.NewPeopleMemoryHandler(pl.PeopleMemory, pmOperator,
+			transport.NewThreadstoreAuthorizer(pl.ThreadStore, pl.MessageStore), pl.PeopleMemoryHub)
+		mux.Handle("/api/people-memory", auth.Wrap(peopleHandler.Routes()))
+		mux.Handle("/api/people-memory/", auth.Wrap(peopleHandler.Routes()))
+	}
+
 	notificationsHandler := transport.NewNotificationsHandler()
 	mux.Handle("/api/notifications", notificationsHandler.Routes())
 	mux.Handle("/api/notifications/", notificationsHandler.Routes())
@@ -369,7 +396,23 @@ func CustodyTrailHandler(pl *platform.Platform) http.HandlerFunc {
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
-		json.NewEncoder(w).Encode(briefing)
+		// G14: fold the code-repo git-ref trajectory into the thread's unified
+		// timeline so the custody trail and code activity share one axis. When no
+		// repo URL is configured the unified list equals the custody trail.
+		unified := []custodyPorts.UnifiedTrailEntry{}
+		if pl.RepoTrajectoryStore != nil {
+			unified = custodyServices.MergeUnifiedTrail(briefing, pl.RepoTrajectoryStore.List())
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"thread_id": briefing.ThreadID,
+			"state":     briefing.State,
+			"holder":    briefing.Holder,
+			"turns":     briefing.Turns,
+			"handoffs":  briefing.Handoffs,
+			"holds":     briefing.Holds,
+			"trail":     briefing.Trail,
+			"unified":   unified,
+		})
 	}
 }
 

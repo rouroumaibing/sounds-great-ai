@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// BallState enumerates the ball custody lifecycle states. Mirrors clowder-ai's
+// BallState enumerates the ball custody lifecycle states. Mirrors the
 // 8-state machine (new/active/blocked/parked/dead/void/zombie/resolved).
 type BallState string
 
@@ -41,7 +41,7 @@ const (
 	BallDispositionRejected BallEventType = "ball.disposition_rejected"
 
 	// G4: lifecycle events that close the gap between SG's 10-event set and
-	// clowder-ai's 19-event set. All add-only; each has a pinned projection.
+	// the 19-event set. All add-only; each has a pinned projection.
 	BallHandedCVO  BallEventType = "ball.handed_cvo"  // escalated to operator/CVO
 	BallVoidPass   BallEventType = "ball.void_pass"   // handoff had no valid target
 	BallHoldExpired BallEventType = "ball.hold_expired" // hold reached its deadline
@@ -54,7 +54,7 @@ const (
 )
 
 // WakeKind enumerates how a parked hold may be awakened (D3 scope: manual +
-// webhook only; wakeWhen(command) is deferred). Mirrors clowder-ai's
+// webhook only; wakeWhen(command) is deferred). Mirrors the
 // hold_ball wake-condition kinds.
 type WakeKind string
 
@@ -75,14 +75,14 @@ type WakeCondition struct {
 	Token string   `json:"token,omitempty"`
 	Note  string   `json:"note,omitempty"`
 	// G5: timed/command wake extensions emitted by a dog inside ```hold_ball.
-	// FireAfterMs wakes the hold automatically after N milliseconds (clowder
-	// wakeAfterMs). Command is a shell command run to completion whose success
-	// wakes the hold (clowder wakeWhen(command)).
+	// FireAfterMs wakes the hold automatically after N milliseconds
+	// (wakeAfterMs). Command is a shell command run to completion whose success
+	// wakes the hold (wakeWhen(command)).
 	FireAfterMs int64  `json:"fire_after_ms,omitempty"`
 	Command     string `json:"command,omitempty"`
 	// G15: WaitSourceRef is the structured grounding for a timed (FireAfterMs)
 	// hold — it declares WHAT the hold is waiting for (a source/event ref) before
-	// a time-based wake is permitted. Mirrors clowder-ai's waitSourceRef: a
+	// a time-based wake is permitted. Mirrors the waitSourceRef rule: a
 	// wakeAfterMs hold without waitSourceRef is rejected (the hold must state
 	// what it is waiting on). Command wakes are self-grounded and exempt.
 	WaitSourceRef string `json:"wait_source_ref,omitempty"`
@@ -146,7 +146,7 @@ type IBallLedgerStore interface {
 }
 
 // IBallLedger records ball custody events and projects current state.
-// This is the orchestration "ball custody ledger" (clowder ball-custody domain).
+// This is the orchestration "ball custody ledger" (the ball-custody domain).
 type IBallLedger interface {
 	RecordHanded(ctx context.Context, threadID, from, to string) error
 	RecordInvocationStarted(ctx context.Context, threadID, holder string) error

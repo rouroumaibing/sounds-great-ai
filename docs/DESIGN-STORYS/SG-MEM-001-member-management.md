@@ -28,6 +28,8 @@
 
 「成员管理」是 **Settings 内的一个分区**（nav id=`members`，与 `accounts` 并列）。设置页默认进入 `accounts`，左侧点「成员管理」→ 右侧渲染 `MemberManagement` 列表页。
 
+> **前置依赖（与「账户与密钥」`SG-ACC-001`）**：成员的 `variant.account_ref` 必须指向《账户与密钥》中已存在的账户（或内置 OAuth client）。即「**先建凭证，再建关联 Agent 角色**」——无可用账号时，添加成员流程内联引导先建账号（见 §7.1），而非凭空创建。
+
 页面自上而下：
 1. **工具栏**：filter tabs（全部/已启用/已停用/CLI(OAuth)/CLI(配置)）+ 「+ 添加成员」按钮。
 2. **全局默认犬选择器** `DefaultDogSelector`：下拉选一只 breed 设为默认犬，落盘持久化。
@@ -205,6 +207,8 @@
 
 ### 5.2 三文件隔离（与账户同根）
 
+> 凭证隔离机制与 0600 权限以《账户与密钥》`SG-ACC-001` §5.1 为准；本表为成员 catalog 字段的**完整真相**（ACC §5.1 已反向指向此处，避免双写）。
+
 | 文件 | 内容 | 权限 | 管理方 | 落盘根 |
 |---|---|---|---|---|
 | `dog-catalog.json` | breeds + roster + review_policy + leader + configs + deleted_breeds + seen_template_breeds | 0644 | `FileSettingsStore` | `ConfigRoot`（项目 `.sounds-great-ai`） |
@@ -215,7 +219,7 @@
 
 ### 5.3 关键结构体（`pkg/pack/breed.go`）
 
-- `BreedConfig`：`ID, Name, DisplayName, Nickname, Avatar, Color{Primary,Secondary}, Personality, RoleDescription, TeamStrengths, MentionPatterns[], Roles[], Caution, DefaultVariantID, Variants[], Review, Features{SessionChain, MissionHub{SelfClaimScope}}, Restrictions[], RelationshipKey, DogID, Source(system/user/plugin), Enabled`。← `dog_id` / `features` / `restrictions` / `relationship_key` 对齐 clowder `cat-template.json`（保持 snake_case 以兼容 Go 解析器）。
+- `BreedConfig`：`ID, Name, DisplayName, Nickname, Avatar, Color{Primary,Secondary}, Personality, RoleDescription, TeamStrengths, MentionPatterns[], Roles[], Caution, DefaultVariantID, Variants[], Review, Features{SessionChain, MissionHub{SelfClaimScope}}, Restrictions[], RelationshipKey, DogID, Source(system/user/plugin), Enabled`。← `dog_id` / `features` / `restrictions` / `relationship_key` 保留 snake_case 以兼容 Go 解析器。
 - `Variant`：`ID, VariantLabel, ClientID, DefaultModel, MCPSupport, CLI{Command,OutputFormat,DefaultArgs[],Effort}, SystemPrompt, Personality, Strengths[], TeamStrengths, Caution, ContextBudget{MaxPromptTokens,MaxContextTokens,MaxMessages}, VoiceConfig, AccountRef, Provider, SessionChain, Strategy, AutoCompactTokenLimit, Name, DisplayName, Avatar, Color{Primary,Secondary}, MentionPatterns[], RoleDescription, DogID, Restrictions[]`。← 成员绑定账号走 `variant.account_ref`；`name/display_name/avatar/color/mention_patterns/role_description/dog_id/restrictions` 为逐变体可覆盖身份字段。
 - `RosterEntry`：`Family, Roles[], Lead, Available, Evaluation`。← `Available` 为启用唯一真相；派生 `CredentialReady` 由 `settings_handler.enrichRoster` 在响应层附加，**不入 catalog 落盘**。
 - `ReviewPolicy`：`RequireDifferentBreed, PreferActiveInThread, ExcludeUnavailable, PreferLead, PreferredRoles[]`。
@@ -282,6 +286,8 @@ credential_ready(breed) = 依据 default variant 绑定的账号：
   account.auth_type == "api_key"
       → FileCredentialStore.Has(account.ID)   // credentials.json（0600）
   无绑定账号 → false
+
+> 注：`kimi` 走 api_key（环境变量 `KIMI_API_KEY`）而非本地 CLI 二进制，故 oauth **二进制探测集为 4 个**（claude/codex/gemini/opencode）。这与 `ValidateAccountRef` 的 5 个内置 OAuth client（含 kimi，见 §4.6）不冲突——前者指"是否查 CLI 二进制存在"，后者指"无需 catalog 账户即可被 `account_ref` 引用"，是两件事。
 ```
 
 - **有效可用性 = `Available ∧ credential_ready`**。前端三态：`已启用（就绪）` / `待配置（已启用但无密钥或 CLI）` / `已停用`。
@@ -298,7 +304,7 @@ credential_ready(breed) = 依据 default variant 绑定的账号：
 ### 6.6 VISION 与 ADR
 
 - `VISION.md` §5.1「首启空、按需组队」已更新：六犬是模板/菜单，非出厂即部署；首启 `dog-catalog.json` 为空（仅 owner），用户经「成员管理 → 从模板添加」组队。
-- `docs/decisions/ADR-001-empty-catalog-first-run.md` 记录本决策。
+- 本决策同时记录于 `VISION.md` §5.1 与本文 §6。
 
 ---
 
@@ -314,7 +320,7 @@ credential_ready(breed) = 依据 default variant 绑定的账号：
         │
 [后端] auth.Wrap → CreateBreed
    → validateBreed: CheckMentionPatternsUnique + 各 variant ValidateClientID + 各 variant ValidateAccountRef
-   → pack.Register → persistBreed（写 dog-catalog.json breeds[] + breedOrder 追加 + roster 初值 Available=Enabled）
+   → pack.Register → persistBreed（追加到 `dog-catalog.json` 的 `breeds[]` 数组末尾（排序真相见 §5.1，无独立 breedOrder 键）+ roster 初值 Available=Enabled）
    → 200 breed
         │
 [前端] refetchBreeds + refetchSettings → 列表出现新成员
@@ -472,7 +478,8 @@ DELETE /api/settings/accounts/{id}       → 200 nil | 409(bound_member_ids) | 4
 - **2026-08-13（首启空 + 凭据就绪闸门，原 SG-MEM-002）**：推翻「种子默认启用」，全新安装首启空 catalog（D1）；`seen_template_breeds` 统一 D1+D3；`MergedBreeds` 仅 catalog；`credential_ready` 派生三态；`router.go` 空 patterns 友好报错；`VISION.md` §5.1 + ADR-001。
 - **2026-08-13（合并与代码对齐）**：合并 MEM-001 + MEM-002 为本文件；修正：`DEFAULT_SECTION='accounts'`、`RAW_SECTIONS` 顺序、`breedOrder` 无独立键（排序=breeds[] 顺序）、`GetTemplates` 返 `BreedConfig[]`、补充 `/bark` `/status` `/env*` 端点、catalog 含 `deleted_breeds`/`seen_template_breeds`。
 - **2026-08-13（剔除 Makefile/守护内容）**：经用户确认，构建/守护进程生命周期（原 SG-DEV-001）应独立成文，故从本文件剔除附录 A，恢复为独立文档 `SG-DEV-001-makefile-daemon-reclaim.md`。
+- **2026-08-16（与 ACC 理清先后关系 + 一致性校正）**：明确「先凭证后角色」前置依赖（§2）；§5.2 标注本表为成员 catalog 字段完整真相、反向指向 ACC §5.1；修正 §7.1「breedOrder 追加」措辞（→ 追加到 breeds[] 数组末尾，与 §5.1 排序真相一致）；§6.4 澄清 kimi 走 api_key、oauth 二进制探测集为 4 个（与 §4.6 的 5 个内置 OAuth client 不冲突）。
 
 ---
 
-> 关联文档：`SG-ACC-001-accounts-keys-auth.md`（账户与密钥/客户配置安全，成员经 `account_ref` 反向引用）、`SG-DEV-001-makefile-daemon-reclaim.md`（构建/守护进程生命周期，独立成文）、`VISION.md` §5.1、`docs/decisions/ADR-001-empty-catalog-first-run.md`、`internal/platform/breeds_merge.go`、`internal/platform/router.go`。
+> 关联文档：`SG-ACC-001-accounts-keys-auth.md`（账户与密钥/客户配置安全，成员经 `account_ref` 反向引用）、`SG-DEV-001-makefile-daemon-reclaim.md`（构建/守护进程生命周期，独立成文）、`VISION.md` §5.1、`internal/platform/breeds_merge.go`、`internal/platform/router.go`。

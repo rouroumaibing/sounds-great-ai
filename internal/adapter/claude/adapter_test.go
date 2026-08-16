@@ -31,7 +31,7 @@ func TestAdapterHealthMissingBinary(t *testing.T) {
 
 func TestAdapterBuildArgs(t *testing.T) {
 	a := New(nil)
-	args := a.buildArgs("claude-opus-4-6", "/tmp/work", nil, "")
+	args, _ := a.buildArgs("claude-opus-4-6", "/tmp/work", nil, "")
 	found := false
 	for _, arg := range args {
 		if arg == "stream-json" {
@@ -147,7 +147,7 @@ func TestAdapterBuildArgsTableDriven(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := a.buildArgs(tt.model, tt.workDir, tt.mcp, tt.systemPrompt)
+			args, _ := a.buildArgs(tt.model, tt.workDir, tt.mcp, tt.systemPrompt)
 			for _, want := range tt.wantContains {
 				if !argsContains(args, want) {
 					t.Errorf("args = %v, want to contain %q", args, want)

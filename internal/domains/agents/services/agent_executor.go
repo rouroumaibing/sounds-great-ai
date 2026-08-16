@@ -34,14 +34,15 @@ func (s *AgentExecutorService) Execute(ctx context.Context, req agentsPorts.Exec
 		callCtx = ctx
 	}
 	uReq := unified.ExecuteRequest{
-		Messages:       req.Messages,
-		SystemPrompt:   req.SystemPrompt,
-		SystemPromptL0: req.SystemPromptL0,
-		Model:          req.Model,
-		Skills:         req.Skills,
-		MCPConfig:      req.MCPConfig,
-		WorkDir:        req.WorkDir,
-		MaxTokens:      req.MaxTokens,
+		Messages:              req.Messages,
+		SystemPrompt:          req.SystemPrompt,
+		SystemPromptL0:        req.SystemPromptL0,
+		Model:                 req.Model,
+		Skills:                req.Skills,
+		MCPConfig:             req.MCPConfig,
+		WorkDir:               req.WorkDir,
+		MaxTokens:             req.MaxTokens,
+		AutoCompactTokenLimit: req.AutoCompactTokenLimit,
 	}
 	return a.Execute(callCtx, uReq)
 }

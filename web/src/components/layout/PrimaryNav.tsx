@@ -50,6 +50,8 @@ export function PrimaryNav() {
         <NavButton nav="tasks" icon="fa-solid fa-diagram-project" label={t('nav.tasks')} activeNav={activeNav} onClick={() => setActiveNav('tasks')} />
         <NavButton nav="memory" icon="fa-solid fa-database" label={t('nav.memory')} activeNav={activeNav} onClick={() => setActiveNav('memory')} />
         <NavButton nav="custody" icon="fa-solid fa-circle-nodes" label={t('nav.custody', '球权轨迹')} activeNav={activeNav} onClick={() => setActiveNav('custody')} />
+        <NavButton nav="profiles" icon="fa-solid fa-paw" label={t('nav.profiles', '养熟')} activeNav={activeNav} onClick={() => setActiveNav('profiles')} />
+        <NavButton nav="people" icon="fa-solid fa-users" label={t('nav.people', '人物记忆')} activeNav={activeNav} onClick={() => setActiveNav('people')} />
       </div>
 
       {/* Bottom Nav Icons */}

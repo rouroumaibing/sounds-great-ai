@@ -17,7 +17,7 @@ import (
 var errPostCommit = errors.New("custody: post-commit invariant mismatch")
 
 // BallLedger records ball custody events into an append-only store and projects
-// the current custody state. It is the SG equivalent of clowder-ai's
+// the current custody state. It is the SG equivalent of the
 // ball-custody domain (event ledger + pure-function state machine).
 //
 // The ledger is a passive observer during P0: the orchestration writes events
@@ -165,7 +165,7 @@ func (l *BallLedger) tryCommitDispatch(ctx context.Context, threadID, from, to s
 		return false, err
 	}
 	snap := Project(events)
-	// G13: three-piece invariant guard (clowder assertCurrentHolder /
+	// G13: three-piece invariant guard (assertCurrentHolder /
 	// assertLatestInvocation / assertExactHandoffIsLive). Any failure appends a
 	// ball.disposition_rejected audit event (state unchanged) and returns false.
 	if err := assertCurrentHolder(snap, from); err != nil {
@@ -343,7 +343,7 @@ func (l *BallLedger) ProjectDutyBriefing(ctx context.Context) (custodyPorts.Duty
 // when no heartbeat exists) is older than timeout, we append InvocationDied so the
 // projected state settles into dead/zombie instead of hanging in active forever.
 //
-// This mirrors clowder-ai's reconcileZombies: when a spawned CLI agent process
+// This is the reconcileZombies sweep: when a spawned CLI agent process
 // crashes or a fiber leaks without closing its event channel, the orchestration
 // goroutine may exit without writing a terminal event. The reconciler sweeps the
 // ledger on a timer and heals those dangling invocations. It is safe to run

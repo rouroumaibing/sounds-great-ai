@@ -3,6 +3,8 @@ package threadstore
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -15,6 +17,16 @@ type sqliteMessageStore struct {
 
 // NewSQLiteMessageStore creates a SQLite-backed MessageStore.
 func NewSQLiteMessageStore(path string) (MessageStore, error) {
+	// Ensure the parent directory exists. On a fresh checkout the configured
+	// SQLitePath (e.g. data/sounds-great.db) lives under a directory that may
+	// not yet exist; without it, the first Exec (schema create) fails and
+	// platform.New bails to legacy mode. Creating the dir here keeps the
+	// platform initialization resilient.
+	if dir := filepath.Dir(path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, fmt.Errorf("create sqlite dir %q: %w", dir, err)
+		}
+	}
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)

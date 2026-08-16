@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"sounds-great-ai/internal/adapter/unified"
 	"sounds-great-ai/internal/settings"
 )
 
@@ -30,10 +31,10 @@ func TestPlatformNew(t *testing.T) {
 	}
 
 	// Verify adapters
-	if p.AgentExecutor.Count() != 4 {
-		t.Fatalf("expected 4 adapters, got %d", p.AgentExecutor.Count())
+	if p.AgentExecutor.Count() != 5 {
+		t.Fatalf("expected 5 adapters, got %d", p.AgentExecutor.Count())
 	}
-	for _, name := range []string{"claude", "codex", "gemini", "opencode"} {
+	for _, name := range []string{"claude", "codex", "gemini", "kimi", "opencode"} {
 		if _, err := p.GetAdapter(name); err != nil {
 			t.Errorf("GetAdapter(%s): %v", name, err)
 		}
@@ -253,7 +254,63 @@ func TestPlatformAdaptersCount(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	if p.AgentExecutor.Count() != 4 {
-		t.Errorf("expected 4 adapters, got %d", p.AgentExecutor.Count())
+	if p.AgentExecutor.Count() != 5 {
+		t.Errorf("expected 5 adapters, got %d", p.AgentExecutor.Count())
 	}
+}
+
+// TestPlatformCarrierChainClaudeFirst locks in the per-provider default chain
+// (2026-08-15): the three long-session CLIs — claude/codex/gemini — each lead
+// with bg_daemon (per-provider warm-pool tier, Point 4); opencode/kimi stay
+// one-shot print_sdk. The bg_daemon transport is only wired under
+// -tags pty (WireWarmPools), so in the default build those three transparently
+// falls back to print_sdk — but the chain order itself must still reflect the
+// claude-first intent so the warm pool activates without a re-register.
+func TestPlatformCarrierChainClaudeFirst(t *testing.T) {
+	breedsDir := t.TempDir()
+	skillsDir := t.TempDir()
+
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if p.CarrierRegistry == nil {
+		t.Fatal("expected non-nil CarrierRegistry")
+	}
+
+	for _, name := range []string{"claude", "codex", "gemini"} {
+		want := []string{"bg_daemon", "print_sdk"}
+		got := kinds(p.CarrierRegistry.ResolveChain(name))
+		if !equalKinds(got, want) {
+			t.Errorf("%s chain = %v, want %v", name, got, want)
+		}
+	}
+
+	for _, name := range []string{"opencode", "kimi"} {
+		want := []string{"print_sdk"}
+		got := kinds(p.CarrierRegistry.ResolveChain(name))
+		if !equalKinds(got, want) {
+			t.Errorf("%s chain = %v, want %v", name, got, want)
+		}
+	}
+}
+
+func kinds(in []unified.TransportKind) []string {
+	out := make([]string, len(in))
+	for i, k := range in {
+		out[i] = string(k)
+	}
+	return out
+}
+
+func equalKinds(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

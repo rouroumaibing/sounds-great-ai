@@ -1,6 +1,6 @@
 ## SOP 阶段
 
-当前 SOP stage：{{.SOPStage}}
+当前 SOP stage：（待接入）
 
 SOP stage 流转：kickoff → impl → quality_gate → [fresh_context] → review → merge → completion
 

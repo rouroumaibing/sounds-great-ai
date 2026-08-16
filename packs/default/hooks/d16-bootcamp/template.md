@@ -1,6 +1,6 @@
 ## 训练营
 
-训练营模式：{{.BootcampActive}}
+训练营模式：（待接入）
 
 当 thread 有 bootcampState 时激活：
 - 引导新用户熟悉犬队功能

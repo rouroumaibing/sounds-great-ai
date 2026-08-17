@@ -1,4 +1,4 @@
-# [SG-DEV-001] [Tech Story] 构建/开发环境 Makefile 守护生命周期设计
+# [FT-DEV-001] [Tech Story] 构建/开发环境 Makefile 守护生命周期设计
 
 > 本文档基于 `sounds-great-ai` **当前代码实况**（`Makefile`、`scripts/daemon-helper.sh`、`cmd/server/handlers.go`）逐文件梳理，描述 Makefile 目标体系与守护进程（daemon）生命周期的**设计意图、结构契约与安全边界**。
 > 不涉及任何历史事件，仅解释"这套构建/运行工具链为什么这样设计、各 target 如何协作、有哪些约定与护栏"。
@@ -197,7 +197,7 @@ daemon:
 ## 10. 修订记录 (Revision History)
 
 - **2026-08-12（初版）**：以设计视角梳理 `Makefile` 目标体系与守护生命周期——`daemon` 开关、双入口骨架、启动三道关、`stop` 双层回收、`clean/deep/upgrade/restart` 意图、跨平台 `daemon-helper.sh`、`sounds-great-ai` 命名约定与安全边界。落盘为 Tech Story（纯设计文档，不含事件背景）。
-- **2026-08-13（拆分恢复为独立文档）**：此前被并入 `SG-MEM-001-member-management.md` 的附录 A；经用户确认 Makefile/守护进程生命周期应独立于「成员管理」成文，故从合并文档中剔除并恢复为本独立 Tech Story（内容未改）。
+- **2026-08-13（拆分恢复为独立文档）**：此前被并入 `FT-MEM-001-member-management.md` 的附录 A；经用户确认 Makefile/守护进程生命周期应独立于「成员管理」成文，故从合并文档中剔除并恢复为本独立 Tech Story（内容未改）。
 - **2026-08-13（`deep` 扩展删除 `.sounds-great-ai`）**：应需求将 `make clean deep` 的清理范围扩展到项目根 `.sounds-great-ai` 运行时目录。`Makefile` 的 `deep` target 新增 `rm -rf .sounds-great-ai`（位于 `node_modules` 清理之后、`go clean` 之前），`make help` 文案同步标注。随之更新本文：§2 命令契约、§3.5 `deep` 行、§6 增补"不可逆清除运行时凭据"取舍项、§8 资安护栏改写（区分 `clean`/`stop` 无敏感数据 vs `deep` 删凭据）。
 
 ---

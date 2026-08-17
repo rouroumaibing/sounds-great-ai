@@ -1,5 +1,3 @@
-//go:build pty
-
 package platform
 
 import (

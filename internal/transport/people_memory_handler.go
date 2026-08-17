@@ -15,7 +15,7 @@ import (
 // PeopleMemoryHandler exposes the F276 "People & Relationship Memory" store over
 // HTTP. Like the capsule handler, NO reasoning runs inside the platform: a
 // candidate is submitted as a proposal and only an explicit approval
-// materializes it (VISION §4.1). The content submitted is treated as operator/
+// materializes it (docs/decisions/irreversible-decisions.md §4.1). The content submitted is treated as operator/
 // CLI-authored truth; the platform stores and projects it only.
 //
 // Multi-operator: every request resolves its owner scope (operatorID) from the
@@ -291,8 +291,8 @@ func (h *PeopleMemoryHandler) Propose(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-	if c.RequesterCat == "" {
-		c.RequesterCat = op
+	if c.RequesterDog == "" {
+		c.RequesterDog = op
 	}
 	// Cross-thread source authorization (fail-closed).
 	if ok, _ := h.authorizer.AuthorizeSource(r.Context(), op, c.SourceMessageRef); !ok {
@@ -316,7 +316,7 @@ func (h *PeopleMemoryHandler) Defer(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Subject   string               `json:"subject"`
 		PersonID  string               `json:"person_id"`
-		Requester string               `json:"requester_cat"`
+		Requester string               `json:"requester_dog"`
 		Coords    []settings.SourceRef `json:"source_coords"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -589,7 +589,7 @@ func (h *PeopleMemoryHandler) ClaimDeferred(w http.ResponseWriter, r *http.Reque
 	op := h.resolveOperator(r)
 	id := r.PathValue("receiptID")
 	var body struct {
-		Requester string `json:"requester_cat"`
+		Requester string `json:"requester_dog"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	if body.Requester == "" {

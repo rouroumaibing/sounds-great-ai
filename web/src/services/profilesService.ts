@@ -57,6 +57,6 @@ export async function distillAgent(
   );
 }
 
-export async function upsertCapsule(key: string, body: string, ownerCat = 'operator'): Promise<RelationshipCapsule> {
-  return apiPut<RelationshipCapsule>(`/api/profiles/${enc(key)}`, { body, owner_cat: ownerCat });
+export async function upsertCapsule(key: string, body: string, ownerDog = 'operator'): Promise<RelationshipCapsule> {
+  return apiPut<RelationshipCapsule>(`/api/profiles/${enc(key)}`, { body, owner_dog: ownerDog });
 }

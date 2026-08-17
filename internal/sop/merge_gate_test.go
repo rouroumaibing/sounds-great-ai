@@ -5,7 +5,7 @@ import "testing"
 func TestMergeGateAllPass(t *testing.T) {
 	rc := NewReviewCycle()
 	rc.ReceiveReview(ReviewProvenance{
-		ReviewerBreed: "xigou",
+		ReviewerDogID: "xigou-dog",
 		ReviewSHA:     "abc123",
 	})
 
@@ -13,7 +13,7 @@ func TestMergeGateAllPass(t *testing.T) {
 	result := g.Run(MergeGateInput{
 		ChangedFiles:        []string{"internal/sop/review.go"},
 		ReviewMatrix:        ReviewProvenanceMatrix{LocalPeerReviewSHA: "abc123", CurrentHead: "abc123"},
-		AuthorBreed:         "bianmu",
+		AuthorDogID:         "bianmu",
 		QualityGatePassed:   true,
 		HasUncommittedChanges: false,
 		TestsPass:           true,
@@ -104,7 +104,7 @@ func TestMergeGateRiskTrack(t *testing.T) {
 func TestMergeGateCrossBreedReview(t *testing.T) {
 	rc := NewReviewCycle()
 	rc.ReceiveReview(ReviewProvenance{
-		ReviewerBreed: "xigou",
+		ReviewerDogID: "xigou-dog",
 		ReviewSHA:     "abc123",
 	})
 
@@ -112,7 +112,7 @@ func TestMergeGateCrossBreedReview(t *testing.T) {
 	result := g.Run(MergeGateInput{
 		ChangedFiles:        []string{"somefile.go"},
 		ReviewMatrix:        ReviewProvenanceMatrix{LocalPeerReviewSHA: "abc123"},
-		AuthorBreed:         "bianmu",
+		AuthorDogID:         "bianmu",
 		QualityGatePassed:   true,
 		HasUncommittedChanges: false,
 		TestsPass:           true,
@@ -120,5 +120,72 @@ func TestMergeGateCrossBreedReview(t *testing.T) {
 	})
 	if !result.Conditions[1].Passed {
 		t.Error("E2 cross-breed should pass")
+	}
+}
+
+func TestMergeGateSelfReviewFails(t *testing.T) {
+	rc := NewReviewCycle()
+	rc.ReceiveReview(ReviewProvenance{
+		ReviewerDogID: "bianmu",
+		ReviewSHA:     "abc123",
+	})
+
+	g := NewMergeGate("")
+	result := g.Run(MergeGateInput{
+		ChangedFiles:        []string{"somefile.go"},
+		ReviewMatrix:        ReviewProvenanceMatrix{LocalPeerReviewSHA: "abc123"},
+		AuthorDogID:         "bianmu",
+		QualityGatePassed:   true,
+		HasUncommittedChanges: false,
+		TestsPass:           true,
+		ReviewCycle:         rc,
+	})
+	if result.Passed {
+		t.Error("expected fail: self-review must not pass the merge gate")
+	}
+	if result.Conditions[1].Passed {
+		t.Error("E2 should fail on self-review")
+	}
+}
+
+func TestMergeGateExternalReviewBindsTarget(t *testing.T) {
+	g := NewMergeGate("")
+	result := g.Run(MergeGateInput{
+		ChangedFiles:        []string{"somefile.go"},
+		ReviewMatrix:        ReviewProvenanceMatrix{CloudReviewSHA: "ext-1", CurrentHead: "ext-1"},
+		QualityGatePassed:   true,
+		HasUncommittedChanges: false,
+		TestsPass:           true,
+	})
+	if !result.Passed {
+		t.Fatalf("external same-target review should pass: %+v", result.Conditions[1])
+	}
+}
+
+func TestMergeGateExternalReviewWrongTarget(t *testing.T) {
+	g := NewMergeGate("")
+	result := g.Run(MergeGateInput{
+		ChangedFiles:        []string{"somefile.go"},
+		ReviewMatrix:        ReviewProvenanceMatrix{CloudReviewSHA: "ext-1", CurrentHead: "head-other"},
+		QualityGatePassed:   true,
+		HasUncommittedChanges: false,
+		TestsPass:           true,
+	})
+	if result.Passed {
+		t.Fatal("external review not binding the exact target revision must fail")
+	}
+}
+
+func TestMergeGateAmbiguousIntentFailsClosed(t *testing.T) {
+	g := NewMergeGate("")
+	result := g.Run(MergeGateInput{
+		ChangedFiles:        []string{"somefile.go"},
+		ReviewMatrix:        ReviewProvenanceMatrix{LocalPeerReviewSHA: "", CloudReviewSHA: ""},
+		QualityGatePassed:   true,
+		HasUncommittedChanges: false,
+		TestsPass:           true,
+	})
+	if result.Passed {
+		t.Fatal("ambiguous review intent must fail closed")
 	}
 }

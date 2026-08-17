@@ -140,7 +140,7 @@ func estimateTokens(s string) int {
 // count of the remaining history fits within maxTokens (Persistent Identity
 // P2, homologous auto-compact budget). The most recent messages are
 // kept; only the head (oldest) is trimmed, mirroring the platform-side
-// compression driven from each cat's contextWindow. A non-positive
+// compression driven from each breed's contextWindow. A non-positive
 // maxTokens is a no-op (no bound applied).
 func BoundContextByTokens(msgs []ContextMessage, maxTokens int) []ContextMessage {
 	if maxTokens <= 0 || len(msgs) == 0 {

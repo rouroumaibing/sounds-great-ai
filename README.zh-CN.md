@@ -39,7 +39,7 @@
 
 犬队协作与系统架构全景图。
 
-![Sounds Great AI 架构设计](docs/design/images/sounds-great-ai.png)
+![Sounds Great AI 架构设计](docs/brand/images/sounds-great-ai.png)
 
 </div>
 
@@ -382,8 +382,8 @@ sounds-great-ai/
 ├── web/                     # 前端 (React + Vite)
 └── docs/
     ├── architecture/        # 架构文档
-    ├── decisions/           # ADR 决策记录
-    ├── design/              # 设计文档
+    ├── governance/decisions/           # ADR 决策记录
+    ├── brand/              # 设计文档
     ├── features/            # 功能文档
     └── plans/               # 实现计划
 ```
@@ -392,8 +392,8 @@ sounds-great-ai/
 
 - [架构谱系](docs/architecture/architecture-lineage.md) — 全量架构主题索引
 - [记忆哲学](docs/architecture/memory-philosophy.md) — 7 公理、21 定律、判据
-- [角色设定](docs/design/CHARACTER-SETTING_zh-CN.md) — 狗狗角色映射表
-- [故事背景](docs/design/STORY_zh-CN.md) — 狗狗特工队的诞生故事
+- [角色设定](docs/brand/CHARACTER-SETTING_zh-CN.md) — 狗狗角色映射表
+- [故事背景](docs/brand/STORY_zh-CN.md) — 狗狗特工队的诞生故事
 
 ## Contributing
 

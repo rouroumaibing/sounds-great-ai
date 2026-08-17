@@ -20,9 +20,13 @@ var errPostCommit = errors.New("custody: post-commit invariant mismatch")
 // the current custody state. It is the SG equivalent of the
 // ball-custody domain (event ledger + pure-function state machine).
 //
-// The ledger is a passive observer during P0: the orchestration writes events
-// but never branches on the projected state ("只写不读"). Later phases (P2/P3/P4)
-// read Snapshot for hold_ball, disposition closure, and brief/trail APIs.
+// The ledger is a read-write participant: the orchestration writes custody
+// events AND branches on the projected state. handleA2AHandoff reads
+// Snapshot to gate dispatch (abort if a third party took the ball),
+// TryDispatchDispositioned reads Project for the three-piece dispatch guard,
+// and ReconcileZombies reads events for zombie sweep. Trail/Brief APIs and
+// hold_ball also consume projections (SG §4.5: ball custody is a first-class
+// orchestration state source, not a passive audit log).
 type BallLedger struct {
 	store custodyPorts.IBallLedgerStore
 	// mu guards the read-judge-write sequence of the conditional Try* methods
@@ -43,8 +47,8 @@ func (l *BallLedger) append(ctx context.Context, ev custodyPorts.BallEvent) erro
 }
 
 // nextGeneration computes the next handoff generation from the existing ledger.
-// This reads the ledger's OWN store (not the orchestration reading it), which is
-// consistent with "只写不读" for the orchestration control flow.
+// This reads the ledger's OWN store; the orchestration also reads projections
+// elsewhere (Snapshot/Project) for dispatch guards.
 func (l *BallLedger) nextGeneration(ctx context.Context, threadID string) int {
 	events, err := l.store.GetEvents(ctx, threadID)
 	if err != nil {

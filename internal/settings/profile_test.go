@@ -14,7 +14,7 @@ func TestProfileRepository_RoundTrip(t *testing.T) {
 	key := "family-sounds-great-ai"
 	c := &RelationshipCapsule{
 		RelationshipKey: key,
-		OwnerCat:        "bianmu",
+		OwnerDog:        "bianmu",
 		Status:          "active",
 		SourceRef:       "operator:manual",
 		CorrectionPath:  "was over-eager; operator said pace down",
@@ -34,7 +34,7 @@ func TestProfileRepository_RoundTrip(t *testing.T) {
 	if got.Body != c.Body {
 		t.Errorf("body = %q, want %q", got.Body, c.Body)
 	}
-	if got.OwnerCat != "bianmu" || got.Status != "active" || got.SourceRef != "operator:manual" {
+	if got.OwnerDog != "bianmu" || got.Status != "active" || got.SourceRef != "operator:manual" {
 		t.Errorf("front-matter mismatch: %+v", got)
 	}
 	if got.UpdatedAt == 0 {

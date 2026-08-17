@@ -12,7 +12,7 @@
 2. **进程自保** — 不杀父进程，不修改启动配置导致无法重启。
 3. **配置不可变** — 不在运行时修改 `internal/config/` 下的配置文件。配置变更需要人类介入。
 4. **网络边界** — 不访问不属于本服务的 localhost 端口。
-5. **愿景不可违** — 不违反 `docs/VISION.md` §4 的不可逆决策。如果要改，先更新 VISION.md。
+5. **愿景不可违** — 不违反 `docs/governance/decisions/irreversible-decisions.md` 的不可逆决策。如果要改，先更新该决策文档。
 
 ## 限制声明
 
@@ -49,12 +49,12 @@
 | 红旗 | 违反 | 正确做法 |
 |------|------|----------|
 | 在 `internal/` 层调 LLM 做推理 | §3 三层原则 | 推理交给 CLI adapter |
-| 硬编码 workflow DAG（固定 pipeline） | §4.2 不可逆决策 | 用动态路由 |
-| 新建 A2A HTTP server/client | §4.1 不可逆决策 | 用 CLI adapter（stdin/stdout pipe） |
-| 在 platform 层做 agent reasoning | §4.1 不可逆决策 | reasoning 是 CLI 的事 |
-| 引入 `internal/a2a/server/` 或 `internal/a2a/client/` | §4.1 不可逆决策 | 已废弃，用 `internal/adapter/` |
-| 新增 `internal/` 顶层目录而不更新 VISION.md §6 | §6 平台能力清单 | 先更新 VISION.md |
-| 跳 Phase（如 Phase 3 代码出现在 Phase 1 期间） | §7 路线图 | 先完成前置 Phase |
+| 硬编码 workflow DAG（固定 pipeline） | `docs/governance/decisions/irreversible-decisions.md` §4.2 不可逆决策 | 用动态路由 |
+| 新建 A2A HTTP **server**（监听外部入站、暴露本地 agent 供第三方 push） | `docs/governance/decisions/irreversible-decisions.md` §4.1+§4.7 不可逆决策 | 平台只作 A2A **客户端**；编排仍走 CLI adapter + 球权账本 |
+| 在 platform 层做 agent reasoning | `docs/governance/decisions/irreversible-decisions.md` §4.1 不可逆决策 | reasoning 是 CLI 的事 |
+| 引入 `internal/a2a/server/` 或 `internal/a2a/client/` 子目录 | `docs/governance/decisions/irreversible-decisions.md` §4.7 不可逆决策 | A2A 协议客户端限 `internal/adapter/a2a/`，协议类型复用 `pkg/a2a/` |
+| 新增 `internal/` 顶层目录而不更新 `docs/architecture/platform-capabilities.md` §6 | §6 平台能力清单 | 先更新该文档 |
+| 跳 Phase（如 Phase 3 代码出现在 Phase 1 期间） | `docs/ROADMAP.md` | 先完成前置 Phase |
 
 ## Vision Check Protocol（愿景守卫）
 
@@ -65,9 +65,9 @@
 ```
 我要做的事是：
 A. 改代码 → 查红旗模式表，命中任何一个 → 停
-B. 加新模块 → 检查 VISION.md §6 是否有对应条目
-C. 改架构 → 必须先更新 VISION.md（时刻 3）
-D. 写 spec → 填 VISION Compatibility 段（§8.1）
+B. 加新模块 → 检查 `docs/architecture/platform-capabilities.md` §6 是否有对应条目
+C. 改架构 → 必须先更新对应文档（时刻 3）
+D. 写 spec → 填 VISION Compatibility 段（`docs/governance/vision-compliance.md` §8.1）
 E. 日常修 bug / 小改动 → 直接做，提交前查时刻 2
 ```
 
@@ -76,19 +76,19 @@ E. 日常修 bug / 小改动 → 直接做，提交前查时刻 2
 在 commit 前检查：
 
 - 是否命中红旗模式表？→ 不提交
-- 是否新增/删除了 `internal/` 下的顶层目录？→ 是否更新了 VISION.md §6？
+- 是否新增/删除了 `internal/` 下的顶层目录？→ 是否更新了 `docs/architecture/platform-capabilities.md` §6？
 - 是否跨了 Phase 边界？→ 前置条件满足了吗？
 
-### 时刻 3：架构变更时 — "这需要更新 VISION 吗？"
+### 时刻 3：架构变更时 — "这需要更新对应文档吗？"
 
-当你发现需要做以下事情时，**必须先更新 `docs/VISION.md` 并向用户说明理由**：
+当你发现需要做以下事情时，**必须先更新对应文档并向用户说明理由**：
 
-- 引入新的不可逆决策
-- 推翻现有不可逆决策
-- 改变三层原则的职责划分
-- 引入新的 Phase 或重排 Phase 顺序
+- 引入 / 推翻不可逆决策 → 更新 `docs/governance/decisions/irreversible-decisions.md`
+- 改变三层原则的职责划分 → 更新 `docs/VISION.md`（§3 仍在本文件）
+- 新增平台模块 / 能力 → 更新 `docs/architecture/platform-capabilities.md` §6
+- 引入新的 Phase 或重排 Phase 顺序 → 更新 `docs/ROADMAP.md`
 
-**未更新 VISION.md 就实施架构变更 = 违反铁律 5。**
+**未更新对应文档就实施架构变更 = 违反铁律 5。**
 
 ### 被阻断时怎么报告
 
@@ -111,13 +111,13 @@ E. 日常修 bug / 小改动 → 直接做，提交前查时刻 2
 **在长任务中（超过 5 个连续工具调用），每完成一个子任务后重问自己：**
 - 我还在我狗狗的职责范围内吗？（查限制声明表）
 - 我没有引入红旗模式吧？（查红旗模式表）
-- 我还在当前 Phase 内吗？（查 VISION.md §7）
+- 我还在当前 Phase 内吗？（查 `docs/ROADMAP.md`）
 
 ## Development Flow
 
 ### 走 spec 流程时
 
-1. Spec 必须包含 `## VISION Compatibility` 段，回答 VISION.md §8.1 的 7 个问题
+1. Spec 必须包含 `## VISION Compatibility` 段，回答 `docs/governance/vision-compliance.md` §8.1 的 7 个问题
 2. 大 Feature（3+ Phase）每个 Phase merge 后和用户碰头（见 VISION.md §2.2）
 3. 小 Feature 直接做到底
 
@@ -142,28 +142,29 @@ E. 日常修 bug / 小改动 → 直接做，提交前查时刻 2
 - Go 代码：`go build ./...` 和 `go test ./...` 必须通过
 - 文件大小：200 行警告 / 350 行硬限
 - 不引入红旗模式表中的任何模式
-- 新增 `internal/` 顶层目录需要更新 VISION.md §6
+- 新增 `internal/` 顶层目录需要更新 `docs/architecture/platform-capabilities.md` §6
 
 ## Truth Sources（真相源）
 
 | 文档 | 内容 |
 |------|------|
-| `docs/VISION.md` | 北极星。哲学、协作、治理、架构、路线图、合规机制 |
+| `docs/VISION.md` | 北极星（方向与理念，§0–§3）。架构/路线图/合规/不可逆决策已拆分至 `docs/architecture/platform-capabilities.md`、`docs/ROADMAP.md`、`docs/governance/vision-compliance.md`、`docs/governance/decisions/irreversible-decisions.md` |
 | `docs/SOP.md` | 开发 SOP。风险路由、review 配对、质量工具 |
-| `docs/decision-matrix.md` | 决策漏斗三层。宏观/中间/细节决策权限 |
-| `docs/meta-aesthetics.md` | 元美学。第一性原理展开、坐标变换 |
+| `docs/governance/decision-matrix.md` | 决策漏斗三层。宏观/中间/细节决策权限 |
+| `docs/governance/meta-aesthetics.md` | 元美学。第一性原理展开、坐标变换 |
 | `docs/public-lessons.md` | 经验教训。LL-XXX 条目、可执行原则、反模式 |
 | `docs/architecture/memory-philosophy.md` | 记忆系统思想纲领。7 公理、21 定律、判据 |
 | `docs/architecture/memory-system-overview.md` | 记忆系统全景。6 器官互制 |
 | `docs/architecture/architecture-lineage.md` | 架构谱系。从 thread 到 feature 的全量主题 |
 | `docs/architecture/collaboration-landscape.md` | 协同全景。人 & 犬 & 犬的协作 |
+| `docs/designs/` | 子系统代码级 Tech Story（FT-XXX-001）。前后端链路 + `文件:行号` 锚点，具体子系统设计的真相源 |
 | `CLAUDE.md` | bianmu (Border Collie) CLI 配置（Claude Code 自动读取） |
 | `GEMINI.md` | jinmao (Golden Retriever) CLI 配置（Gemini CLI 自动读取） |
 | `packs/default/breeds/dog-template.json` | 狗狗身份**种子**配置（role_templates / client_defaults / breeds[含 variants] / roster / review_policy / leader）。字段含 `dog_id`、`name`、`display_name`、`avatar`、`color`、`mention_patterns`、`role_description`、`personality`、`team_strengths`、`features`、`restrictions`、`relationship_key`（保持 snake_case 以兼容 Go 解析器）。运行时以 `.sounds-great-ai/dog-catalog.json` 为准 |
 | `AGENTS.md` | 所有犬共享的铁律、限制、红旗、Vision Check Protocol、Magic Words、决策漏斗、治理协议 |
-| `docs/decisions/` | Architecture Decision Records (ADR-XXX) |
+| `docs/governance/decisions/` | Architecture Decision Records (ADR-XXX) |
 | `docs/plans/` | 实施计划 |
-| `docs/features/` | Feature 文档 |
+| `docs/features/` | Feature 文档占位（F-XXX）；当前特性设计见 `docs/designs/` 的 SG-XXX |
 
 ## Review Protocol
 
@@ -180,7 +181,7 @@ E. 日常修 bug / 小改动 → 直接做，提交前查时刻 2
 - **可逆性**：≤1 commit 回滚 + 不影响外部用户/数据/契约 + 不碰硬排除（愿景/权限/生产数据/新外部依赖/契约/显著成本）→ 自决 + 事后通报
 - operator 升级必带 **Decision Packet**：给价值取舍题不给技术 A/B 题；缺 Packet = 打回
 
-详见 `docs/decision-matrix.md`。
+详见 `docs/governance/decision-matrix.md`。
 
 ## 传球三选一 + @ 路由规则
 
@@ -235,7 +236,7 @@ fix/hotfix/quick fix/minimal fix/band-aid/temp/workaround → hotfix；跨犬 re
 -「绕路了」= 局部最优但全局绕路 → 停，画出直线路径，丢掉绕路部分
 -「喵约」= 你忘了我们的约定 → 重读家规，逐条对照当前行为
 -「星星罐子」= P0 不可逆风险 → 立刻停止新增副作用（不发新命令、不写新文件、不 push），等 operator 指示
--「第一性原理」= 你在堆复杂度代偿无知 → 停，砍掉认知脚手架只留运行时必需（详见 `docs/meta-aesthetics.md`）
+-「第一性原理」= 你在堆复杂度代偿无知 → 停，砍掉认知脚手架只留运行时必需（详见 `docs/governance/meta-aesthetics.md`）
 -「数学之美」= 同「第一性原理」→ 最优表达在正确坐标系下必然最简——如果方案需要那么多层，说明坐标系选错了
 -「下次一定」= 你在把"未做"包装成"已规划" → 停，能做的现在做，做不了的走 signoff，不留尾巴
 -「我能猜出来」= 你在用推理跳过查询 → 停，Read 源文件。搜到的摘要是索引不是答案——碎片推理 ≠ 查证

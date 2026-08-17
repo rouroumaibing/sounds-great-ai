@@ -1,7 +1,7 @@
 ---
 name: workspace-navigator
 description: >
-  猫猫把"打开文档、代码或日志"等模糊意图解析成本地绝对路径或 worktree 相对路径。
+  狗狗把"打开文档、代码或日志"等模糊意图解析成本地绝对路径或 worktree 相对路径。
   Use when: 想说"文件在 X 路径"、operator 问"打开 X"。
   Not for: HTTP 链接、localhost app（用 browser-preview）。
   Output: applied/queued/blocked/unconfirmed 投递状态。

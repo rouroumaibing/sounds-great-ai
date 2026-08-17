@@ -31,10 +31,10 @@ func TestPlatformNew(t *testing.T) {
 	}
 
 	// Verify adapters
-	if p.AgentExecutor.Count() != 5 {
-		t.Fatalf("expected 5 adapters, got %d", p.AgentExecutor.Count())
+	if p.AgentExecutor.Count() != 6 {
+		t.Fatalf("expected 6 adapters (claude/codex/gemini/kimi/opencode + a2a protocol client), got %d", p.AgentExecutor.Count())
 	}
-	for _, name := range []string{"claude", "codex", "gemini", "kimi", "opencode"} {
+	for _, name := range []string{"claude", "codex", "gemini", "kimi", "opencode", "a2a"} {
 		if _, err := p.GetAdapter(name); err != nil {
 			t.Errorf("GetAdapter(%s): %v", name, err)
 		}
@@ -254,8 +254,8 @@ func TestPlatformAdaptersCount(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	if p.AgentExecutor.Count() != 5 {
-		t.Errorf("expected 5 adapters, got %d", p.AgentExecutor.Count())
+	if p.AgentExecutor.Count() != 6 {
+		t.Errorf("expected 6 adapters (claude/codex/gemini/kimi/opencode + a2a protocol client), got %d", p.AgentExecutor.Count())
 	}
 }
 

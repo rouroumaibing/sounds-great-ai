@@ -68,8 +68,8 @@ func initOTel() (func(), error) {
 	TokenUsage, _ = meter.Int64Counter("dog_pack.token.usage")
 	A2AHandoffCount, _ = meter.Int64Counter("dog_pack.a2a.handoff.count")
 	// Profile-update governance eval counters (homologous KD-10).
-	// Counter names mirror the cat_cafe.profile_update.* contract,
-	// prefixed with SG's dog_pack. namespace.
+	// Counter names follow the dog_pack.profile_update.* convention,
+	// under the SG dog_pack. namespace.
 	ProfileUpdateProposed, _ = meter.Int64Counter("dog_pack.profile_update.proposed")
 	ProfileUpdateApproved, _ = meter.Int64Counter("dog_pack.profile_update.approved")
 	ProfileUpdateRejected, _ = meter.Int64Counter("dog_pack.profile_update.rejected")

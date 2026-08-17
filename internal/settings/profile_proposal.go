@@ -14,7 +14,7 @@ import (
 // proposal* file, and only an explicit operator approval promotes it to the
 // active capsule. This mirrors the propose → Approval Hub → write flow
 // without ever invoking an LLM inside the platform (reasoning about *what* to
-// write is delegated to the operator or a CLI agent, per VISION §4.1).
+// write is delegated to the operator or a CLI agent, per docs/decisions/irreversible-decisions.md §4.1).
 
 func (r *ProfileRepository) proposalPath(key string) string {
 	return filepath.Join(r.root, sanitizeKey(key)+proposalSuffix)
@@ -36,7 +36,7 @@ func (r *ProfileRepository) WriteProposal(key string, c *RelationshipCapsule) er
 	defer r.mu.Unlock()
 	proposal := &RelationshipCapsule{
 		RelationshipKey: key,
-		OwnerCat:        c.OwnerCat,
+		OwnerDog:        c.OwnerDog,
 		Status:          "proposed",
 		SourceRef:       c.SourceRef,
 		CorrectionPath:  c.CorrectionPath,
@@ -106,8 +106,8 @@ func (r *ProfileRepository) ApproveProposal(key string) (*RelationshipCapsule, e
 		active = &RelationshipCapsule{RelationshipKey: key, Status: "active"}
 	}
 	active.Body = prop.Body
-	if prop.OwnerCat != "" {
-		active.OwnerCat = prop.OwnerCat
+	if prop.OwnerDog != "" {
+		active.OwnerDog = prop.OwnerDog
 	}
 	if prop.SourceRef != "" {
 		active.SourceRef = prop.SourceRef

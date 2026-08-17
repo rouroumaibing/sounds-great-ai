@@ -22,6 +22,7 @@ import (
 	"sounds-great-ai/internal/platform"
 	"sounds-great-ai/internal/ragstore"
 	"sounds-great-ai/internal/settings"
+	"sounds-great-ai/internal/sop"
 	"sounds-great-ai/internal/telemetry"
 	"sounds-great-ai/internal/threadstore"
 	threadPorts "sounds-great-ai/internal/domains/threads/ports"
@@ -34,10 +35,10 @@ import (
 
 func BuildMux() http.Handler {
 	p := pack.New("default")
-	return BuildMuxWithHandler(transport.NewWSHandler(p), p, nil, nil, nil, "", time.Now(), nil, ops.NewLogBuffer(1000))
+	return BuildMuxWithHandler(transport.NewWSHandler(p), p, nil, nil, nil, "", time.Now(), nil, ops.NewLogBuffer(1000), nil)
 }
 
-func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platform.Platform, registry *ragstore.StoreRegistry, embedder embedding.Embedder, workspaceDir string, startTime time.Time, evalHandler *transport.EvalHandler, logBuf *ops.LogBuffer) http.Handler {
+func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platform.Platform, registry *ragstore.StoreRegistry, embedder embedding.Embedder, workspaceDir string, startTime time.Time, evalHandler *transport.EvalHandler, logBuf *ops.LogBuffer, qcRunner *sop.AutoRunner) http.Handler {
 	auth := transport.NewAuthMiddleware()
 	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
 	cors := transport.CORSMiddleware(allowedOrigin)
@@ -218,6 +219,14 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	mux.HandleFunc("GET /api/ops/logs", OpsLogsHandler(logBuf))
 	mux.HandleFunc("GET /api/diagnostics/pool", DiagnosticsPoolHandler(wsHandler, logBuf, registry))
 	mux.HandleFunc("GET /api/ops/git", auth.WrapFunc(GitStatusHandler()))
+
+	// QC auto-runner: server-side auto-trigger of the QC loop. Status is a
+	// read-only heartbeat snapshot; run triggers an on-demand pass (use
+	// ?heavy=1 to also run the heavy build/test step).
+	if qcRunner != nil {
+		mux.HandleFunc("GET /api/qc/status", auth.WrapFunc(QCStatusHandler(qcRunner)))
+		mux.HandleFunc("POST /api/qc/run", auth.WrapFunc(QCRunHandler(qcRunner)))
+	}
 
 	opsHandler := transport.NewOpsHandler()
 	opsHandler.RegisterRoutes(mux)
@@ -468,5 +477,42 @@ func GitStatusHandler() http.HandlerFunc {
 			"branch": branch, "ahead": ahead, "behind": behind,
 			"dirty": modified > 0 || untracked > 0, "untracked": untracked, "modified": modified,
 		})
+	}
+}
+
+// QCStatusHandler returns the latest auto-run snapshot plus the persisted QC
+// state and (when available) the aggregated eval:qc telemetry.
+func QCStatusHandler(runner *sop.AutoRunner) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		last, lastRun, lastErr := runner.Last()
+		state := sop.LoadQCState(runner.StatePath())
+		out := map[string]any{
+			"passed":              last.Passed,
+			"risk_tier":           last.RiskTier,
+			"stale":               last.Stale,
+			"reviewed_sha":        last.ReviewedSha,
+			"steps":               last.Steps,
+			"last_run":            lastRun.UTC().Format(time.RFC3339),
+			"last_error":          lastErr,
+			"state_phase":         state.Phase,
+			"state_reviewed_sha":  state.ReviewedSha,
+		}
+		if agg, err := sop.AggregateQCMetrics(runner.MetricsPath()); err == nil {
+			out["aggregate"] = agg
+		}
+		json.NewEncoder(w).Encode(out)
+	}
+}
+
+// QCRunHandler triggers an on-demand QC pass. ?heavy=1 also runs the heavy
+// build/test step; otherwise it respects the runner's skipHeavy default.
+func QCRunHandler(runner *sop.AutoRunner) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		forceHeavy := r.URL.Query().Get("heavy") == "1"
+		result := runner.RunNow(forceHeavy)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(result)
 	}
 }

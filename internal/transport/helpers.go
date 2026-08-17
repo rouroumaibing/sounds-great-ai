@@ -261,3 +261,17 @@ func (h *WSHandler) SendSystemNotice(severity, title, message string) {
 		s.SendEvent(context.Background(), event)
 	}
 }
+
+// emitSopGate sends a SOP_GATE event for the given session so the frontend can
+// render the cross-breed review routing / gate status.
+func (h *WSHandler) emitSopGate(ctx context.Context, sessionID, author, reviewer, reason string, blocked bool) {
+	event := protocol.NewEvent(protocol.EventSopGate, sessionID, &protocol.SopGatePayload{
+		Reason:   reason,
+		Author:   author,
+		Reviewer: reviewer,
+		Blocked:  blocked,
+	})
+	if s := h.GetStreamer(sessionID); s != nil {
+		_ = s.SendEvent(ctx, event)
+	}
+}

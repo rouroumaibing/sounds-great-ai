@@ -136,7 +136,7 @@ func TestLoadActualDevelopmentYAML(t *testing.T) {
 	if def.ID != "development" {
 		t.Errorf("expected ID=development, got %s", def.ID)
 	}
-	expectedStages := []string{"kickoff", "impl", "quality_gate", "review", "merge", "completion"}
+	expectedStages := []string{"kickoff", "impl", "quality_gate", "fresh_context", "review", "merge", "completion"}
 	if len(def.Stages) != len(expectedStages) {
 		t.Fatalf("expected %d stages, got %d", len(expectedStages), len(def.Stages))
 	}

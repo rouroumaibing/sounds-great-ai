@@ -1,4 +1,4 @@
-## 治理摘要（VISION §0-§4 精简版）
+## 治理摘要（VISION §0-§3 + docs/governance/decisions/irreversible-decisions.md 精简版）
 
 ### §0 为什么存在
 
@@ -27,11 +27,11 @@
 | Agent CLI | 工具调用、文件操作、MCP | 团队协调、review |
 | Platform（Go+Eino） | 身份、协作、纪律、审计、路由 | 推理（那是 CLI 的事） |
 
-### §4 不可逆决策
+### 不可逆决策（docs/governance/decisions/irreversible-decisions.md）
 
 1. **CLI adapter 架构** — spawn 外部 CLI 进程，stdin/stdout pipe 通信，不内置 reasoning。
 2. **动态路由，非固定 DAG** — 根据任务类型动态决定调用哪些 agent。
 3. **Dog personas 保留** — 6 个狗狗映射 personality + role + CLI binding。
 4. **Go + Eino 平台语言** — 平台层用 Go + Eino。
 
-> **真相源**：`docs/VISION.md` 是北极星。所有 spec 必须与 VISION 兼容。
+> **真相源**：`docs/VISION.md` 是北极星（方向与理念，§0–§3）。不可逆决策见 `docs/governance/decisions/irreversible-decisions.md`，所有 spec 必须与之兼容。

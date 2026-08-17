@@ -23,6 +23,11 @@ type ExecuteRequest struct {
 	Messages       []*schema.Message // Eino message format (conversation history)
 	SystemPrompt   string            // Breed persona prompt + injected skills
 	SystemPromptL0 string            // Native L0 system prompt (compression-immune, via CLI flag)
+	// ClientID selects the underlying adapter (claude/codex/gemini/opencode/kimi
+	// or the a2a protocol client). The domain layer populates it; the unified
+	// adapters that don't care (CLI) ignore it, while the A2A adapter uses it to
+	// resolve the external endpoint.
+	ClientID       string
 	Model          string            // Model variant (e.g., "claude-opus-4-6")
 	Skills         []string          // Skill prompt IDs to inject
 	MCPConfig      *MCPConfig        // MCP server configs to pass to CLI

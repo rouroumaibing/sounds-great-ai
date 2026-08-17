@@ -48,4 +48,4 @@ Thread 1 的犬 → cross_post → Thread 2 的犬 → 结果回来。
 | 中间 | 犬犬讨论 | 架构 / 选型 |
 | 细节 | 犬犬自治 | 可逆 + 不碰硬排除 |
 
-详见 `docs/decision-matrix.md`。
+详见 `docs/governance/decision-matrix.md`。

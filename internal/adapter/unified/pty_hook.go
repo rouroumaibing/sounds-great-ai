@@ -1,5 +1,3 @@
-//go:build pty
-
 package unified
 
 // pty_hook.go implements the Claude Code Hook side-channel, the
@@ -29,7 +27,7 @@ import (
 )
 
 // EnvHookSidecar is the env var pointing the capture script at the sidecar
-// jsonl file. It mirrors the CAT_CAFE_HOOK_SIDECAR contract.
+// jsonl file. It follows the SG hook-sidecar contract (SG_HOOK_SIDECAR).
 const EnvHookSidecar = "SG_HOOK_SIDECAR"
 
 // HookEvent is a single Claude Code hook event as captured from stdin.

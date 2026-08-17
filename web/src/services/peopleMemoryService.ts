@@ -74,7 +74,7 @@ export async function proposeCandidate(body: Partial<CaptureCandidate>): Promise
 export async function deferReceipt(body: {
   subject: string;
   person_id?: string;
-  requester_cat?: string;
+  requester_dog?: string;
   source_coords?: SourceRef[];
 }): Promise<DeferredPersonMemoryReceipt> {
   return apiPost<DeferredPersonMemoryReceipt>('/api/people-memory/defer', body, operatorHeaders());
@@ -198,11 +198,11 @@ export async function listDeferred(): Promise<DeferredPersonMemoryReceipt[]> {
 
 export async function claimDeferred(
   receiptID: string,
-  requesterCat = 'operator',
+  requesterDog = 'operator',
 ): Promise<CaptureCandidate> {
   return apiPost<CaptureCandidate>(
     `/api/people-memory/deferred/${encodeURIComponent(receiptID)}/claim`,
-    { requester_cat: requesterCat },
+    { requester_dog: requesterDog },
     operatorHeaders(),
   );
 }

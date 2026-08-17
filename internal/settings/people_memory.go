@@ -27,7 +27,7 @@ import (
 //     worth-remembering-but-not-now cues become content-free deferred receipts
 //     that a daily clerk can later claim into a normal proposal.
 //
-// No LLM reasoning runs inside the platform (VISION §4.1): this package only
+// No LLM reasoning runs inside the platform (docs/decisions/irreversible-decisions.md §4.1): this package only
 // stores and projects what an operator or CLI dog submits.
 
 // F276 claim kinds. agent_inference is accepted only as a draft signal and is
@@ -221,7 +221,7 @@ type PersonIdentityDraft struct {
 // truth; only an explicit approval materializes it.
 type CaptureCandidate struct {
 	CandidateID          string                  `json:"candidate_id"`
-	RequesterCat         string                  `json:"requester_cat"`
+	RequesterDog         string                  `json:"requester_dog"`
 	SourceMessageRef     SourceRef               `json:"source_message_ref"`
 	PersonDraft          *PersonIdentityDraft    `json:"person_draft,omitempty"`
 	TargetPersonID       string                  `json:"target_person_id,omitempty"`
@@ -240,14 +240,14 @@ type CaptureCandidate struct {
 }
 
 // DeferredPersonMemoryReceipt is the content-free, exact-source-bound receipt of
-// the dual path (AC-A20): it persists only server-derived owner/cat/origin,
+// the dual path (AC-A20): it persists only server-derived owner/breed/origin,
 // bounded subject, exact source coordinates/digests — NEVER the message body,
 // excerpt, transcript, or relationship fact. A daily clerk claims it back into a
 // normal proposal.
 type DeferredPersonMemoryReceipt struct {
 	ReceiptID    string      `json:"receipt_id"`
 	OwnerUserID  string      `json:"owner_user_id"`
-	RequesterCat string      `json:"requester_cat"`
+	RequesterDog string      `json:"requester_dog"`
 	Subject      string      `json:"subject"` // bounded subject only
 	PersonID     string      `json:"person_id,omitempty"`
 	SourceCoords []SourceRef `json:"source_coords"` // exact typed coordinates/digests

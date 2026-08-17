@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"encoding/json"
 	"log"
 
 	"sounds-great-ai/internal/settings"
@@ -9,18 +10,24 @@ import (
 
 // MergedBreeds returns the effective breed registry. Per decision D1/D3 the
 // runtime registry contains ONLY catalog breeds; the pack template
-// (dog-template.json) is no longer merged into the active registry. The
-// template remains available as an "add member" menu via GetTemplates, which
-// reads dog-template.json directly.
+// (dog-template.json) is not auto-injected as active dogs. The template remains
+// available as an "add member" menu via GetTemplates, which reads
+// dog-template.json directly.
 //
-// SyncTemplateBreeds (called here) keeps the catalog in sync with the template:
-//   - first run (no catalog file): writes an EMPTY catalog + marks every
-//     template breed as seen, so the user starts with no dogs (D1) and a later
-//     restart does not re-inject them.
-//   - existing catalog: any template breed not already in the catalog and not
-//     yet seen is added (Enabled=true) and marked seen — this is the upgrade
-//     auto-add of new template dogs (D3). Breeds already seen but not added are
-//     never resurrected.
+// Merge semantics follow clowder's cat-config-loader (deep merge + id-keyed
+// backfill), adopted 2026-08-17 because it is strictly better than the previous
+// "catalog wins entirely" rule:
+//   - catalog edits win per-field (so a template upgrade never clobbers a user's
+//     catalog edits),
+//   - nested objects are recursively merged,
+//   - the variants array is merged by id: catalog variants override template
+//     variants, NEW template variants are backfilled, and catalog-only variants
+//     are preserved.
+//
+// SyncTemplateBreeds (called here) keeps breed *membership* in sync with the
+// template: first run writes an EMPTY catalog + marks every template breed seen
+// (D1); an upgrade auto-adds genuinely-new template breeds (D3). Breed-level
+// field/variant backfill is delivered by the deep merge below.
 func MergedBreeds(templateBreeds map[string]*pack.BreedConfig, store settings.SettingsStore) (map[string]*pack.BreedConfig, error) {
 	if err := SyncTemplateBreeds(templateBreeds, store); err != nil {
 		return nil, err
@@ -30,10 +37,145 @@ func MergedBreeds(templateBreeds map[string]*pack.BreedConfig, store settings.Se
 		return nil, err
 	}
 	merged := make(map[string]*pack.BreedConfig, len(catalog))
-	for _, b := range catalog {
-		merged[b.ID] = b // only catalog breeds; the template is not active
+	for _, c := range catalog {
+		if c == nil {
+			continue
+		}
+		if tmpl, ok := templateBreeds[c.ID]; ok {
+			// clowder-style deep merge: template is the BASE, catalog is the
+			// OVERLAY. Catalog edits win per-field; new template fields/variants
+			// are backfilled without clobbering catalog edits.
+			merged[c.ID] = deepMergeBreeds(tmpl, c)
+		} else {
+			merged[c.ID] = c
+		}
 	}
 	return merged, nil
+}
+
+// deepMergeBreeds returns the effective breed after merging the template (base)
+// with the catalog (overlay). See deepMergeConfig for the algorithm.
+func deepMergeBreeds(base, overlay *pack.BreedConfig) *pack.BreedConfig {
+	if base == nil {
+		return overlay
+	}
+	if overlay == nil {
+		return base
+	}
+	bJSON, err := json.Marshal(base)
+	if err != nil {
+		return overlay
+	}
+	oJSON, err := json.Marshal(overlay)
+	if err != nil {
+		return overlay
+	}
+	var bMap, oMap map[string]interface{}
+	_ = json.Unmarshal(bJSON, &bMap)
+	_ = json.Unmarshal(oJSON, &oMap)
+	merged := deepMergeConfig(bMap, oMap)
+	out, err := json.Marshal(merged)
+	if err != nil {
+		return overlay
+	}
+	var result pack.BreedConfig
+	if err := json.Unmarshal(out, &result); err != nil {
+		return overlay
+	}
+	return &result
+}
+
+// breedAtomicObjectKeys are object fields replaced wholesale by the catalog
+// overlay rather than field-merged. Mirrors clowder's ATOMIC_OBJECT_KEYS to
+// prevent stale sub-fields surviving a provider/model switch.
+var breedAtomicObjectKeys = map[string]bool{
+	"color":       true,
+	"voice_config": true,
+}
+
+// deepMergeConfig is a Go port of clowder's deepMergeConfig (cat-config-loader):
+// overlay fields override base; atomic object keys replace base entirely;
+// id-keyed arrays are merged by id (base-only items preserved); other objects
+// recurse; other arrays/primitives are replaced by overlay.
+func deepMergeConfig(base, overlay map[string]interface{}) map[string]interface{} {
+	merged := make(map[string]interface{}, len(base)+len(overlay))
+	for k, v := range base {
+		merged[k] = v
+	}
+	for k, oVal := range overlay {
+		bVal := merged[k]
+		switch {
+		case breedAtomicObjectKeys[k]:
+			merged[k] = oVal
+		case isIDArray(oVal) && isIDArray(bVal):
+			merged[k] = mergeByID(bVal.([]interface{}), oVal.([]interface{}))
+		case isObj(oVal) && isObj(bVal):
+			merged[k] = deepMergeConfig(bVal.(map[string]interface{}), oVal.(map[string]interface{}))
+		default:
+			merged[k] = oVal
+		}
+	}
+	return merged
+}
+
+func isObj(v interface{}) bool {
+	m, ok := v.(map[string]interface{})
+	return ok && m != nil
+}
+
+func isIDArray(v interface{}) bool {
+	arr, ok := v.([]interface{})
+	if !ok || len(arr) == 0 {
+		return false
+	}
+	for _, it := range arr {
+		m, ok := it.(map[string]interface{})
+		if !ok || m == nil {
+			return false
+		}
+		if _, has := m["id"]; !has {
+			return false
+		}
+	}
+	return true
+}
+
+// mergeByID merges two id-keyed arrays: overlay items override base items by
+// id (recursively, so catalog edits survive a template upgrade), overlay-only
+// items are appended, and base-only items are preserved (template backfill).
+func mergeByID(base, overlay []interface{}) []interface{} {
+	bm := make(map[string]interface{}, len(base))
+	for _, it := range base {
+		if m, ok := it.(map[string]interface{}); ok {
+			if id, ok := m["id"].(string); ok {
+				bm[id] = it
+			}
+		}
+	}
+	seen := make(map[string]bool, len(overlay))
+	result := make([]interface{}, 0, len(base)+len(overlay))
+	for _, o := range overlay {
+		om, ok := o.(map[string]interface{})
+		if !ok {
+			result = append(result, o)
+			continue
+		}
+		id, _ := om["id"].(string)
+		seen[id] = true
+		if b, ok := bm[id]; ok {
+			result = append(result, deepMergeConfig(b.(map[string]interface{}), om))
+		} else {
+			result = append(result, o)
+		}
+	}
+	for _, b := range base {
+		if m, ok := b.(map[string]interface{}); ok {
+			if id, ok := m["id"].(string); ok && !seen[id] {
+				result = append(result, b)
+			}
+		}
+	}
+	return result
 }
 
 // SyncTemplateBreeds reconciles the runtime catalog with the template using the

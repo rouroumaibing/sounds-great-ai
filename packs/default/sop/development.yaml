@@ -75,6 +75,19 @@ stages:
           type: command_pattern
           must_match: go test|go build|go vet
 
+  - id: fresh_context
+    label: Fresh-Context Pre-Review（可选）
+    suggested_skill: fresh-context-review
+    optional: true
+    hard_rules: []
+    pitfalls:
+      - id: fresh-context-not-approval
+        text: Fresh-context 是 finding generator，不是 approval authority——不产出 verdict，不记入 Review Provenance Matrix
+        severity: warn
+        predicate:
+          type: manual_only
+          reason: Fresh-context output is free-form finding list, not a structured verdict event.
+
   - id: review
     label: 独立验证（按风险择源）
     suggested_skill: request-review

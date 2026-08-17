@@ -25,7 +25,7 @@ triggers:
 
 - 讨论记录在 feature 文件中
 - 决策有 ADR 对应
-- 不偏离 VISION §4 不可逆决策
+- 不偏离 `docs/governance/decisions/irreversible-decisions.md` 的不可逆决策
 
 ## 完成
 

@@ -307,3 +307,62 @@ func TestMergedBreedsFirstRunEmpty(t *testing.T) {
 		t.Errorf("first run must yield an empty registry (D1), got %d breeds: %v", len(merged), merged)
 	}
 }
+
+// TestMergedBreedsDeepMergeBackfill verifies the adopted clowder semantics
+// (2026-08-17): per-field catalog edits win, and NEW template variants are
+// backfilled into the runtime without clobbering existing catalog variants or
+// edits. This is the improvement over the old "catalog wins entirely" rule.
+func TestMergedBreedsDeepMergeBackfill(t *testing.T) {
+	dir := t.TempDir()
+	store := settings.NewFileSettingsStore(
+		filepath.Join(dir, "accounts.json"),
+		filepath.Join(dir, "dog-catalog.json"),
+		false,
+	)
+	if err := store.CreateBreed(&pack.BreedConfig{
+		ID:       "shared",
+		Name:     "Catalog Name",
+		Enabled:  true,
+		Variants: []pack.Variant{{ID: "v1", ClientID: "claude"}},
+	}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	templateBreeds := map[string]*pack.BreedConfig{
+		"shared": {
+			ID:   "shared",
+			Name: "Template Name",
+			Variants: []pack.Variant{
+				{ID: "v1", ClientID: "codex"},  // differs from catalog v1
+				{ID: "v2", ClientID: "gemini"}, // NEW in template
+			},
+		},
+	}
+	merged, err := MergedBreeds(templateBreeds, store)
+	if err != nil {
+		t.Fatalf("MergedBreeds: %v", err)
+	}
+	got, ok := merged["shared"]
+	if !ok {
+		t.Fatalf("shared missing from merged")
+	}
+	if got.Name != "Catalog Name" {
+		t.Errorf("catalog name must win: got %q", got.Name)
+	}
+	if !got.Enabled {
+		t.Errorf("catalog enabled must be preserved")
+	}
+	byID := map[string]pack.Variant{}
+	for _, v := range got.Variants {
+		byID[v.ID] = v
+	}
+	if len(byID) != 2 {
+		t.Fatalf("expected 2 variants (catalog v1 + backfilled v2), got %d: %v", len(byID), got.Variants)
+	}
+	if byID["v1"].ClientID != "claude" {
+		t.Errorf("catalog v1 edit must win (client=claude), got %q", byID["v1"].ClientID)
+	}
+	if byID["v2"].ClientID != "gemini" {
+		t.Errorf("new template v2 must be backfilled (client=gemini), got %q", byID["v2"].ClientID)
+	}
+}

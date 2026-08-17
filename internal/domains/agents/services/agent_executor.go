@@ -37,6 +37,7 @@ func (s *AgentExecutorService) Execute(ctx context.Context, req agentsPorts.Exec
 		Messages:              req.Messages,
 		SystemPrompt:          req.SystemPrompt,
 		SystemPromptL0:        req.SystemPromptL0,
+		ClientID:              req.ClientID,
 		Model:                 req.Model,
 		Skills:                req.Skills,
 		MCPConfig:             req.MCPConfig,

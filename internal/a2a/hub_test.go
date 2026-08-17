@@ -268,3 +268,32 @@ func TestThreadIncrementMultipleRounds(t *testing.T) {
 		t.Fatalf("expected 0 after reset, got %d", thread.ReviewRoundCount)
 	}
 }
+
+// TestHandoffRecordsVariants asserts that the executing variant identity is
+// carried through the handoff into the thread history. The cross-model review
+// gate keys on the variant-level dog_id, so recording the variant here is what
+// lets a same-breed, different-model handoff be distinguished from a self
+// handoff (the two resolve to different dog_ids).
+func TestHandoffRecordsVariants(t *testing.T) {
+	hub := NewHub(nil)
+	thread := hub.CreateThread("task", []string{"bianmu"})
+
+	hub.Handoff(thread, Handoff{
+		FromBreed:   "bianmu",
+		FromVariant: "bianmu-codex",
+		ToBreed:     "bianmu",
+		ToVariant:   "bianmu-claude",
+		Artifact:    "review this",
+	})
+
+	msg := thread.History[len(thread.History)-1]
+	if msg.FromVariant != "bianmu-codex" {
+		t.Errorf("FromVariant = %q, want bianmu-codex", msg.FromVariant)
+	}
+	if msg.ToVariant != "bianmu-claude" {
+		t.Errorf("ToVariant = %q, want bianmu-claude", msg.ToVariant)
+	}
+	if msg.FromBreed != "bianmu" || msg.ToBreed != "bianmu" {
+		t.Errorf("breed labels should be preserved: from=%q to=%q", msg.FromBreed, msg.ToBreed)
+	}
+}

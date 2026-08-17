@@ -38,7 +38,7 @@ func (h *RulesHandler) GetRules(w http.ResponseWriter, r *http.Request) {
 		{"id": "2", "title": "进程自保", "desc": "不杀父进程，不修改启动配置导致无法重启。"},
 		{"id": "3", "title": "配置不可变", "desc": "不在运行时修改 internal/config/ 下的配置文件。配置变更需要人类介入。"},
 		{"id": "4", "title": "网络边界", "desc": "不访问不属于本服务的 localhost 端口。"},
-		{"id": "5", "title": "愿景不可违", "desc": "不违反 docs/VISION.md §4 的不可逆决策。如果要改，先更新 VISION.md。"},
+		{"id": "5", "title": "愿景不可违", "desc": "不违反 docs/decisions/irreversible-decisions.md 的不可逆决策。如果要改，先更新该决策文档。"},
 	}
 
 	redFlags := []map[string]string{

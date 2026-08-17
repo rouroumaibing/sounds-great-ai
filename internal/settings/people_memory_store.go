@@ -52,9 +52,9 @@ type PeopleMemoryStore interface {
 	ListEvents(operatorID, personID string) ([]*InteractionEvent, error)
 
 	// Dual-path deferred receipts.
-	DeferReceipt(operatorID, requesterCat, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error)
+	DeferReceipt(operatorID, requesterDog, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error)
 	ListReadyDeferred(operatorID string) ([]*DeferredPersonMemoryReceipt, error)
-	ClaimDeferredReceipt(operatorID, receiptID, requesterCat string) (*CaptureCandidate, error)
+	ClaimDeferredReceipt(operatorID, receiptID, requesterDog string) (*CaptureCandidate, error)
 	// ReserveDeferredReceipt marks a receipt claimed without creating a candidate
 	// (used by the daily clerk before re-invoking the original dog). ReleaseDeferredReceipt
 	// clears the reservation so the receipt becomes ready again.
@@ -460,11 +460,11 @@ func (s *FilePeopleMemoryStore) ListEvents(operatorID, personID string) ([]*Inte
 
 // ---- Dual-path deferred receipts (file: stored inside the operator doc) ----
 
-func (s *FilePeopleMemoryStore) DeferReceipt(operatorID, requesterCat, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error) {
+func (s *FilePeopleMemoryStore) DeferReceipt(operatorID, requesterDog, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	d := s.opDoc(operatorID)
-	r, err := d.deferReceipt(operatorID, requesterCat, subject, personID, coords)
+	r, err := d.deferReceipt(operatorID, requesterDog, subject, personID, coords)
 	if err != nil {
 		return nil, err
 	}
@@ -481,11 +481,11 @@ func (s *FilePeopleMemoryStore) ListReadyDeferred(operatorID string) ([]*Deferre
 	return d.listReadyDeferred(), nil
 }
 
-func (s *FilePeopleMemoryStore) ClaimDeferredReceipt(operatorID, receiptID, requesterCat string) (*CaptureCandidate, error) {
+func (s *FilePeopleMemoryStore) ClaimDeferredReceipt(operatorID, receiptID, requesterDog string) (*CaptureCandidate, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	d := s.opDoc(operatorID)
-	c, err := d.claimDeferredReceipt(receiptID, requesterCat)
+	c, err := d.claimDeferredReceipt(receiptID, requesterDog)
 	if err != nil {
 		return nil, err
 	}

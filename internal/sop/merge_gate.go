@@ -32,6 +32,7 @@ type MergeGateInput struct {
 	ChangedFiles       []string
 	ReviewMatrix       ReviewProvenanceMatrix
 	AuthorBreed        string
+	AuthorDogID        string
 	QualityGatePassed  bool
 	HasUncommittedChanges bool
 	TestsPass          bool
@@ -93,21 +94,77 @@ func (g *MergeGate) checkE1ReviewExists(input MergeGateInput) ConditionResult {
 	return ConditionResult{ID: "E1_review_exists", Passed: true, Message: "review SHA recorded"}
 }
 
-// E2: review is from different breed
+// E2: review independence via dual-route intent. A merge may be gated by a
+// local cross-dog review (the peer-review handoff routed back through the
+// review cycle) or by an external review that binds the exact target revision
+// (the cloud review SHA matches the current head). If the intent is ambiguous —
+// neither route supplies valid evidence — the gate fails closed rather than
+// admitting an unaudited merge.
 func (g *MergeGate) checkE2CrossBreedReview(input MergeGateInput) ConditionResult {
-	if input.AuthorBreed == "" {
-		return ConditionResult{ID: "E2_cross_breed", Passed: true, Message: "no author breed specified (advisory)"}
+	localSHA := input.ReviewMatrix.LocalPeerReviewSHA
+	cloudSHA := input.ReviewMatrix.CloudReviewSHA
+	authorID := input.AuthorDogID
+	if authorID == "" {
+		authorID = input.AuthorBreed
 	}
-	if input.ReviewCycle != nil {
-		sha := input.ReviewMatrix.LocalPeerReviewSHA
-		if sha == "" {
-			sha = input.ReviewMatrix.CloudReviewSHA
-		}
-		if sha != "" && input.ReviewCycle.IsCrossBreedReview(sha, input.AuthorBreed) {
-			return ConditionResult{ID: "E2_cross_breed", Passed: true, Message: "cross-breed review confirmed"}
+
+	hasLocal := localSHA != ""
+	hasCloud := cloudSHA != ""
+
+	if !hasLocal && !hasCloud {
+		return ConditionResult{
+			ID:      "E2_cross_breed",
+			Passed:  false,
+			Message: "review completion intent ambiguous: a local cross-dog review or a same-target external review is required (fail-closed)",
 		}
 	}
-	return ConditionResult{ID: "E2_cross_breed", Passed: true, Message: "cross-breed check advisory (no cycle)"}
+
+	var msgs []string
+	localOK := false
+	if hasLocal {
+		if authorID == "" {
+			// No author identity to compare against; advisory pass.
+			localOK = true
+		} else if input.ReviewCycle != nil {
+			if input.ReviewCycle.IsSelfReview(localSHA, authorID) {
+				msgs = append(msgs, "local review performed by author's own dog identity")
+			} else if input.ReviewCycle.IsCrossBreedReview(localSHA, authorID) {
+				localOK = true
+			} else {
+				msgs = append(msgs, "local review identity not confirmed cross-dog")
+			}
+		} else {
+			// SHA recorded but no cycle evidence; legacy advisory pass.
+			localOK = true
+		}
+	}
+
+	cloudOK := false
+	if hasCloud {
+		head := input.ReviewMatrix.CurrentHead
+		if head != "" && cloudSHA != head {
+			msgs = append(msgs, "external review does not bind the exact target revision")
+		} else {
+			cloudOK = true
+		}
+	}
+
+	// Fail closed when neither route validates.
+	if !localOK && !cloudOK {
+		return ConditionResult{
+			ID:      "E2_cross_breed",
+			Passed:  false,
+			Message: "review independence not established: " + strings.Join(msgs, "; "),
+		}
+	}
+	if len(msgs) > 0 {
+		return ConditionResult{
+			ID:      "E2_cross_breed",
+			Passed:  false,
+			Message: "review independence weakened: " + strings.Join(msgs, "; "),
+		}
+	}
+	return ConditionResult{ID: "E2_cross_breed", Passed: true, Message: "cross-model review (local or external) confirmed"}
 }
 
 // E3: quality gate passed

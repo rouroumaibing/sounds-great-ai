@@ -63,15 +63,27 @@ type Variant struct {
 	SessionChain          string        `json:"session_chain,omitempty"`
 	Strategy              string        `json:"strategy,omitempty"`
 	AutoCompactTokenLimit int           `json:"auto_compact_token_limit,omitempty"`
-	// cat-style per-variant overrides:
-	// allow a variant to diverge from its breed for identity/linkage fields.
+	// A2AURL is the remote A2A Protocol agent endpoint for client_id="a2a"
+	// variants (§4.7). When set, the unified A2A adapter calls this external
+	// agent via Google A2A Protocol tasks/send (JSON-RPC over HTTPS). Ignored
+	// for non-a2a client_ids.
+	A2AURL string `json:"a2a_url,omitempty"`
+	// Per-variant overrides — a variant may tune presentation (name/avatar/
+	// color/role/etc.) and its own identity without forking the whole breed.
+	//
+	// Two-level dog_id model:
+	//   - BreedConfig.DogID (breed-level, the "dog" the breed represents, e.g.
+	//     "bianmu") is the breed's own individual id.
+	//   - Variant.DogID (below) overrides it per-variant (e.g. "bianmu-sonnet").
+	// Both identify the SAME individual dog; the variant-level id is what the
+	// running agent actually presents. This is NOT a redundant derived field.
 	Name            string   `json:"name,omitempty"`
 	DisplayName     string   `json:"display_name,omitempty"`
 	Avatar          string   `json:"avatar,omitempty"`
 	Color           *Color   `json:"color,omitempty"`
 	MentionPatterns []string `json:"mention_patterns,omitempty"`
 	RoleDescription string   `json:"role_description,omitempty"`
-	DogID           string   `json:"dog_id,omitempty"`
+	DogID           string   `json:"dog_id,omitempty"` // variant-level individual id
 	Restrictions    []string `json:"restrictions,omitempty"`
 }
 
@@ -122,6 +134,16 @@ func (b *BreedConfig) DefaultVariant() *Variant {
 	}
 	if len(b.Variants) > 0 {
 		return &b.Variants[0]
+	}
+	return nil
+}
+
+// VariantByID returns the variant with the given ID, or nil if not present.
+func (b *BreedConfig) VariantByID(id string) *Variant {
+	for i := range b.Variants {
+		if b.Variants[i].ID == id {
+			return &b.Variants[i]
+		}
 	}
 	return nil
 }

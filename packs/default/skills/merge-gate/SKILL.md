@@ -34,7 +34,19 @@ diff 触碰 `internal/sop/` 门禁逻辑或 VISION.md 不可逆决策时，直�
 
 ## Review Source 选择
 
-**默认选择一个合适的独立验证源**，且必须是非作者：
+**默认选择一个合适的独立验证源**，且必须是非作者（硬约束，fail-closed）：
+
+- reviewer `dog_id` 必须 ≠ author `dog_id`；同一 `dog_id` 自我 review 在合入门禁处被拒。
+- 跨 `dog_id` = 跨模型独立验证（如 bianmu 写、xigou 审），优先选不同 `dog_id` 的队友。
+- 无独立 review source 或身份无法判定为不同 `dog_id` 时，不得合入。
+
+### 双路由 intent（fail-closed）
+
+合入证据只能是两条互斥路由之一，intent 模糊时 fail-closed（直接拒合入）：
+
+- **local peer review**：本地的跨 `dog_id` 交接写回，由 review cycle 记录。要求 reviewer `dog_id` ≠ author `dog_id`（身份独立），且必须沿直连 review thread 写回（carrier 守卫，见 receive-review / cross-dog-handoff）。
+- **external（cloud）review**：外部 review 信号（如 cloud review SHA）必须**绑定当前精确目标 revision**（SHA 一致）。不匹配精确目标的外部 review 视为无效证据，fail-closed。
+- 两条都缺、或提供的证据相互矛盾（如 cloud SHA 不绑定目标且本地非跨模型）→ 合入门禁判 intent 不明确，直接拒绝，不允许"无审计合入"。
 
 | Source | 适用场景 | 不适用 |
 |--------|----------|--------|

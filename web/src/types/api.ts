@@ -226,6 +226,14 @@ export interface SystemNoticePayload {
   timestamp: string; // ISO 8601
 }
 
+// SOP_GATE payload: cross-breed review gate status pushed from the backend.
+export interface SopGatePayload {
+  reason: string;
+  author?: string;
+  reviewer?: string;
+  blocked?: boolean;
+}
+
 export interface BarkRejectedPayload {
   reason: string;
   max: number;

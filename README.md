@@ -39,7 +39,7 @@ This isn't just another Agent invocation framework. It's a **Pack** — a squad 
 
 High-level architecture and dog-pack collaboration model.
 
-![Sounds Great AI Design](docs/design/images/sounds-great-ai.png)
+![Sounds Great AI Design](docs/brand/images/sounds-great-ai.png)
 
 </div>
 
@@ -383,8 +383,8 @@ sounds-great-ai/
 ├── web/                     # Frontend (React + Vite)
 └── docs/
     ├── architecture/        # Architecture docs
-    ├── decisions/           # ADR records
-    ├── design/              # Design docs
+    ├── governance/decisions/           # ADR records
+    ├── brand/              # Design docs
     ├── features/            # Feature docs
     └── plans/               # Implementation plans
 ```
@@ -393,8 +393,8 @@ sounds-great-ai/
 
 - [Architecture Lineage](docs/architecture/architecture-lineage.md) — Full architecture topic index
 - [Memory Philosophy](docs/architecture/memory-philosophy.md) — 7 axioms, 21 laws, judgment criteria
-- [Character Setting](docs/design/CHARACTER-SETTING.md) — Breed role mapping table
-- [Origin Story](docs/design/STORY.md) — The birth story of the Dog Agent Squad
+- [Character Setting](docs/brand/CHARACTER-SETTING.md) — Breed role mapping table
+- [Origin Story](docs/brand/STORY.md) — The birth story of the Dog Agent Squad
 
 ## Contributing
 

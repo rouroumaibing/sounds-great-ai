@@ -24,4 +24,12 @@ triggers:
 | 与风险匹配的验证输出 | 始终 | BLOCKED |
 | 原始需求摘录 | 涉及用户意图 | BLOCKED |
 
-同一个体不能 review 自己。跨狗狗 review 优先。
+## 身份不变量（硬约束，fail-closed）
+
+Review 必须由**与作者不同的 dog 身份**执行。身份以执行该 breed 的 variant（模型）的 `dog_id` 为准——两只狗解析到不同的 `dog_id` 即视为不同身份（跨模型），无论它们是否同属一个 breed。
+
+- **`reviewer dog_id` 必须 ≠ `author dog_id`**。同一 `dog_id` 自我 review 在交接与写回两处均被 fail-closed 拒绝。
+- 跨 dog_id = 跨模型 review（如 bianmu 写、xigou 审），优先选不同 `dog_id`（不同模型）的队友。
+- 当 variant `dog_id` 不足以判定时，回退到 breed `dog_id`；两者都为空则按"无法判定身份"处理，不默认放行。
+
+写回 verdict 时：只有被指定的 reviewer（`dog_id` + 发起 review 的 thread）可写回；其他人写回、或写回到非直连 review thread，都会被拒。

@@ -16,8 +16,8 @@ export function RelationshipCapsuleCard({ capsule, proposal, onChanged }: Props)
     <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className={`w-2.5 h-2.5 rounded-full ${breedDot(capsule.owner_cat)}`}></span>
-          <span className="text-sm font-semibold text-slate-100">{breedLabel(capsule.owner_cat)}</span>
+          <span className={`w-2.5 h-2.5 rounded-full ${breedDot(capsule.owner_dog)}`}></span>
+          <span className="text-sm font-semibold text-slate-100">{breedLabel(capsule.owner_dog)}</span>
           <span className="text-[10px] text-slate-500">· {capsule.status}</span>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-slate-500">

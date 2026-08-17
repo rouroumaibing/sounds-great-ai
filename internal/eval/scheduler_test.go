@@ -50,7 +50,7 @@ func TestSchedulerEffectiveBreedOverride(t *testing.T) {
 	ctx := context.Background()
 
 	d := EvalDomain{DomainID: "eval:a2a", EvalBreed: "bianmu"}
-	client.HSet(ctx, "eval:cat-override:eval:a2a", "breedId", "demu")
+	client.HSet(ctx, "eval:breed-override:eval:a2a", "breedId", "demu")
 
 	s := &Scheduler{redis: client}
 	got := s.effectiveBreed(ctx, d)

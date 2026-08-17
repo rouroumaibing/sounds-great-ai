@@ -11,10 +11,13 @@ import (
 )
 
 type Message struct {
-	ID        string
-	FromBreed string
-	Content   string
-	Role      string
+	ID          string
+	FromBreed   string
+	FromVariant string
+	ToBreed     string
+	ToVariant   string
+	Content     string
+	Role        string
 }
 
 type Thread struct {
@@ -30,11 +33,13 @@ func (t *Thread) IncrementReviewRound() { t.ReviewRoundCount++ }
 func (t *Thread) ResetReviewRounds()    { t.ReviewRoundCount = 0 }
 
 type Handoff struct {
-	FromBreed  string
-	ToBreed    string
-	Artifact   string
-	Context    []Message
-	ReviewFlag bool
+	FromBreed   string
+	FromVariant string
+	ToBreed     string
+	ToVariant   string
+	Artifact    string
+	Context     []Message
+	ReviewFlag  bool
 }
 
 type A2AHub struct {
@@ -74,24 +79,31 @@ func (h *A2AHub) Handoff(thread *Thread, hf Handoff) (*Thread, error) {
 		_, span := tracer.Start(ctx, "a2a.handoff")
 		span.SetAttributes(
 			attribute.String("from", hf.FromBreed),
+			attribute.String("from_variant", hf.FromVariant),
 			attribute.String("to", hf.ToBreed),
+			attribute.String("to_variant", hf.ToVariant),
 		)
 		defer span.End()
 		if telemetry.A2AHandoffCount != nil {
 			telemetry.A2AHandoffCount.Add(ctx, 1,
 				metric.WithAttributes(
 					attribute.String("from", hf.FromBreed),
+					attribute.String("from_variant", hf.FromVariant),
 					attribute.String("to", hf.ToBreed),
+					attribute.String("to_variant", hf.ToVariant),
 				))
 		}
 	}
 
 	thread.IncrementReviewRound()
 	thread.History = append(thread.History, Message{
-		ID:        uuid.New().String(),
-		FromBreed: hf.FromBreed,
-		Content:   hf.Artifact,
-		Role:      "handoff",
+		ID:          uuid.New().String(),
+		FromBreed:   hf.FromBreed,
+		FromVariant: hf.FromVariant,
+		ToBreed:     hf.ToBreed,
+		ToVariant:   hf.ToVariant,
+		Content:     hf.Artifact,
+		Role:        "handoff",
 	})
 	thread.Participants = appendUnique(thread.Participants, hf.ToBreed)
 	return thread, nil

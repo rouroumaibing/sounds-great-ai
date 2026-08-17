@@ -171,11 +171,11 @@ func (d *peopleMemoryDocument) listEvents(personID string) []*InteractionEvent {
 }
 
 // deferReceipt creates a content-free, exact-source-bound deferred receipt (AC-A20).
-func (d *peopleMemoryDocument) deferReceipt(ownerUserID, requesterCat, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error) {
+func (d *peopleMemoryDocument) deferReceipt(ownerUserID, requesterDog, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error) {
 	r := &DeferredPersonMemoryReceipt{
 		ReceiptID:    "rcpt-" + uuid.NewString()[:12],
 		OwnerUserID:  ownerUserID,
-		RequesterCat: requesterCat,
+		RequesterDog: requesterDog,
 		Subject:      subject,
 		PersonID:     personID,
 		SourceCoords: coords,
@@ -202,7 +202,7 @@ func (d *peopleMemoryDocument) listReadyDeferred() []*DeferredPersonMemoryReceip
 }
 
 // claimDeferredReceipt converts a deferred receipt into a staged candidate.
-func (d *peopleMemoryDocument) claimDeferredReceipt(receiptID, requesterCat string) (*CaptureCandidate, error) {
+func (d *peopleMemoryDocument) claimDeferredReceipt(receiptID, requesterDog string) (*CaptureCandidate, error) {
 	r, ok := d.Receipts[receiptID]
 	if !ok {
 		return nil, fmt.Errorf("receipt %q not found", receiptID)
@@ -216,7 +216,7 @@ func (d *peopleMemoryDocument) claimDeferredReceipt(receiptID, requesterCat stri
 	now := time.Now().UnixMilli()
 	c := &CaptureCandidate{
 		CandidateID:       "cand-" + uuid.NewString()[:12],
-		RequesterCat:      requesterCat,
+		RequesterDog:      requesterDog,
 		SourceMessageRef:  firstOrEmptySource(r.SourceCoords),
 		TargetPersonID:    r.PersonID,
 		State:             CandPendingApproval,

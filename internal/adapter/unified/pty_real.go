@@ -1,5 +1,3 @@
-//go:build pty
-
 package unified
 
 import (
@@ -22,10 +20,11 @@ import (
 
 // PtyTransport is the interactive_pty (R3) carrier tier: launch the CLI inside
 // a pseudo-terminal so it sees a real TTY. Some CLIs require this for billing
-// identity or interactive attach. It is only compiled under the `pty` build
-// tag (which also requires `github.com/creack/pty`); under the default build
-// pty_stub.go provides a no-op placeholder. Per ADR-002, R3 is reserved/opt-in
-// and the default three CLIs (claude/codex/gemini) + kimi run one-shot.
+// identity or interactive attach. It is compiled in unconditionally (no `pty`
+// build tag required; `github.com/creack/pty` is a regular dependency). Per
+// ADR-002, R3 is reserved/opt-in and only enters a carrier chain when a CLI
+// requires a real TTY; the warm-pool (R2 bg_daemon) tier is now DEFAULT-ON via
+// platform.WireWarmPools.
 //
 // Alignment with F230 PtyDriver (R3 gap remediation, "不臆想，按实际代码"):
 //   - ready probe: a fixed grace after pty.Start before injecting the prompt

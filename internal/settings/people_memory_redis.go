@@ -30,7 +30,7 @@ const redisPeoplePrefix = "pm:"
 var (
 	luaStageReceipt = redis.NewScript(`
 if redis.call('EXISTS', KEYS[1]) == 1 then return 'EXISTS' end
-redis.call('HSET', KEYS[1], 'receipt_id', ARGV[1], 'owner_user_id', ARGV[2], 'subject', ARGV[3], 'person_id', ARGV[4], 'created_at', ARGV[5], 'requester_cat', ARGV[6], 'claimed_at', '0', 'claim_id', '', 'withdrawn', '0')
+redis.call('HSET', KEYS[1], 'receipt_id', ARGV[1], 'owner_user_id', ARGV[2], 'subject', ARGV[3], 'person_id', ARGV[4], 'created_at', ARGV[5], 'requester_dog', ARGV[6], 'claimed_at', '0', 'claim_id', '', 'withdrawn', '0')
 redis.call('ZADD', KEYS[2], ARGV[5], ARGV[1])
 return 'CREATED'`)
 
@@ -139,7 +139,7 @@ func (s *RedisPeopleMemoryStore) ListOperators() ([]string, error) {
 
 // ---- Dual-path deferred receipts (Lua-guarded) ----
 
-func (s *RedisPeopleMemoryStore) DeferReceipt(operatorID, requesterCat, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error) {
+func (s *RedisPeopleMemoryStore) DeferReceipt(operatorID, requesterDog, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error) {
 	if strings.TrimSpace(subject) == "" {
 		return nil, fmt.Errorf("subject is required")
 	}
@@ -147,7 +147,7 @@ func (s *RedisPeopleMemoryStore) DeferReceipt(operatorID, requesterCat, subject,
 	r := &DeferredPersonMemoryReceipt{
 		ReceiptID:    "rcpt-" + newShortID(),
 		OwnerUserID:  operatorID,
-		RequesterCat: requesterCat,
+		RequesterDog: requesterDog,
 		Subject:      subject,
 		PersonID:     personID,
 		SourceCoords: coords,
@@ -155,7 +155,7 @@ func (s *RedisPeopleMemoryStore) DeferReceipt(operatorID, requesterCat, subject,
 	}
 	res, err := luaStageReceipt.Run(context.Background(), s.client,
 		[]string{s.rcptKey(operatorID, r.ReceiptID), s.readyKey(operatorID)},
-		r.ReceiptID, operatorID, subject, personID, strconv.FormatInt(now, 10), requesterCat).Text()
+		r.ReceiptID, operatorID, subject, personID, strconv.FormatInt(now, 10), requesterDog).Text()
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func (s *RedisPeopleMemoryStore) readReceipt(operatorID, id string) (*DeferredPe
 		OwnerUserID:  m["owner_user_id"],
 		Subject:      m["subject"],
 		PersonID:     m["person_id"],
-		RequesterCat: m["requester_cat"],
+		RequesterDog: m["requester_dog"],
 	}
 	if v, e := strconv.ParseInt(m["created_at"], 10, 64); e == nil {
 		r.CreatedAt = v
@@ -218,7 +218,7 @@ func (s *RedisPeopleMemoryStore) readReceipt(operatorID, id string) (*DeferredPe
 	return r, true
 }
 
-func (s *RedisPeopleMemoryStore) ClaimDeferredReceipt(operatorID, receiptID, requesterCat string) (*CaptureCandidate, error) {
+func (s *RedisPeopleMemoryStore) ClaimDeferredReceipt(operatorID, receiptID, requesterDog string) (*CaptureCandidate, error) {
 	claimID := "cand-" + newShortID()
 	res, err := luaClaimReceipt.Run(context.Background(), s.client,
 		[]string{s.rcptKey(operatorID, receiptID), s.readyKey(operatorID)},
@@ -244,7 +244,7 @@ func (s *RedisPeopleMemoryStore) ClaimDeferredReceipt(operatorID, receiptID, req
 	now := time.Now().UnixMilli()
 	c := &CaptureCandidate{
 		CandidateID:       claimID,
-		RequesterCat:      requesterCat,
+		RequesterDog:      requesterDog,
 		SourceMessageRef:  firstOrEmptySource(r.SourceCoords),
 		TargetPersonID:    r.PersonID,
 		State:             CandPendingApproval,

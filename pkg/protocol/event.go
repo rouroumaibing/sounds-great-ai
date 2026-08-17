@@ -199,3 +199,17 @@ type CarrierHealthPayload struct {
 	Reason      string `json:"reason,omitempty"`
 	RemainingMs int64  `json:"remaining_ms,omitempty"`
 }
+
+// SOP gate 事件类型 (跨狗狗审查门禁)
+const (
+	EventSopGate EventType = "SOP_GATE"
+)
+
+// SopGatePayload 是 SOP_GATE 事件的 payload。后端在交接/合入门禁触发跨狗狗
+// 审查不变量时下发，前端 SopGate 组件据此渲染状态条。
+type SopGatePayload struct {
+	Reason   string `json:"reason"`
+	Author   string `json:"author,omitempty"`
+	Reviewer string `json:"reviewer,omitempty"`
+	Blocked  bool   `json:"blocked,omitempty"`
+}

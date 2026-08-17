@@ -1178,7 +1178,7 @@ function DeferredListView({
         <div key={r.receipt_id} className="rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2 flex items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="text-[12px] text-slate-200 truncate">{r.subject}</div>
-            <div className="text-[10px] text-slate-500">{r.requester_cat} · {r.source_coords.length} 条来源坐标</div>
+            <div className="text-[10px] text-slate-500">{r.requester_dog} · {r.source_coords.length} 条来源坐标</div>
           </div>
           <div className="flex gap-1 shrink-0">
             <button

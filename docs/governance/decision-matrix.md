@@ -23,7 +23,7 @@
 
 | 排除项 | 说明 |
 |--------|------|
-| 愿景 | VISION.md §4 不可逆决策 |
+| 愿景 | `docs/governance/decisions/irreversible-decisions.md` 不可逆决策 |
 | 权限 | auth / 角色 / 访问控制 |
 | 生产数据 | internal/memory/、internal/ragstore/ 持久化数据 |
 | production data boundary | 不指向生产用户数据 |

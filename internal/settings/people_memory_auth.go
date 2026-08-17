@@ -48,7 +48,7 @@ const (
 
 // ClerkInvokeFunc re-invokes a dog (CLI client) one-shot and returns its final
 // text. Used so the daily clerk lets the ORIGINAL dog re-derive the F276
-// proposal from the exact sources — homologous: the cat (not the
+// proposal from the exact sources — homologous: the dog (not the
 // platform) does the reasoning. clientID selects the CLI adapter
 // (claude/codex/gemini/opencode/kimi); workDir is the dog's working directory.
 type ClerkInvokeFunc func(ctx context.Context, clientID, prompt, workDir string) (string, error)
@@ -85,7 +85,7 @@ func nextDailyRun(now time.Time, hour, min int) time.Duration {
 // PeopleMemoryClerkCronSpec (04:30 local), the SG homologue of the
 // DeferredPersonMemoryDailyTaskSpec. Each tick promotes ready (unclaimed,
 // non-withdrawn) deferred receipts into rejectable capture candidates. When
-// deps.Invoke is set it re-invokes the ORIGINAL dog (RequesterCat) so the dog —
+// deps.Invoke is set it re-invokes the ORIGINAL dog (RequesterDog) so the dog —
 // not the platform — re-derives the proposal from the exact sources; the
 // platform only persists the dog's returned, rejectable proposal. It never
 // silently materializes truth and never reads message bodies directly (the dog
@@ -137,7 +137,7 @@ func RunPeopleMemoryClerkOnce(ctx context.Context, store PeopleMemoryStore, deps
 				log.Printf("[people-memory-clerk] operator=%s receipt=%s reserve failed: %v", op, r.ReceiptID, err)
 				continue
 			}
-			clientID := r.RequesterCat
+			clientID := r.RequesterDog
 			if strings.TrimSpace(clientID) == "" {
 				clientID = deps.DefaultClientID
 			}
@@ -269,7 +269,7 @@ func buildCandidateFromProposal(operatorID string, r *DeferredPersonMemoryReceip
 	now := time.Now().UnixMilli()
 	c := &CaptureCandidate{
 		CandidateID:       "cand-" + uuid.NewString()[:12],
-		RequesterCat:      r.RequesterCat,
+		RequesterDog:      r.RequesterDog,
 		SourceMessageRef:  firstOrEmptySource(r.SourceCoords),
 		TargetPersonID:    p.TargetPersonID,
 		State:             CandPendingApproval,

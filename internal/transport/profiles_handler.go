@@ -27,7 +27,7 @@ const distillAgentTimeout = 120 * time.Second
 // P1) and its Approval-Hub workflow (P1-b "养熟" governance) over HTTP. The
 // capsule content itself is never reasoned about inside the platform: a
 // candidate is submitted as a *proposal*, and only an explicit operator
-// approval promotes it to the active capsule (VISION §4.1 — reasoning belongs
+// approval promotes it to the active capsule (docs/decisions/irreversible-decisions.md §4.1 — reasoning belongs
 // to a CLI agent or the operator, not to internal/).
 //
 // "autonomous distill" (point 6) is implemented WITHOUT internal reasoning: a
@@ -35,7 +35,7 @@ const distillAgentTimeout = 120 * time.Second
 // to propose an updated primer. The dog does the reasoning; the platform only
 // parses its reply, clamps it to the 300-visible-rune budget, and writes it as
 // a *pending proposal* the operator must approve (POST /api/profiles/{key}/
-// distill/agent). Faithful: the cat distills ITS OWN primer, so the distiller is the
+// distill/agent). The dog distills ITS OWN primer, so the distiller is the
 // distiller is the dog of the CURRENT session: the caller passes
 // `?session_id=<active session>` and the platform derives the breed that ran
 // it. An explicit `?client_id=<breed>` remains as an operator override. There
@@ -105,7 +105,7 @@ func (h *ProfilesHandler) List(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{
 			"relationship_key": key,
 			"status":           c.Status,
-			"owner_cat":        c.OwnerCat,
+			"owner_dog":        c.OwnerDog,
 			"source_ref":       c.SourceRef,
 			"eval_approvals":   c.EvalApprovals,
 			"eval_rejections":  c.EvalRejections,
@@ -139,7 +139,7 @@ func (h *ProfilesHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 	var body struct {
 		Body           string `json:"body"`
-		OwnerCat       string `json:"owner_cat"`
+		OwnerDog       string `json:"owner_dog"`
 		Status         string `json:"status"`
 		SourceRef      string `json:"source_ref"`
 		CorrectionPath string `json:"correction_path"`
@@ -150,7 +150,7 @@ func (h *ProfilesHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 	}
 	c := &settings.RelationshipCapsule{
 		RelationshipKey: key,
-		OwnerCat:        body.OwnerCat,
+		OwnerDog:        body.OwnerDog,
 		Status:          body.Status,
 		SourceRef:       body.SourceRef,
 		CorrectionPath:  body.CorrectionPath,
@@ -193,7 +193,7 @@ func (h *ProfilesHandler) Propose(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 	var body struct {
 		Body           string `json:"body"`
-		OwnerCat       string `json:"owner_cat"`
+		OwnerDog       string `json:"owner_dog"`
 		SourceRef      string `json:"source_ref"`
 		CorrectionPath string `json:"correction_path"`
 	}
@@ -203,7 +203,7 @@ func (h *ProfilesHandler) Propose(w http.ResponseWriter, r *http.Request) {
 	}
 	c := &settings.RelationshipCapsule{
 		RelationshipKey: key,
-		OwnerCat:        body.OwnerCat,
+		OwnerDog:        body.OwnerDog,
 		SourceRef:       body.SourceRef,
 		CorrectionPath:  body.CorrectionPath,
 		Body:            body.Body,
@@ -333,14 +333,14 @@ func cEvalRejections(c *settings.RelationshipCapsule) int {
 // budget (KD-7), and writes it as a *pending proposal* — the operator must
 // still approve it (POST .../proposal/approve) before it becomes active. This
 // is exactly the "model self-improves, operator approves" loop the user
-// accepted. Faithful to F231 (the cat distills its OWN primer), the
+// accepted. Per F231 (the dog distills its OWN primer), the
 // distiller is derived from the CURRENT session via ?session_id (no hardcoded
 // default dog); ?client_id=<breed> is an explicit operator override. The dog's
 // own identity (L0) is injected so it distills in character.
 func (h *ProfilesHandler) DistillAgent(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 
-	// 0. Derive which dog distills — faithful: the cat distills its
+	// 0. Derive which dog distills — the dog distills its
 	// OWN primer, so the distiller is the dog of the CURRENT session, derived
 	// from ?session_id (the operator's active session). There is NO hardcoded
 	// default: an explicit ?client_id is kept only as an operator override. If
@@ -464,7 +464,7 @@ func (h *ProfilesHandler) DistillAgent(w http.ResponseWriter, r *http.Request) {
 	body = settings.TruncateCapsuleBody(body)
 	proposal := &settings.RelationshipCapsule{
 		RelationshipKey: key,
-		OwnerCat:        dogID,
+		OwnerDog:        dogID,
 		SourceRef:       fmt.Sprintf("dog:%s#distill", dogID),
 		Body:            body,
 	}
@@ -489,7 +489,7 @@ func (h *ProfilesHandler) DistillAgent(w http.ResponseWriter, r *http.Request) {
 // it aggregates the evidence store for the CURRENT session's dog relationship
 // key and, if matching evidence exists and no proposal is already pending,
 // writes a pending capsule proposal (never auto-applied). It performs NO
-// reasoning — faithful to the platform-only aggregation contract (VISION §4.1).
+// reasoning — faithful to the platform-only aggregation contract (docs/decisions/irreversible-decisions.md §4.1).
 // Every failure path is swallowed; the caller must treat it as fire-and-forget.
 func (h *ProfilesHandler) AutoDistillSession(ctx context.Context, sessionID, breedID string) {
 	if h == nil || h.evidence == nil || h.profiles == nil || h.platform == nil {
@@ -527,7 +527,7 @@ func (h *ProfilesHandler) AutoDistillSession(ctx context.Context, sessionID, bre
 	body = settings.TruncateCapsuleBody(body)
 	proposal := &settings.RelationshipCapsule{
 		RelationshipKey: key,
-		OwnerCat:        breedID,
+		OwnerDog:        breedID,
 		SourceRef:       fmt.Sprintf("dog:%s#auto-distill", breedID),
 		Body:            body,
 	}
@@ -541,7 +541,7 @@ func (h *ProfilesHandler) AutoDistillSession(ctx context.Context, sessionID, bre
 }
 
 // relationshipKeyForBreed resolves the capsule key for the dog that ran the
-// session. The distiller is the session's dog (the cat distills its OWN
+// session. The distiller is the session's dog (the dog distills its OWN
 // primer), so the key comes from that breed's config.
 func (h *ProfilesHandler) relationshipKeyForBreed(breedID string) string {
 	if h.platform == nil {

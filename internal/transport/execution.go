@@ -17,6 +17,7 @@ import (
 	agentsPorts "sounds-great-ai/internal/domains/agents/ports"
 	sopPorts "sounds-great-ai/internal/domains/sop/ports"
 	routingPorts "sounds-great-ai/internal/domains/routing/ports"
+	"sounds-great-ai/internal/platform"
 	"sounds-great-ai/pkg/protocol"
 
 	"github.com/cloudwego/eino/schema"
@@ -77,7 +78,7 @@ func (h *WSHandler) recordBall(ctx context.Context, fn func(l custodyPorts.IBall
 // counter it ALSO performs a best-effort autonomous distill: the accumulated
 // evidence for the session's dog relationship key is aggregated into a pending
 // capsule proposal (never auto-applied). Reasoning stays in the CLI agent /
-// operator — the platform only aggregates what it already holds (VISION §4.1).
+// operator — the platform only aggregates what it already holds (docs/decisions/irreversible-decisions.md §4.1).
 // Both steps are fail-closed and non-blocking: a distill failure can never
 // break a dog run.
 func (h *WSHandler) fireProfileDistillationTrigger(sessionID, breedID, reason string) {
@@ -423,7 +424,7 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 			if thread == nil {
 				thread = h.platform.A2AHub.CreateThread(ctx, query, []string{breedID})
 			}
-			h.handleA2AHandoff(ctx, thread, breedID, toBreed, sessionID, invID, cleaned)
+			h.handleA2AHandoff(ctx, thread, breedID, variant.ID, toBreed, sessionID, invID, cleaned)
 		}
 	}
 
@@ -726,7 +727,7 @@ func (h *WSHandler) executeParallel(ctx context.Context, breedIDs []string, sess
 	}
 }
 
-func (h *WSHandler) handleA2AHandoff(ctx context.Context, thread *a2a.Thread, fromBreed, toBreed, sessionID, invID, artifact string) {
+func (h *WSHandler) handleA2AHandoff(ctx context.Context, thread *a2a.Thread, fromBreed, fromVariant, toBreed, sessionID, invID, artifact string) {
 	if thread == nil {
 		return
 	}
@@ -774,7 +775,8 @@ func (h *WSHandler) handleA2AHandoff(ctx context.Context, thread *a2a.Thread, fr
 		// (pushToWorklist's entry.list.push + a2aFrom parity).
 		h.platform.Worklist.PushToWorklist(invID, []string{toBreed}, fromBreed)
 	}
-	h.platform.A2AHub.Handoff(ctx, thread, a2a.Handoff{FromBreed: fromBreed, ToBreed: toBreed, Artifact: enriched})
+	toVariantID := defaultVariantID(h.platform, toBreed)
+	h.platform.A2AHub.Handoff(ctx, thread, a2a.Handoff{FromBreed: fromBreed, FromVariant: fromVariant, ToBreed: toBreed, ToVariant: toVariantID, Artifact: enriched})
 	if action := h.platform.SOP.CheckA2ADepth(thread); action == sopPorts.EscalateToCVO {
 		// G4: escalate to operator/CVO by parking the ball (handed_cvo → parked)
 		// instead of just surfacing an error and leaving the ball unresolved.
@@ -786,10 +788,86 @@ func (h *WSHandler) handleA2AHandoff(ctx context.Context, thread *a2a.Thread, fr
 		h.SendSystemNotice("warn", "已上报 CVO", "A2A 深度超限，已将球权上交运营/主管处理。")
 		return
 	}
+	// Enforce the cross-model review invariant: a dog may not hand its own
+	// authored work to itself for review, and a review verdict may only be
+	// written back by the assigned reviewer into the direct review thread.
+	// This is the platform-level gate that keeps review independent of the
+	// author; it fails closed. The author identity is the dog_id of the
+	// variant that actually executed the breed (fromVariant), so an execution
+	// that runs a non-default model variant resolves to a distinct reviewing
+	// identity rather than collapsing onto the breed default.
+	fromVariantID := fromVariant
+	authorDog := dogIDFor(h.platform, fromBreed, fromVariantID)
+	reviewerDog := dogIDFor(h.platform, toBreed, toVariantID)
+	if verdict := h.platform.SOP.EnforceReviewHandoff(sopPorts.ReviewHandoffInput{
+		AuthorBreed:       fromBreed,
+		AuthorDogID:       authorDog,
+		AuthorVariantID:   fromVariantID,
+		ReviewerBreed:     toBreed,
+		ReviewerDogID:     reviewerDog,
+		ReviewerVariantID: toVariantID,
+		SessionID:         sessionID,
+	}); verdict.Blocked {
+		h.SendSystemNotice("warn", "交接被拒：跨模型审查门禁", strings.Join(verdict.Messages, "; "))
+		h.emitSopGate(ctx, sessionID, authorDog, reviewerDog, strings.Join(verdict.Messages, "; "), true)
+		return
+	}
+	// A valid cross-model handoff: surface the routing so the operator can see
+	// that independent verification is engaged.
 	if reviewer := h.platform.SOP.SelectReviewer(fromBreed, thread.Participants, sopPorts.ReviewPolicy{RequireDifferentBreed: true}); reviewer != "" && reviewer != toBreed {
-		fmt.Printf("A2A handoff: selected reviewer %s for %s → %s\n", reviewer, fromBreed, toBreed)
+		h.emitSopGate(ctx, sessionID, authorDog, reviewerDog,
+			fmt.Sprintf("跨模型审查已触发：建议由 %s 审查 %s 的工作，本次已路由至 %s。", reviewer, fromBreed, toBreed), false)
+	}
+	// §4.5 read-driven gate: before actually dispatching to the next breed
+	// (which may be an external A2A agent), confirm via the custody ledger
+	// projection that the ball is still live and that fromBreed handed it to
+	// toBreed. This turns the ledger from write-only audit into a real
+	// pre-dispatch guard against a concurrent/late handoff superseding this
+	// one between G1 (above) and the actual send.
+	if h.platform != nil && h.platform.BallLedger != nil {
+		snap, snapErr := h.platform.BallLedger.Snapshot(ctx, sessionID)
+		if snapErr == nil && snap.State != custodyPorts.BallStateVoid && snap.State != custodyPorts.BallStateDead {
+			if snap.Holder != "" && snap.Holder != toBreed && snap.Holder != fromBreed {
+				h.SendSystemNotice("warn", "传球中止", "球权在交接前已被 "+snap.Holder+" 接管，跳过本次到 "+toBreed+" 的 handoff。")
+				return
+			}
+		}
 	}
 	h.executeWithPlatform(ctx, toBreed, sessionID, enriched, invID, false)
+}
+
+// dogIDFor resolves the canonical dog identity (the executing model). Given a
+// breed and the executing variant ID, it returns that variant's dog_id; when
+// the variant ID is empty or unknown it falls back to the breed's default
+// variant, then to the breed dog_id. Review identity therefore follows the
+// model that performs the work, so two executions that resolve to the same
+// dog_id are the same reviewing identity regardless of breed label.
+func dogIDFor(p *platform.Platform, breedID, variantID string) string {
+	if b := p.GetBreed(breedID); b != nil {
+		if variantID != "" {
+			if v := b.VariantByID(variantID); v != nil && v.DogID != "" {
+				return v.DogID
+			}
+		}
+		if v := b.DefaultVariant(); v != nil && v.DogID != "" {
+			return v.DogID
+		}
+		if b.DogID != "" {
+			return b.DogID
+		}
+	}
+	return ""
+}
+
+// defaultVariantID returns the ID of the variant that will execute a breed, or
+// empty if the breed has no variant configured.
+func defaultVariantID(p *platform.Platform, breedID string) string {
+	if b := p.GetBreed(breedID); b != nil {
+		if v := b.DefaultVariant(); v != nil {
+			return v.ID
+		}
+	}
+	return ""
 }
 
 func detectMentionInResponse(response string) []string {

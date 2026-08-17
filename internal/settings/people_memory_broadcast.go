@@ -136,16 +136,16 @@ func (b *BroadcastingPeopleMemoryStore) HardForget(operatorID, personID string) 
 
 // ---- Dual-path deferred receipts ----
 
-func (b *BroadcastingPeopleMemoryStore) DeferReceipt(operatorID, requesterCat, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error) {
-	r, err := b.PeopleMemoryStore.DeferReceipt(operatorID, requesterCat, subject, personID, coords)
+func (b *BroadcastingPeopleMemoryStore) DeferReceipt(operatorID, requesterDog, subject, personID string, coords []SourceRef) (*DeferredPersonMemoryReceipt, error) {
+	r, err := b.PeopleMemoryStore.DeferReceipt(operatorID, requesterDog, subject, personID, coords)
 	if err == nil {
 		b.publish(PeopleMemoryEvent{OperatorID: operatorID, Type: "deferred_updated"})
 	}
 	return r, err
 }
 
-func (b *BroadcastingPeopleMemoryStore) ClaimDeferredReceipt(operatorID, receiptID, requesterCat string) (*CaptureCandidate, error) {
-	c, err := b.PeopleMemoryStore.ClaimDeferredReceipt(operatorID, receiptID, requesterCat)
+func (b *BroadcastingPeopleMemoryStore) ClaimDeferredReceipt(operatorID, receiptID, requesterDog string) (*CaptureCandidate, error) {
+	c, err := b.PeopleMemoryStore.ClaimDeferredReceipt(operatorID, receiptID, requesterDog)
 	if err == nil {
 		b.publish(PeopleMemoryEvent{OperatorID: operatorID, CandidateID: c.CandidateID, Type: "deferred_updated"})
 	}

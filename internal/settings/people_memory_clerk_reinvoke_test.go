@@ -112,7 +112,7 @@ func TestRecallContextForQuery(t *testing.T) {
 	store := NewFilePeopleMemoryStore(t.TempDir())
 	op := "operator"
 	c := &CaptureCandidate{
-		CandidateID: "c1", RequesterCat: op, State: CandPendingApproval,
+		CandidateID: "c1", RequesterDog: op, State: CandPendingApproval,
 		PersonDraft: &PersonIdentityDraft{DisplayName: "Alice", PrivateAliases: []string{"Al"}},
 		ClaimDrafts: []CandidateClaimDraft{{
 			DraftID: "d1", Payload: PersonClaimPayload{Kind: "reported_fact", Predicate: "likes tea"}, Decision: "pending",

@@ -26,4 +26,4 @@ triggers:
 
 - 先验证 dev server 正在运行
 - 路径默认 `/`
-- 可选传 `worktreeId` / `threadId` / `catId`
+- 可选传 `worktreeId` / `threadId` / `dogId`

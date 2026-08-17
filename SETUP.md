@@ -20,7 +20,7 @@
 git clone https://github.com/sounds-great-ai/sounds-great-ai.git
 cd sounds-great-ai
 
-# 2. Install CLI tools (see docs/cli.md for details)
+# 2. Install CLI tools (see docs/reference/cli.md for details)
 npm install -g @anthropic-ai/claude-code@latest
 npm install -g @google/gemini-cli@latest
 
@@ -36,7 +36,7 @@ cd web && npm install && npm run dev
 
 ## CLI Tool Configuration
 
-See `docs/cli.md` for installing and configuring Claude Code, Gemini CLI, Codex, and other CLI agents.
+See `docs/reference/cli.md` for installing and configuring Claude Code, Gemini CLI, Codex, and other CLI agents.
 
 ## Project Structure
 
@@ -53,5 +53,5 @@ See `docs/cli.md` for installing and configuring Claude Code, Gemini CLI, Codex,
 ## Troubleshooting
 
 - **Port already in use**: 用 `PORT` 环境变量改端口，例如 `PORT=9090 go run cmd/server/main.go`（默认 8080）
-- **CLI not found**: Ensure CLI tools are installed globally (see `docs/cli.md`)
+- **CLI not found**: Ensure CLI tools are installed globally (see `docs/reference/cli.md`)
 - **Breed config not loading**: Check `packs/default/breeds/dog-template.json` syntax

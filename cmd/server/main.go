@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/ops"
 	"sounds-great-ai/internal/platform"
+	"sounds-great-ai/internal/sop"
 	"sounds-great-ai/internal/telemetry"
 	"sounds-great-ai/internal/transport"
 )
@@ -92,7 +94,13 @@ func main() {
 
 	evalScheduler, evalHandler := SetupEval(ctx, pl, workspaceDir)
 
-	mux := BuildMuxWithHandler(wsHandler, p, pl, registry, embedder, workspaceDir, startTime, evalHandler, logBuf)
+	// QC auto-runner (server-side auto-trigger): periodically runs the QC loop
+	// and exposes status via /api/qc/*. Mirrors the eval scheduler pattern
+	// (SetupEval -> scheduler.Start) so QC is no longer only a dev-run `make qc`.
+	qcSkipHeavy := GetenvDefault("QC_AUTO_SKIP_HEAVY", "true") != "false"
+	qcRunner := sop.NewAutoRunner(workspaceDir, qcSkipHeavy)
+
+	mux := BuildMuxWithHandler(wsHandler, p, pl, registry, embedder, workspaceDir, startTime, evalHandler, logBuf, qcRunner)
 
 	port := GetenvDefault("PORT", "8080")
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
@@ -113,6 +121,15 @@ func main() {
 	}
 
 	burnRateMonitor, monitorCancel := setupBurnRateMonitor(wsHandler)
+
+	// QC auto-runner periodic sweep. A separate cancelable context (not the
+	// shared ctx used by SetupEval) keeps shutdown isolated: cancelling it stops
+	// the ticker goroutine without touching the eval scheduler.
+	if interval := parseQCInterval(); interval > 0 {
+		qcCtx, qcCancel := context.WithCancel(ctx)
+		go qcRunner.Start(qcCtx, interval)
+		defer qcCancel()
+	}
 
 	sig := <-sigCh
 	log.Printf("Received signal %s, shutting down...", sig)
@@ -135,4 +152,20 @@ func main() {
 		evalScheduler.Stop()
 	}
 	log.Printf("Server stopped")
+}
+
+// parseQCInterval reads the QC auto-runner period from QC_AUTO_INTERVAL.
+// Recognised values: a Go duration (e.g. "30m", "1h"), or "off"/"0"/"false" to
+// disable the periodic sweep (QC then runs only on demand via POST /api/qc/run).
+// Defaults to 30m.
+func parseQCInterval() time.Duration {
+	v := GetenvDefault("QC_AUTO_INTERVAL", "30m")
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "off", "0", "false", "":
+		return 0
+	}
+	if d, err := time.ParseDuration(v); err == nil {
+		return d
+	}
+	return 30 * time.Minute
 }

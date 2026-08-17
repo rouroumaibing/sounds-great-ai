@@ -17,9 +17,9 @@ triggers:
 
 ## 通知
 
-用 `cross_post_message(threadId, content, targetCats)` 向另一个 thread 投递消息。
+用 `cross_post_message(threadId, content, targetDogs)` 向另一个 thread 投递消息。
 
-- 必须包含 routing credentials：`targetCats` 数组或行首 `@handle`
+- 必须包含 routing credentials：`targetDogs` 数组或行首 `@handle`
 - 无 routing 的消息会被 REJECT
 - 不复制 [爪感差] marker，引用 sourceMessageId
 

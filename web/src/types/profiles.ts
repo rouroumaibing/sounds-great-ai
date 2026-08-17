@@ -4,7 +4,7 @@
 export interface CapsuleSummary {
   relationship_key: string;
   status: string;
-  owner_cat: string;
+  owner_dog: string;
   source_ref: string;
   eval_approvals: number;
   eval_rejections: number;
@@ -14,7 +14,7 @@ export interface CapsuleSummary {
 
 export interface RelationshipCapsule {
   relationship_key: string;
-  owner_cat: string;
+  owner_dog: string;
   status: string;
   source_ref: string;
   correction_path?: string;

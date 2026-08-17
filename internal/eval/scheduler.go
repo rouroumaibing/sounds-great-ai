@@ -108,7 +108,8 @@ func (s *Scheduler) effectiveBreed(ctx context.Context, domain EvalDomain) strin
 	if s.redis == nil {
 		return domain.EvalBreed
 	}
-	key := fmt.Sprintf("eval:cat-override:%s", domain.DomainID)
+
+	key := fmt.Sprintf("eval:breed-override:%s", domain.DomainID)
 	override, err := s.redis.HGet(ctx, key, "breedId").Result()
 	if err != nil || override == "" {
 		return domain.EvalBreed // 静默降级

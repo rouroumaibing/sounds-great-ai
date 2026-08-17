@@ -1,5 +1,5 @@
 ---
-name: cross-cat-handoff
+name: cross-dog-handoff
 description: >
   跨犬交接与 review 双路由。
   Use when: 交接、exact-HEAD external PR review task 或 PR tracking。
@@ -12,7 +12,7 @@ triggers:
   - "交给"
 ---
 
-# Cross-Cat Handoff（跨犬交接）
+# Cross-Dog Handoff（跨犬交接）
 
 把球传给下一只犬。交接不是通知，是带着上下文的球权转移。
 
@@ -53,4 +53,13 @@ triggers:
 
 撞 cross-feature 问题且 owner = 你的 `breedId`（平行世界自己）时：
 - 不用本 thread `@句柄` 假装路由
-- 先找 thread 坐标，再 `cross_post_message(threadId, targetCats, content)` 投递
+- 先找 thread 坐标，再 `cross_post_message(threadId, targetDogs, content)` 投递
+
+## Review 交接的硬约束
+
+把工作交给另一只犬做 review 时，球权转移必须满足跨模型 review 不变量：
+
+- ** reviewer `dog_id` 必须 ≠ author `dog_id`**。同 `dog_id` 自我 review 在交接处被 fail-closed 拒绝，不进入 review 流程。
+- **首次跨 dog_id 交接 = review 指派**：系统记录「谁审谁、哪个 thread 发起」。后续该 thread 把工作交回作者，即 review 写回。
+- **写回必须回到直连 review carrier**：只有被指派的 reviewer 可写回 verdict，且必须回到发起 review 的那个 thread（direct review carrier），不是祖先 thread 或误投落点。非指派方写回、或写回错 thread，均被 fail-closed 拒绝。
+- 这一约束在交接（handoff）与写回（verdict）两端都强制，而不是靠约定。

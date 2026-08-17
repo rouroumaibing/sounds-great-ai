@@ -68,7 +68,14 @@ Some handlers attach structured fields (e.g. `bound_member_ids`) alongside `erro
 
 Handlers: `internal/packapi/handler.go`. Base path: `/api/breeds`.
 
-A breed is described by `pkg/pack/breed.go`'s `BreedConfig`. The canonical identity is now **variant-based**: each breed has one or more `variants`, and each variant names a `client_id` from the CLI whitelist (`claude`, `codex`, `gemini`, `opencode`, `kimi`). The legacy top-level `cli_adapter` / `tendency` / `restrictions` fields from older docs no longer exist.
+A breed is described by `pkg/pack/breed.go`'s `BreedConfig`. Identity is **two-level**:
+
+- `BreedConfig.dog_id` (breed-level) is the breed's own individual id — the "dog" the breed represents (e.g. `"bianmu"`).
+- each `variants[].dog_id` overrides it per-variant (e.g. `"bianmu-sonnet"`).
+
+Both identify the **same** individual dog; the variant-level id is what the running agent actually presents. This is NOT a redundant derived field.
+
+Each variant also names a `client_id` from the CLI whitelist (`claude`, `codex`, `gemini`, `opencode`, `kimi`). The legacy top-level `cli_adapter` / `tendency` / `restrictions` fields from older docs no longer exist.
 
 ### GET /api/breeds
 List all breed configurations (system + user + plugin sources merged).
@@ -245,7 +252,7 @@ Handlers: `internal/transport/people_memory_handler.go`. Base path: `/api/people
 - `POST /api/people-memory/deferred/{receiptID}/claim` (and `/withdraw`, `/forget`) — deferred receipt lifecycle
 - `POST /api/people-memory/person/{personID}/forget` — forget a person (redaction)
 
-> Exact request/response shapes live in `people_memory_handler.go`. This surface is part of the Persistent Identity feature (`docs/DESIGN-STORYS/SG-PI-001-persistent-identity.md`).
+> Exact request/response shapes live in `people_memory_handler.go`. This surface is part of the Persistent Identity feature (`docs/designs/FT-PI-001-persistent-identity.md`).
 
 ## Profiles API
 

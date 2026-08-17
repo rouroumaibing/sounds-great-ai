@@ -134,7 +134,7 @@ export interface PersonIdentityDraft {
 
 export interface CaptureCandidate {
   candidate_id: string;
-  requester_cat: string;
+  requester_dog: string;
   source_message_ref: SourceRef;
   person_draft?: PersonIdentityDraft;
   target_person_id?: string;
@@ -195,7 +195,7 @@ export interface PersonMemoryDecisionReceipt {
 export interface DeferredPersonMemoryReceipt {
   receipt_id: string;
   owner_user_id: string;
-  requester_cat: string;
+  requester_dog: string;
   subject: string;
   person_id?: string;
   source_coords: SourceRef[];

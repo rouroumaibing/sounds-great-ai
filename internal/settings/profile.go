@@ -28,9 +28,9 @@ type RelationshipCapsule struct {
 	// "family-sounds-great-ai"). It is the same key declared on a breed's
 	// relationship_key field, so a breed binds to its capsule by key.
 	RelationshipKey string `json:"relationship_key"`
-	// OwnerCat is the breed id that authored/maintains the capsule. Empty means
+	// OwnerDog is the breed id that authored/maintains the capsule. Empty means
 	// the operator authored it directly.
-	OwnerCat string `json:"owner_cat,omitempty"`
+	OwnerDog string `json:"owner_dog,omitempty"`
 	// Status: active | dormant | corrected.
 	Status string `json:"status,omitempty"`
 	// SourceRef records the provenance coordinates of the capsule (where the
@@ -273,7 +273,7 @@ func renderCapsule(c *RelationshipCapsule) []byte {
 	var sb strings.Builder
 	sb.WriteString("---\n")
 	sb.WriteString(fmt.Sprintf("relationship_key: %s\n", c.RelationshipKey))
-	sb.WriteString(fmt.Sprintf("owner_cat: %s\n", c.OwnerCat))
+	sb.WriteString(fmt.Sprintf("owner_dog: %s\n", c.OwnerDog))
 	sb.WriteString(fmt.Sprintf("status: %s\n", c.Status))
 	sb.WriteString(fmt.Sprintf("source_ref: %s\n", c.SourceRef))
 	sb.WriteString(fmt.Sprintf("correction_path: %s\n", c.CorrectionPath))
@@ -329,8 +329,8 @@ func parseCapsule(key string, raw []byte) (*RelationshipCapsule, error) {
 		k := strings.TrimSpace(line[:idx])
 		v := strings.TrimSpace(line[idx+1:])
 		switch k {
-		case "owner_cat":
-			c.OwnerCat = v
+		case "owner_dog":
+			c.OwnerDog = v
 		case "status":
 			if v != "" {
 				c.Status = v

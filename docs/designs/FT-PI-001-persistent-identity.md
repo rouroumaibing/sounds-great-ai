@@ -1,4 +1,4 @@
-# [SG-PI-001] [Tech Story] Persistent Identity 前后端逻辑梳理（F231 关系胶囊 + F276 人物关系记忆 + Continuity）
+# [FT-PI-001] [Tech Story] Persistent Identity 前后端逻辑梳理（F231 关系胶囊 + F276 人物关系记忆 + Continuity）
 
 > 本文是 **代码级逻辑梳理 Story**，非新需求交付。目标：把 sounds-great-ai 的 Persistent Identity 能力（后端 + 前端）按数据流、状态机、前后端协作一次性讲清，作为后续维护 / 评审 / onboarding 的真相源。
 > 数据来源：全部实读 `internal/settings/people_memory*.go`、`internal/transport/people_memory_handler.go`、`internal/transport/profiles_handler.go`、`internal/transport/execution.go`、`web/src/components/people-memory/`、`web/src/components/profiles/`、`web/src/services/peopleMemoryService.ts`、`web/src/services/profilesService.ts`，非印象。
@@ -23,7 +23,7 @@
 | 人物与关系记忆 | **F276** | **第三方人物**的事实/判断/关系/事件 | `PeopleMemoryHandler`（`/api/people-memory`） | `web/src/components/people-memory/PeopleMemoryContent.tsx` | `PeopleMemoryStore`（file/redis） |
 | 连续性摘要 | **P3** | 每犬按 rotation 的 continuity digest | `ContinuityHandler`（`/api/continuity`，**仅 inspection，无前端**） | 无 | `ContinuityStore` |
 
-> **铁律边界（贯穿全文）**：平台层（`internal/`）**不做推理**——任何「蒸馏 / 派生提案」都由 CLI 狗执行，平台只聚合证据、解析回复、截断预算、写 *pending proposal*，必须由 operator 显式批准才生效（VISION §4.1）。多 operator 通过 `operatorID` / `X-Operator-Id` 隔离；任何不可验证的 source 引用 **fail-closed 零写入**。
+> **铁律边界（贯穿全文）**：平台层（`internal/`）**不做推理**——任何「蒸馏 / 派生提案」都由 CLI 狗执行，平台只聚合证据、解析回复、截断预算、写 *pending proposal*，必须由 operator 显式批准才生效（`docs/governance/decisions/irreversible-decisions.md` §4.1）。多 operator 通过 `operatorID` / `X-Operator-Id` 隔离；任何不可验证的 source 引用 **fail-closed 零写入**。
 
 ---
 
@@ -84,8 +84,8 @@ flowchart TB
 - `rejectDrafts`：逐草稿标 `rejected`，永不物化（fail-closed）。`undoDecision`：按 `DecisionReceipt` 反物化并恢复被 supersede 的 claim。
 
 **双路径（defer receipt + clerk 回唤原狗重派生）**：
-- `DeferReceipt` 写**无内容**回执（仅 server-derived owner/cat/源坐标/digest，绝不存正文）。
-- 每日 04:30 clerk（`RunPeopleMemoryClerkOnce`）遍历 ready 回执 → `ReserveDeferredReceipt` → 经 `PeopleMemoryClerkDeps.Invoke` **回唤原狗**（`client_id = requesterCat`），喂入 `ResolveSource` 从 `MessageStore` 取的 exact source 正文 + 结构化提案提示（狗只输出单 JSON，不静默物化）→ 平台 `parseClerkProposal` 解析并 `Propose` 落盘为可驳回候选（`DeferredReceiptID` 回绑）。证据不足 / 狗返回 `{"defer":true}` → 释放回执次日重试；`Invoke` 为 nil → 降级旧行为（空壳卡）。**平台「狗推理 + 平台解析落盘」的 clerk 回唤方案（回执责任方分离）**。
+- `DeferReceipt` 写**无内容**回执（仅 server-derived owner/breed/源坐标/digest，绝不存正文）。
+- 每日 04:30 clerk（`RunPeopleMemoryClerkOnce`）遍历 ready 回执 → `ReserveDeferredReceipt` → 经 `PeopleMemoryClerkDeps.Invoke` **回唤原狗**（`client_id = requesterDog`），喂入 `ResolveSource` 从 `MessageStore` 取的 exact source 正文 + 结构化提案提示（狗只输出单 JSON，不静默物化）→ 平台 `parseClerkProposal` 解析并 `Propose` 落盘为可驳回候选（`DeferredReceiptID` 回绑）。证据不足 / 狗返回 `{"defer":true}` → 释放回执次日重试；`Invoke` 为 nil → 降级旧行为（空壳卡）。**平台「狗推理 + 平台解析落盘」的 clerk 回唤方案（回执责任方分离）**。
 
 **recall 注入（聊天卡，≤160/≤600 预算）**（`people_memory_recall.go` + `execution.go:157`）：用户消息含已知人物别名时，`RecallContextForQuery(pmOp, query)` 产出「## 关系记忆」块（anchor-first，F236 预算上限），单卡 ≤160 token、全段 ≤600 token（超限逐条 pop facts / 丢 interaction / 丢 relationship line），注入狗 system prompt。`estimateTokens` 用 CJK ≈ 4 runes/token。
 
@@ -99,7 +99,7 @@ flowchart TB
 
 ### 3.2 F231 关系胶囊 / 养熟（`internal/transport/profiles_handler.go` + `settings.ProfileRepository`）
 
-**capsule / proposal 状态机**：`ProfileRepository` 存 active capsule（`RelationshipCapsule`：key/body/ownerCat/sourceRef/eval 计数）+ 一个 pending `proposal`。`PUT /api/profiles/{key}` 直接写（当前前端未调用）；正常路径是**提案→审批**。
+**capsule / proposal 状态机**：`ProfileRepository` 存 active capsule（`RelationshipCapsule`：key/body/ownerDog/sourceRef/eval 计数）+ 一个 pending `proposal`。`PUT /api/profiles/{key}` 直接写（当前前端未调用）；正常路径是**提案→审批**。
 
 **Distill（平台只聚合，不推理）**（`Distill`，:287）：`evidence.ListEvidence()` 按 key 过滤，返回证据列表 + `evidence_count` + 提示 operator 走 `propose`/`PUT`。**不调用 LLM**。
 
@@ -145,7 +145,7 @@ flowchart TB
 `FE 提交 propose` → `PM.Propose`（SSE 广播）→ `FE 候选列表实时刷新` → `FE 逐 draft approve` → `PM.ApproveDrafts`（物化 canonical，SSE 广播）→ 下次对话 `execution.RecallContextForQuery` 注入关系卡进狗上下文。
 
 ### 流 B — 延迟回执→clerk 回唤→提案
-`FE 提交 defer`（仅源坐标）→ `PM.DeferReceipt` → 04:30 clerk 取 ready 回执 → `ClerkDeps.Invoke(requesterCat)` 回唤原狗（exact source 正文 + 提案提示）→ 狗输出 JSON → 平台 `parseClerkProposal` → `PM.Propose`（pending，回绑 receiptID）→ `FE 候选列表出现`，operator 审批。
+`FE 提交 defer`（仅源坐标）→ `PM.DeferReceipt` → 04:30 clerk 取 ready 回执 → `ClerkDeps.Invoke(requesterDog)` 回唤原狗（exact source 正文 + 提案提示）→ 狗输出 JSON → 平台 `parseClerkProposal` → `PM.Propose`（pending，回绑 receiptID）→ `FE 候选列表出现`，operator 审批。
 
 ### 流 C — 蒸馏→审批（养熟）
 对话中/session-seal → `PS.DistillAgent`（spawn 狗）或 `execution.fireProfileDistillationTrigger→PS.AutoDistillSession`（自动）→ 写 **pending proposal** → `FE ProfilesContent` 出现待审（侧栏圆点）→ `ApprovalCard` 批准 → `PS.Approve` 写入 active capsule（狗下次以更新后画像协作）。
@@ -249,3 +249,47 @@ flowchart TB
 ---
 
 *附：本文梳理的四项成熟度差距（自动蒸馏 trigger / eval 计数 / drill 预算 / source 鉴权重验）已于 2026-08-16 全部「已完成」并通过 `go build`/`vet`/`test` 闸门。*
+
+---
+
+## 9. 变更记录（2026-08-15 决策细化）
+
+> 本节为 Persistent Identity 落地过程中的历次决策细化，按日期归档，便于追溯。**所有细化均为对 §4 不可逆决策的扩展，未引入新不可逆决策、未触碰红旗。**
+
+### 9.1 Persistent Identity 能力扩展（2026-08-15）
+
+将 SG 身份持久化从「静态配置」扩展到「配置 + 关系 + 经验」三层，分四 Phase 落地：
+
+- **P0 经验记忆落盘**：`internal/memory` 由纯内存改为 JSON 原子写 + 热加载，API 兼容。
+- **P1 关系胶囊**：`RelationshipKey` 驱动 `profiles/<operator>/relationship/<key>-primer.md` + provenance，独立于 `dog-catalog.json`。
+- **P2 平台压缩控制**：`auto_compact_token_limit` 真正驱动 CLI carrier。
+- **P3 跨 runtime 续接**：continuity bootstrap + identity history 审计。
+
+遵循持久层隔离纪律：关系/经验持久层**不塞进 dog-catalog.json**，独立目录。设计基线见本文 §1–§8。
+
+### 9.2 Carrier 默认链改为 per-provider 三家长会话（2026-08-15）
+
+此前 5 家 CLI 默认 `print_sdk` 单 transport（one-shot）。细化后：
+
+- claude / codex / gemini 均支持长会话：`WireWarmPools`（`//go:build pty`）为三者各构造专属 warm 池 + PtyRunner（各自 spawn func），carrier 链改为 `bg_daemon → print_sdk`。
+- opencode / kimi 维持 one-shot（CLI 自身不支持长会话）。
+- `RegisterWarmPool` / `RegisterWarmPoolForProviders` 支持多 provider；未接入 warm 池时三家透明回退 one-shot，零新增依赖。
+
+### 9.3 Persistent Identity 补齐 P1-b / P5（2026-08-15）
+
+在 P0–P4 之上补齐四项缺口：
+
+1. **胶囊长度上限 KD-7**：`RelationshipCapsule` 正文硬限 300 rune（`MaxCapsuleBodyLen`），`WriteCapsule` / `WriteProposal` 超长拒绝（HTTP 400）。
+2. **P1-b 关系胶囊 HTTP 端点 + 审批环（Approval Hub）**：`/api/profiles` 提供 CRUD，propose→approve→reject 治理（候选独立存 `<key>-proposal.md`，approve 才提升 active，eval 计数入 front-matter）；`/api/profiles/{key}/distill` 仅**聚合 evidence 草稿、不做推理**（`docs/governance/decisions/irreversible-decisions.md` §4.1 平台层不内置 LLM 推理，胶囊内容由 operator/CLI agent 写）。
+3. **P5 续接会话内轮换粒度**：`continuity` 重写为按 rotation 索引的检查点环（容遗留格式迁移），`LastDigestForRotation` 支持长会话 cascade 轮换重注入，one-shot 退化为 rotation 0；`/api/continuity` 提供检视端点。
+
+### 9.4 Persistent Identity 二次细化（9 点指令，2026-08-15）
+
+在 P0–P5 之上忠实对齐用户的 9 点指令：
+
+1. **注入形态（Point 1）**：胶囊 300 上限口径改为「去空白后可见 rune 数」（`capsuleStrippedRuneCount`，KD-7），并加 `TruncateCapsuleBody` 注入处防御性夹断（写拒 + 读夹双保险）。
+2. **续接粒度（Point 2/8）**：`RecordNextRotation` 每次 spawn 自增索引，续接环真正滚动 8 槽（修复原 `RecordRotation(…,0)` 永远覆盖 index 0 的「只跑 index 0」现象）。
+3. **压缩落点（Point 3/9）**：`AutoCompactTokenLimit` 真接通——`agent_executor` 不再静默丢弃该字段，codex 注入 `--config=model_auto_compact_token_limit=<N>`，claude/gemini 走 CLI 原生 autoCompact（沿用「CLI 自带压缩更好」），平台侧 `BoundContextByTokens` 仍作兜底。
+4. **长会话成熟度（Point 4）**：见 §9.2 三家长会话。
+5. **养熟审批环 + autonomous distill（Point 5/6）**：`POST /api/profiles/{key}/distill/agent` 让 CLI 狗狗（默认 bianmu）自蒸馏胶囊草稿并落为待审提案，operator 仍需 approve（平台不内推，铁律不变）。
+6. **单 operator（Point 7）**：决策仅单 operator（大当家），多 operator 形态本期不做，胶囊/审批环均按单 operator 简化。

@@ -41,7 +41,7 @@
 | @mention 路由 | A2A handoff 触发 | `s8-a2a-format` hook | 完成 |
 | 传球三选一 | 自决/@句柄/等外部/@leader | `AGENTS.md` + `l3-ball-passing` hook | 完成 |
 | hold_ball | 球权保管 + 定时唤醒 | `AGENTS.md` | 完成 |
-| 决策漏斗 | 三层决策权限 | `decision-matrix.md` | 完成 |
+| 决策漏斗 | 三层决策权限 | `governance/decision-matrix.md` | 完成 |
 | Magic Words | 10 个拉闸词 | `AGENTS.md` | 完成 |
 | 治理协议 | hotfix/fallback/创意-实现解耦 | `AGENTS.md` | 完成 |
 
@@ -53,7 +53,7 @@
 | Quality Gate | 交付自检 | `quality-gate` skill | 完成 |
 | Merge Gate | 合入 main 门禁 | `merge-gate` skill | 完成 |
 | Review Protocol | 跨狗狗 review | `request-review` / `receive-review` skill | 完成 |
-| Cross-cat Handoff | 跨犬交接 | `cross-cat-handoff` skill | 完成 |
+| Cross-dog Handoff | 跨犬交接 | `cross-dog-handoff` skill | 完成 |
 | Handoff Grounding | 接球真相核验 | `receive-handoff-grounding` skill | 完成 |
 
 ### 1.6 Hook 系统
@@ -70,7 +70,7 @@
 | 类别 | 数量 | 示例 | 状态 |
 |------|------|------|------|
 | 核心开发 | 5 | tdd / debugging / writing-plans / request-review / receive-review | 完成 |
-| 治理门禁 | 4 | quality-gate / merge-gate / cross-cat-handoff / receive-handoff-grounding | 完成 |
+| 治理门禁 | 4 | quality-gate / merge-gate / cross-dog-handoff / receive-handoff-grounding | 完成 |
 | 协作 | 6 | cross-thread-sync / collaborative-thinking / thread-orchestration / code-as-harness / self-evolution / feat-lifecycle | 完成 |
 | 记忆 | 2 | memory-navigation / memory-search-best-practices | 完成 |
 | 上下文 | 2 | context-self-management / fresh-context-review | 完成 |
@@ -86,8 +86,8 @@
 ```
 VISION.md (北极星)
 ├── AGENTS.md (共享治理)
-│   ├── Magic Words → meta-aesthetics.md
-│   ├── 决策漏斗 → decision-matrix.md
+│   ├── Magic Words → governance/meta-aesthetics.md
+│   ├── 决策漏斗 → governance/decision-matrix.md
 │   └── 治理协议 → SOP.md
 ├── Per-breed 身份 (6 个)
 │   └── Breed Config (JSON)
@@ -112,3 +112,4 @@ VISION.md (北极星)
 - 新增 skill / hook 时更新对应表格
 - 状态变更时更新"状态"列
 - 本文是架构全貌索引，不是详细文档——详情查对应文档
+- 架构总览图（三层结构 / A2A 流转 / 数据流 mermaid）见 `architecture/overview.md`

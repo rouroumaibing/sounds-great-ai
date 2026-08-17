@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
@@ -38,7 +37,7 @@ type memoryDocument struct {
 
 type MemoryStore struct {
 	mu        sync.RWMutex
-	path      string
+	p         persister // nil = non-persistent (NewMemoryStore)
 	evidence  []Evidence
 	lessons   []Lesson
 	decisions map[string]*Decision
@@ -50,43 +49,45 @@ func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{decisions: make(map[string]*Decision)}
 }
 
-// NewMemoryStoreAt returns a store backed by a JSON file at path. Existing
-// data is loaded on init; every mutation is persisted atomically (tmp+rename).
-// This is the Persistent Identity layer (F231/F287):
-// learned experience (evidence/lessons/decisions) survives restarts instead of
-// being lost with the process.
+// NewMemoryStoreAt returns a store whose experience memory survives restarts.
+// Since 2026-08-17 it prefers a SQLite-backed persister (modernc.org/sqlite,
+// pure Go, no server) and falls back to the legacy JSON file if SQLite cannot
+// be initialized. This is the Persistent Identity layer (F231/F287): learned
+// experience (evidence/lessons/decisions) survives restarts instead of being
+// lost with the process.
 func NewMemoryStoreAt(path string) *MemoryStore {
-	s := &MemoryStore{path: path, decisions: make(map[string]*Decision)}
-	s.load()
+	s := &MemoryStore{decisions: make(map[string]*Decision)}
+	s.p = newDefaultPersister(path)
+	if doc, err := s.p.load(); err != nil {
+		log.Printf("memory: load failed (%s): %v", path, err)
+	} else {
+		s.evidence = doc.Evidence
+		s.lessons = doc.Lessons
+		if doc.Decisions != nil {
+			s.decisions = doc.Decisions
+		}
+	}
 	return s
 }
 
 func (s *MemoryStore) load() {
-	if s.path == "" {
+	if s.p == nil {
 		return
 	}
-	data, err := os.ReadFile(s.path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return
+	if doc, err := s.p.load(); err != nil {
+		log.Printf("memory: load failed: %v", err)
+		return
+	} else {
+		s.evidence = doc.Evidence
+		s.lessons = doc.Lessons
+		if doc.Decisions != nil {
+			s.decisions = doc.Decisions
 		}
-		log.Printf("memory: load failed (%s): %v", s.path, err)
-		return
-	}
-	var doc memoryDocument
-	if err := json.Unmarshal(data, &doc); err != nil {
-		log.Printf("memory: corrupt store (%s): %v", s.path, err)
-		return
-	}
-	s.evidence = doc.Evidence
-	s.lessons = doc.Lessons
-	if doc.Decisions != nil {
-		s.decisions = doc.Decisions
 	}
 }
 
 func (s *MemoryStore) flush() {
-	if s.path == "" {
+	if s.p == nil {
 		return
 	}
 	doc := memoryDocument{
@@ -94,12 +95,8 @@ func (s *MemoryStore) flush() {
 		Lessons:   s.lessons,
 		Decisions: s.decisions,
 	}
-	data, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return
-	}
-	if err := writeAtomic(s.path, data); err != nil {
-		log.Printf("memory: persist failed (%s): %v", s.path, err)
+	if err := s.p.save(&doc); err != nil {
+		log.Printf("memory: persist failed: %v", err)
 	}
 }
 

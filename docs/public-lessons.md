@@ -113,15 +113,15 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 
 ### P3: No Architecture Reversal
 
-> **架构决策一旦写入 VISION.md 的"不可逆决策"，不得在后续 spec 中推翻。**
+> **架构决策一旦写入 `docs/governance/decisions/irreversible-decisions.md` 的"不可逆决策"，不得在后续 spec 中推翻。**
 
-如果确实需要推翻，必须先更新 VISION.md 并标注"决策变更 + 理由 + 影响范围"。
+如果确实需要推翻，必须先更新 `docs/governance/decisions/irreversible-decisions.md` 并标注"决策变更 + 理由 + 影响范围"。
 
 ### P4: Phase Ordering
 
 > **Phase N 的前置条件必须全部满足后，才能开始 Phase N+1 的 spec。**
 
-不允许跳 phase。如果需要提前，必须在 VISION.md 中标注"Phase X 提前 + 理由"。
+不允许跳 phase。如果需要提前，必须在 `docs/ROADMAP.md` 中标注"Phase X 提前 + 理由"。
 
 ### P5: Spec Compatibility Check
 
@@ -168,9 +168,9 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 坑：spec 精良但缺顶层 vision 约束，各自合理但拼在一起与最终方向矛盾。
 - 根因：没有文档说"我们最终做 CLI adapter 架构"，A2A 设计和 DAG 设计各自合理但与 08-04 方向完全矛盾。
 - 触发条件：多个 spec 独立设计、独立实现、独立批准，无统一 vision 约束。
-- 修复：创建 VISION.md 不可逆决策，spec 必须填 VISION Compatibility 段。
-- 防护：AGENTS.md 时刻 1 自检 + spec 模板 §8.1 检查清单。
-- 来源锚点：`docs/VISION.md` §4 + `docs/public-lessons.md` §2.5
+- 修复：创建 `docs/governance/decisions/irreversible-decisions.md` 的不可逆决策，spec 必须填 VISION Compatibility 段（`docs/governance/vision-compliance.md` §8.1）。
+- 防护：AGENTS.md 时刻 1 自检 + spec 模板（`docs/governance/vision-compliance.md` §8.1）检查清单。
+- 来源锚点：`docs/governance/decisions/irreversible-decisions.md` + `docs/public-lessons.md` §2.5
 
 - 关联：P1 Vision-First
 
@@ -181,9 +181,9 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 坑：07-31 决策（固定 DAG、A2A server/client）在 08-04 被 180° 反转。
 - 根因：没有"不可逆决策"机制，每个 spec 可以自由推翻前一个 spec 的架构决策。
 - 触发条件：新 spec 认为旧架构不合理，直接推翻而非先更新 vision。
-- 修复：VISION.md §4 锁定 4 个不可逆决策。
+- 修复：`docs/governance/decisions/irreversible-decisions.md` 锁定 4 个不可逆决策。
 - 防护：AGENTS.md 红旗模式表 + 时刻 3 架构变更检查。
-- 来源锚点：`docs/VISION.md` §4 + `docs/public-lessons.md` §2.2
+- 来源锚点：`docs/governance/decisions/irreversible-decisions.md` + `docs/public-lessons.md` §2.2
 
 - 关联：P3 No Architecture Reversal
 
@@ -194,9 +194,9 @@ VISION.md 是北极星。spec 必须回答：与三层原则兼容？与不可�
 - 坑：把 Phase 4 (multi-agent) 和 Phase 7 (memory/RAG) 提前到 Phase 5/6 之前，在未稳定的地基上盖复杂楼层。
 - 根因：7 phase 有明确依赖但未强制执行顺序。
 - 触发条件：觉得某个 Phase "看起来可以独立做"。
-- 修复：VISION.md §7 路线图标注前置条件。
+- 修复：`docs/ROADMAP.md` 标注前置条件。
 - 防护：AGENTS.md 红旗模式"跳 Phase" + 时刻 2 提交前检查。
-- 来源锚点：`docs/VISION.md` §7 + `docs/public-lessons.md` §2.3
+- 来源锚点：`docs/ROADMAP.md` + `docs/public-lessons.md` §2.3
 
 - 关联：P4 Phase Ordering
 

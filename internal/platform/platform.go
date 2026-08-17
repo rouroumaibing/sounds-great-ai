@@ -13,6 +13,7 @@ import (
 	"github.com/cloudwego/eino/components/embedding"
 	"github.com/redis/go-redis/v9"
 	"sounds-great-ai/internal/a2a"
+	a2aadapter "sounds-great-ai/internal/adapter/a2a"
 	"sounds-great-ai/internal/adapter/claude"
 	"sounds-great-ai/internal/adapter/codex"
 	"sounds-great-ai/internal/adapter/gemini"
@@ -84,9 +85,6 @@ type Platform struct {
 	HookPipeline   *hooks.Pipeline
 	HookTraceStore *hooks.TraceStore
 
-	// Compressor for A2A handoffs
-	Compressor *a2a.ContextCompressor
-
 	// Stores (port/factory pattern)
 	ThreadStore   threadPorts.IThreadStore
 	SettingsStore settings.SettingsStore
@@ -111,7 +109,7 @@ type Platform struct {
 
 	// SessionBreed maps an active session id to the breed (dog) running it.
 	// It lets the autonomous-distill endpoint derive the distiller from the
-	// CURRENT session (homologous: the cat distills its own primer),
+	// CURRENT session (homologous: the dog distills its own primer),
 	// instead of a hardcoded default. Populated best-effort on each spawn and
 	// read on distill. Guarded by SessionBreedMu.
 	SessionBreed   map[string]string
@@ -173,22 +171,32 @@ func New(cfg Config) (*Platform, error) {
 	pm := unified.NewProcessManager()
 
 	// Initialize adapters
+	//
+	// §4.7: the A2A protocol client is a sibling carrier of the CLI adapters.
+	// It is keyed by client_id="a2a" (or a more specific "a2a-<name>") and
+	// calls an EXTERNAL agent via Google A2A Protocol tasks/send. Endpoints are
+	// wired from breed variant.a2a_url after the catalog merges (see below).
+	a2aAdapter := a2aadapter.New(pm, "a2a")
 	adapters := map[string]unified.AgentExecutor{
 		"claude":   claude.New(pm),
 		"codex":    codex.New(pm),
 		"gemini":   gemini.New(pm),
 		"kimi":     kimi.New(pm),
 		"opencode": opencode.New(pm),
+		"a2a":      a2aAdapter,
 	}
 
 	// R1/R2/R3/R6 carrier registry. The default carrier chain is per-provider:
-	// claude leads with bg_daemon (long-session tier, live only when a warm pool
-	// is wired via WireClaudeWarmPool under -tags pty; otherwise it transparently
-	// falls back to print_sdk), and the other four CLIs stay one-shot (print_sdk).
-	// R2 warm-pool and R3 PTY tiers are reserved/opt-in and only enter claude's
-	// chain when explicitly enabled. R6: RedisHealth is compiled in by default
-	// but only activated when a Redis URL is configured; otherwise we keep the
-	// zero-dependency in-memory store.
+	// claude/codex/gemini lead with bg_daemon (long-session warm-pool tier) and
+	// fall back to print_sdk; opencode/kimi stay one-shot (print_sdk).
+	//
+	// 2026-08-17: the warm-pool (R2) tier is now DEFAULT-ON. pty is compiled in
+	// unconditionally (no -tags pty build needed) and p.WireWarmPools() below
+	// wires the per-provider warm pools + PtyRunner, so the bg_daemon tier in the
+	// chain is actually live (not a transparent one-shot fallback). R3 PTY stays
+	// reserved/opt-in (only needed for CLIs requiring a real TTY). R6: RedisHealth
+	// is compiled in by default but only activated when a Redis URL is configured;
+	// otherwise we keep the zero-dependency in-memory store.
 	var carrierHealth unified.CarrierHealth = unified.NewMemoryHealth()
 	var rclient *redis.Client
 	if cfg.RedisURL != "" {
@@ -215,21 +223,16 @@ func New(cfg Config) (*Platform, error) {
 			v.SetRegistry(registry, name)
 		}
 	}
-	// Per-provider default carrier chain (claude-first). claude PREFERS the
-	// bg_daemon (warm-pool)
-	// long-session tier; the other four CLIs stay one-shot (print_sdk). When the
-	// bg_daemon transport is not wired (default build, or WireClaudeWarmPool
-	// never called), the registry transparently falls back to print_sdk —
-	// behavior identical to pre-R2. This is the "gating/standby" the user asked
-	// for: claude-first intent, but the long-session tier is only live when its
-	// warm pool + PTY runner are compiled in (see WireClaudeWarmPool, -tags pty).
+	// Per-provider default carrier chain (claude-first). claude/codex/gemini
+	// PREFER the bg_daemon (warm-pool) long-session tier; opencode/kimi stay
+	// one-shot. The bg_daemon tier is wired by p.WireWarmPools() below (called
+	// unconditionally since pty is now always compiled); without that call the
+	// registry would transparently fall back to print_sdk.
 	for name := range adapters {
 		chain := []unified.TransportKind{unified.TransportPrintSDK}
 		// Per-provider long session: claude/codex/gemini lead with bg_daemon
 		// (warm pool), falling back to one-shot print_sdk. opencode/kimi stay
-		// one-shot. The bg_daemon tier is only live when WireWarmPools (-tags pty)
-		// registers a transport for that provider; otherwise the registry finds
-		// none and transparently falls back to print_sdk.
+		// one-shot.
 		switch name {
 		case "claude", "codex", "gemini":
 			chain = []unified.TransportKind{unified.TransportBgDaemon, unified.TransportPrintSDK}
@@ -240,6 +243,15 @@ func New(cfg Config) (*Platform, error) {
 			Transports: chain,
 		})
 	}
+
+	// 2026-08-17: warm-pool (R2 bg_daemon) is now DEFAULT-ON. pty is compiled in
+	// unconditionally, so WireWarmPools wires the per-provider warm pools +
+	// PtyRunner and the bg_daemon tier above becomes live (claude/codex/gemini
+	// reuse long-lived CLI processes). Without this call the bg_daemon tier is
+	// never wired and those CLIs transparently fall back to one-shot. The pools
+	// are lazy: no process is spawned until the first turn Acquires a lease.
+	// (The actual WireWarmPools() call is made after `pl` is constructed below,
+	// because it needs pl.CarrierRegistry + pl.WorkspaceDir.)
 
 	// Initialize stores (port/factory pattern) — created before the breed
 	// merge so the runtime catalog can be seeded/merged into the registry.
@@ -264,6 +276,23 @@ func New(cfg Config) (*Platform, error) {
 		breeds = merged
 	}
 
+	// §4.7: wire A2A protocol client endpoints from breed variant config.
+	// A variant with client_id="a2a" (or "a2a-<name>") and a non-empty
+	// a2a_url routes to the A2A client adapter. Specific client_ids beyond the
+	// base "a2a" are registered on demand so distinct external agents can be
+	// addressed independently.
+	for _, b := range breeds {
+		for _, v := range b.Variants {
+			if v.ClientID == "" || v.A2AURL == "" {
+				continue
+			}
+			a2aAdapter.SetEndpoint(v.ClientID, v.A2AURL, "")
+			if v.ClientID != "a2a" {
+				adapters[v.ClientID] = a2aAdapter
+			}
+		}
+	}
+
 	// Initialize platform services
 	skillMgr := skills.NewManager(cfg.SkillsDir)
 	_ = skillMgr.LoadFromDir() // best effort
@@ -284,8 +313,6 @@ func New(cfg Config) (*Platform, error) {
 	memStore := memory.NewMemoryStoreAt(
 		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), "memory.json"),
 	)
-
-	compressor := a2a.NewContextCompressor()
 
 	// Initialize stores (port/factory pattern)
 	threadStore, err := threadstore.NewThreadStore(threadstore.StoreConfig{
@@ -351,7 +378,7 @@ func New(cfg Config) (*Platform, error) {
 
 	// Project archive source (G8): file-backed repo trajectory store + git-ref
 	// collector. repo_url defaults empty → the collector is inert until the
-	// operator configures a code-repo URL (VISION §6 new capability).
+	// operator configures a code-repo URL (docs/architecture/platform-capabilities.md §6 new capability).
 	repoTrajectoryStore := custodyStores.NewRepoTrajectoryStore(
 		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), settings.RepoTrajectoryFileName),
 	)
@@ -418,7 +445,6 @@ func New(cfg Config) (*Platform, error) {
 		A2AHub:         a2aHub,
 		SOP:            sopServices.NewSOPGuardianService(sopGuardian),
 		Memory:         memStore,
-		Compressor:     compressor,
 
 		ThreadStore:   threadStorePort,
 		SettingsStore: settingsStore,
@@ -450,6 +476,14 @@ func New(cfg Config) (*Platform, error) {
 		RepoTrajectoryStore: repoTrajectoryStore,
 		GitRefCollector:     gitRefCollector,
 	}
+
+	// 2026-08-17: warm-pool (R2 bg_daemon) is now DEFAULT-ON. pl.WireWarmPools
+	// wires the per-provider warm pools + PtyRunner so the bg_daemon tier in the
+	// carrier chain becomes live (claude/codex/gemini reuse long-lived CLI
+	// processes). pty is compiled in unconditionally, so this call is always
+	// effective. Pools are lazy: no process is spawned until the first turn
+	// Acquires a lease.
+	pl.WireWarmPools()
 
 	// Start the daily deferred-receipt clerk (homologous F276 dual path):
 	// aligned to "30 4 * * *" (04:30 local), it promotes ready deferred receipts

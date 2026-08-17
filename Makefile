@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: dev prod daemon backend frontend build stop restart clean install upgrade help deep
+.PHONY: dev prod daemon backend frontend build stop restart clean install upgrade help deep qc install-git-hooks
 
 .DEFAULT_GOAL := help
 
@@ -153,7 +153,17 @@ restart: stop
 
 clean:
 	rm -rf web/dist bin/
-	rm -f main server server-dev sounds-great-ai sounds-great-ai-dev
+	rm -f main server server-dev sounds-great-ai sounds-great-ai-dev qc
+
+qc:
+	@go run ./cmd/qc --author "$(AUTHOR)" --workdir "$(CURDIR)"
+
+install-git-hooks:
+	@mkdir -p .git/hooks
+	@cp scripts/pre-merge-check.sh .git/hooks/pre-push
+	@chmod +x .git/hooks/pre-push
+	@echo "Installed pre-push hook -> .git/hooks/pre-push"
+	@echo "Run 'make qc AUTHOR=<breed>' to run the QC loop locally."
 
 deep: stop clean
 	rm -rf .logs .pids
@@ -182,3 +192,5 @@ help:
 	@echo "  make clean deep    Deep clean: + logs, pids, SQLite, Go cache, node_modules, .sounds-great-ai (runtime settings/credentials)"
 	@echo "  make backend       Start Go backend only"
 	@echo "  make frontend      Start Vite dev server only"
+	@echo "  make qc AUTHOR=<breed>   Run the 7-step QC loop locally (cross-model review gate)"
+	@echo "  make install-git-hooks   Install scripts/pre-merge-check.sh as .git/hooks/pre-push"

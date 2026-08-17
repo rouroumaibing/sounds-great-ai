@@ -66,9 +66,9 @@ export function ApprovalCard({ relationshipKey, proposal, onDecided }: Props) {
   return (
     <div className="my-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 space-y-2">
       <div className="flex items-center gap-2 text-xs">
-        <span className={`w-2 h-2 rounded-full ${breedDot(proposal.owner_cat)}`}></span>
+        <span className={`w-2 h-2 rounded-full ${breedDot(proposal.owner_dog)}`}></span>
         <span className="font-bold text-amber-300">{t('profiles.proposalTitle', '提议更新关系档案（primer）')}</span>
-        <span className="text-slate-500 text-[10px]">· {breedLabel(proposal.owner_cat)}</span>
+        <span className="text-slate-500 text-[10px]">· {breedLabel(proposal.owner_dog)}</span>
       </div>
       <p className="text-[12px] text-slate-200 whitespace-pre-wrap leading-relaxed">{proposal.body}</p>
       {error && <p className="text-[11px] text-rose-400">{error}</p>}

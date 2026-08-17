@@ -1164,6 +1164,65 @@
         }
       ],
       "dog_id": "jinmao-opencode"
+    },
+    {
+      "id": "a2a-remote",
+      "name": "远程协作者（A2A 客户端）",
+      "display_name": "远程 A2A 协作者",
+      "nickname": "远程协作者",
+      "avatar": "bianmu.png",
+      "color": {
+        "primary": "#6366F1",
+        "secondary": "#8B5CF6"
+      },
+      "personality": "外部 agent，经 Google A2A Protocol 接入的异构协作伙伴",
+      "role_description": "§4.7 受控 A2A 协议客户端示例：把外部已部署 agent（另一套 SG 实例或独立 A2A agent）作为普通犬接入协作。仅当 variant.a2a_url 配置后才生效；默认不出现在运行时（无凭据/无地址）。",
+      "team_strengths": "跨实例/跨生态协作、异构 agent 接入",
+      "mention_patterns": [
+        "@远程协作者",
+        "@a2a-remote"
+      ],
+      "roles": [
+        "collaborator"
+      ],
+      "review_policy": {
+        "can_review": [],
+        "cannot_review_self": true,
+        "cross_breed_preferred": false
+      },
+      "caution": "外部 agent：仅在 a2a_url 与凭据就绪时启用；平台不为其开放入站控制面",
+      "restrictions": [
+        "禁止本地 reasoning 注入",
+        "仅作 A2A 客户端被调用"
+      ],
+      "relationship_key": "a2a-remote",
+      "default_variant_id": "a2a-remote-default",
+      "variants": [
+        {
+          "id": "a2a-remote-default",
+          "client_id": "a2a",
+          "default_model": "",
+          "mcp_support": false,
+          "a2a_url": "",
+          "variant_label": "A2A 客户端",
+          "personality": "外部 agent，经 Google A2A Protocol 接入的异构协作伙伴",
+          "team_strengths": "跨实例/跨生态协作、异构 agent 接入",
+          "system_prompt": "你是经 A2A 协议接入的外部协作者。你承接来自 Sounds Great AI 犬队的任务，按 A2A Protocol tasks/send 交付结果。你不持有本地球权状态，只作为被调用方返回制品。",
+          "strengths": [
+            "a2a",
+            "cross-instance"
+          ],
+          "caution": "外部 agent：仅在 a2a_url 配置后启用",
+          "context_budget": {
+            "max_prompt_tokens": 100000,
+            "max_context_tokens": 80000,
+            "max_messages": 100
+          },
+          "dog_id": "a2a-remote"
+        }
+      ],
+      "dog_id": "a2a-remote",
+      "enabled": false
     }
   ]
 }

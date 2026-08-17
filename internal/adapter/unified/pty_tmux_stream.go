@@ -1,5 +1,3 @@
-//go:build pty
-
 package unified
 
 // pty_tmux_stream.go wires the tmux launch (pty_tmux.go) into PtyTransport and

@@ -1,4 +1,4 @@
-# [SG-CLI-001] [Tech Story] CLI Adapter 前后端逻辑全链路设计
+# [FT-CLI-001] [Tech Story] CLI Adapter 前后端逻辑全链路设计
 
 > 本文基于 `sounds-great-ai` **2026-08-15 代码实况**，逐文件（`internal/adapter/**`、`internal/transport/**`、`pkg/protocol/**`、`web/src/**`）梳理 CLI adapter 的**后端执行链路**与**前端消费链路**，所有结论带 `文件:行号` 锚点，未臆测。
 
@@ -167,7 +167,7 @@
 
 ### 5.1 后端 → 前端 协议事件（经 WS，adapter 层视角）
 
-> **完整 WS 事件契约以 `SG-ORC-001` §4.2 为单一真相**（含编排层事件与前端映射）。本节仅列出**由 CLI adapter / transport 层构造并发送**的事件，聚焦其 `pkg/protocol/event.go` 中的 payload 字段细节（adapter 开发者对照用）：
+> **完整 WS 事件契约以 `FT-ORC-001` §4.2 为单一真相**（含编排层事件与前端映射）。本节仅列出**由 CLI adapter / transport 层构造并发送**的事件，聚焦其 `pkg/protocol/event.go` 中的 payload 字段细节（adapter 开发者对照用）：
 
 | 协议事件（adapter 构造） | Payload 关键字段（`pkg/protocol/event.go`） | 前端落点 |
 |---|---|---|

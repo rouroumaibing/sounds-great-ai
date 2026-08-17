@@ -4,7 +4,7 @@ import { WsManager } from '../services/ws';
 import { API_BASE } from '../services/http';
 import { useAppStore } from './useAppStore';
 import { useNoticeStore } from './useNoticeStore';
-import type { StreamEvent, BreedResponseLiveEvent, BreedResponseCompleteEvent } from '../types';
+import type { StreamEvent, BreedResponseLiveEvent, BreedResponseCompleteEvent, SopGateEvent } from '../types';
 import { useI18n } from './useI18n';
 import type {
   WsEvent,
@@ -21,6 +21,7 @@ import type {
   SystemNoticePayload,
   LivenessPayload,
   CarrierHealthPayload,
+  SopGatePayload,
 } from '../types/api';
 
 // Re-export useShallow for components that select objects/arrays from this store
@@ -489,6 +490,21 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       case 'SYSTEM_NOTICE': {
         const p = payload as SystemNoticePayload;
         useNoticeStore.getState().addNotice(p);
+        break;
+      }
+
+      case 'SOP_GATE': {
+        const p = payload as SopGatePayload;
+        set((state) => {
+          const threadEvents = state.events[threadId] ?? [];
+          const evt: SopGateEvent = { type: 'sop_gate', reason: p.reason };
+          return {
+            events: {
+              ...state.events,
+              [threadId]: [...threadEvents, evt],
+            },
+          };
+        });
         break;
       }
 

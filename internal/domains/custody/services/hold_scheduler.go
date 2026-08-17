@@ -48,7 +48,7 @@ const (
 // the ball-custody ledger (guarded by G1) and returns the HoldRecord so the
 // caller can re-dispatch the holder breed.
 //
-// It mirrors the hold_ball primitive: a cat parks the ball and the orchestrator
+// It mirrors the hold_ball primitive: a dog parks the ball and the orchestrator
 // waits for the wake condition before dispositioning and continuing the worklist.
 // The secret webhook token lives ONLY here (in memory); it is never written to
 // the append-only ledger.

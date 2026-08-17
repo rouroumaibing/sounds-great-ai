@@ -1,5 +1,3 @@
-//go:build pty
-
 package unified
 
 // pty_tmux.go implements the "tmux-transcript + Hook side-channel"

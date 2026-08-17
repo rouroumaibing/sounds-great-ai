@@ -1,10 +1,10 @@
-# [SG-ORC-001] [Tech Story] 梳理并固化 Multi-Agent Orchestration 前后端逻辑
+# [FT-ORC-001] [Tech Story] 梳理并固化 Multi-Agent Orchestration 前后端逻辑
 
-> 本文档基于 `sounds-great-ai` 真实源码核查（**2026-08-14 重新生成，反映截至本日的代码真实状态**）与既有编排 spec（`docs/plans/2026-multi-agent-orchestration.md`）编写，目标是把"多智能体编排"这一核心子系统的**前后端协作逻辑**固化为单一可信来源（single source of truth），供后续开发、review 与新人 onboarding 使用。
+> 本文档基于 `sounds-great-ai` 真实源码核查（**2026-08-14 重新生成，反映截至本日的代码真实状态**）与既有编排 spec（`docs/designs/FT-ORC-001-multi-agent-orchestration.md`）编写，目标是把"多智能体编排"这一核心子系统的**前后端协作逻辑**固化为单一可信来源（single source of truth），供后续开发、review 与新人 onboarding 使用。
 >
 > **与初版差异**：初版在"全部修复"轮次前写成，含若干过时表述（kimi 无 adapter、webhook 无全局 auth、人工唤醒 UI 待补、配置默认犬与执行脱钩）。本版已全部校正，并补入 `client_id` 归一化（迁移修复）与默认犬配置接进路由的落地细节。
 >
-> **2026-08-16 校正**：WS 事件契约（§4.2）补全为运行时**单一真相**（补 `AGENT_MESSAGE`/`AGENT_LIVENESS`/`CARRIER_HEALTH`/`ERROR`，并修正对死组件 `TerminalOutputBlock` 的引用 → `CliOutputBlock`）；补 `dog-catalog.json` 的 `seen_template_breeds` 字段（§4.5）。CLI adapter 专属内容已收敛到 `SG-CLI-001`，本文仅保留运行时编排视角。
+> **2026-08-16 校正**：WS 事件契约（§4.2）补全为运行时**单一真相**（补 `AGENT_MESSAGE`/`AGENT_LIVENESS`/`CARRIER_HEALTH`/`ERROR`，并修正对死组件 `TerminalOutputBlock` 的引用 → `CliOutputBlock`）；补 `dog-catalog.json` 的 `seen_template_breeds` 字段（§4.5）。CLI adapter 专属内容已收敛到 `FT-CLI-001`，本文仅保留运行时编排视角。
 
 ---
 
@@ -128,7 +128,7 @@
 
 ### 4.2 WebSocket 事件契约（后端→前端，运行时单一真相 / single source of truth）
 
-> 本表是 **WS 事件契约的权威来源**。所有经 `GET /ws` 下发的事件均在此列（类型常量见 `pkg/protocol/event.go`；`ERROR` 经 `protocol.NewEvent("ERROR", ...)` 动态构造于 `internal/transport/ws_handler.go`）。事件按**产出层**分类——`编排` 由 `ws_handler.go`/`execution.go`/`mention_router` 在路由/执行/A2A/hold 流程发出；`适配` 由 `internal/adapter/unified/*` + 各 provider adapter 在 CLI 子进程执行与 NDJSON 解析中发出（G1/R8/T25 落地项）。CLI 层只负责构造**标「适配」**的子集 payload，字段细节见 `SG-CLI-001` §5.1。
+> 本表是 **WS 事件契约的权威来源**。所有经 `GET /ws` 下发的事件均在此列（类型常量见 `pkg/protocol/event.go`；`ERROR` 经 `protocol.NewEvent("ERROR", ...)` 动态构造于 `internal/transport/ws_handler.go`）。事件按**产出层**分类——`编排` 由 `ws_handler.go`/`execution.go`/`mention_router` 在路由/执行/A2A/hold 流程发出；`适配` 由 `internal/adapter/unified/*` + 各 provider adapter 在 CLI 子进程执行与 NDJSON 解析中发出（G1/R8/T25 落地项）。CLI 层只负责构造**标「适配」**的子集 payload，字段细节见 `FT-CLI-001` §5.1。
 
 | 事件类型 | 产出层 | 含义 | 前端映射 |
 |----------|--------|------|----------|
@@ -196,7 +196,7 @@ append-only 事件流，纯函数投影为可观测状态：
 **CLI client_id 白名单**（`internal/settings/validation.go`）：`claude / codex / gemini / opencode / kimi`。5 个 client **均有对应 adapter**（kimi 为 `internal/adapter/kimi`，凭证走 `KIMI_API_KEY` 等环境变量），均可 spawn。
 
 **持久化文件**（`.sounds-great-ai/`，`ConfigRoot` 解析顺序：`SOUNDS_GREAT_AI_GLOBAL_CONFIG_ROOT` → `{projectRoot}/.sounds-great-ai` → `{home}/.sounds-great-ai`）：
-- `dog-catalog.json`(0644)：breeds/roster/review_policy/leader/configs/deleted_breeds/seen_template_breeds — **运行时唯一真相**（字段与首启空/升级同步机制详见 `SG-MEM-001` §5.1 / §6.2）
+- `dog-catalog.json`(0644)：breeds/roster/review_policy/leader/configs/deleted_breeds/seen_template_breeds — **运行时唯一真相**（字段与首启空/升级同步机制详见 `FT-MEM-001` §5.1 / §6.2）
 - `accounts.json`(0644)：账户元数据
 - `credentials.json`(0600)：密钥
 - 种子：`packs/default/breeds/dog-template.json`；`MergedBreeds()` 用 catalog 覆盖模板。
@@ -219,6 +219,16 @@ append-only 事件流，纯函数投影为可观测状态：
 - **生效范围**：首次启动播种、热加载（`file_store` 文件轮询）、以及**恢复旧 `.bak` 备份**都会自动修正，杜绝"恢复备份即炸"。
 - **活体文件已就地修正**：`.sounds-great-ai/dog-catalog.json` 与种子 `packs/default/breeds/dog-template.json` 的 legacy 值已全部改为 `claude/codex/gemini`（各 12 处），当前残留计数 = 0。
 - **回归测试**：`TestFileStore_LegacyClientIDNormalizedOnLoad` 锁定该行为。
+
+### 4.5.3 两级 dog_id 身份模型（2026-08-16 校正）
+
+为避免"breed / dog_id 身份理解不一致"，在此固化身份模型（本段为单一可信来源）：
+
+- **individual（个体）= 狗（dog）；species/breed（品种/容器）= `breeds[]` 这个数组桶**。
+  - `BreedConfig.dog_id` = breed 级个体 id（如 `bianmu`）；`variants[].dog_id` = variant 级个体 id（如 `bianmu-sonnet`）。
+- **两级都是同一个体的身份，不是冗余派生字段**：breed 级 `dog_id` 标识"这个 breed 所代表的狗"，variant 级 `dog_id` 覆盖为"该 variant 实际呈现的狗"；运行时以 variant 级为准。
+- 先前出现的"理解不一致"源于 **reference/API.md 旧表述把身份说成"variant-based"、breed.go 旧注释把 breed 级 dog_id 暗示为可派生的 override**——这两处已在 2026-08-16 修正（见 `docs/reference/API.md` §Pack API 与 `pkg/pack/breed.go` 注释）。
+- **命名约定**：`breeds[]` / `BreedConfig` 保留为"品种容器"义；个体叙事统一为 dog。历史泄漏的 cat 风格术语 `requesterCat` / `ownerCat` 已彻底清理为 `requesterDog` / `ownerDog`（含持久化 front-matter 字段 `owner_cat` → `owner_dog`，旧 `owner_cat` 解析分支已移除，不再兼容）。
 
 ### 4.6 关键前端组件
 
@@ -270,4 +280,4 @@ append-only 事件流，纯函数投影为可观测状态：
 
 ---
 
-> 关联文档：`docs/plans/2026-multi-agent-orchestration.md`（编排升级 spec，全阶段已完成）、`docs/plans/2026-multi-agent-orchestration-gaps*.md`（差距分析）、`docs/DESIGN-STORYS/SG-MEM-001-member-management.md`、`SG-ACC-001-accounts-keys-auth.md`。
+> 关联文档：`docs/designs/FT-ORC-001-multi-agent-orchestration.md`（编排升级 spec，全阶段已完成）、`docs/designs/FT-ORC-001-multi-agent-orchestration.md`（差距分析）、`docs/designs/FT-MEM-001-member-management.md`、`FT-ACC-001-accounts-keys-auth.md`。

@@ -26,8 +26,8 @@ import (
 	"time"
 )
 
-// Environment keys passed to the sidecar (mirrors the
-// CAT_CAFE_SUPERVISOR_* naming, prefixed SG_).
+// Environment keys passed to the sidecar, prefixed SG_ (same shape as the
+// SG_SUPERVISOR_* supervisor keys).
 const (
 	EnvParentPID = "SG_SUPERVISOR_PARENT_PID"
 	EnvPollMs    = "SG_SUPERVISOR_POLL_MS"

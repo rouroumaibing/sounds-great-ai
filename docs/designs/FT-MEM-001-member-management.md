@@ -1,6 +1,6 @@
-# [SG-MEM-001] [Tech Story] 设置页「成员管理」设计
+# [FT-MEM-001] [Tech Story] 设置页「成员管理」设计
 
-> 本文件由 `SG-MEM-001-member-management.md`（成员管理前后端）、`SG-MEM-002-empty-first-run.md`（首启空 Catalog + 凭据就绪闸门）合并而成。
+> 本文件由 `FT-MEM-001-member-management.md`（成员管理前后端）、`FT-MEM-002-empty-first-run.md`（首启空 Catalog + 凭据就绪闸门）合并而成。
 > 内容按 `sounds-great-ai` **2026-08-13 代码实况**逐文件重新梳理：前端 `web/src`、后端 `internal/packapi` + `internal/transport/{settings,config}_handler.go` + `internal/settings`、`internal/platform/{breeds_merge.go,router.go}`、装配 `cmd/server/routes.go`。
 > 相对三份旧文档，已修正以下与代码不符之处：
 > - `settings-nav-config.ts` 实际 `DEFAULT_SECTION = 'accounts'`（旧文档误写为 `'members'`）；`RAW_SECTIONS` 顺序为 `accounts` 在前、`members` 在后。
@@ -28,7 +28,7 @@
 
 「成员管理」是 **Settings 内的一个分区**（nav id=`members`，与 `accounts` 并列）。设置页默认进入 `accounts`，左侧点「成员管理」→ 右侧渲染 `MemberManagement` 列表页。
 
-> **前置依赖（与「账户与密钥」`SG-ACC-001`）**：成员的 `variant.account_ref` 必须指向《账户与密钥》中已存在的账户（或内置 OAuth client）。即「**先建凭证，再建关联 Agent 角色**」——无可用账号时，添加成员流程内联引导先建账号（见 §7.1），而非凭空创建。
+> **前置依赖（与「账户与密钥」`FT-ACC-001`）**：成员的 `variant.account_ref` 必须指向《账户与密钥》中已存在的账户（或内置 OAuth client）。即「**先建凭证，再建关联 Agent 角色**」——无可用账号时，添加成员流程内联引导先建账号（见 §7.1），而非凭空创建。
 
 页面自上而下：
 1. **工具栏**：filter tabs（全部/已启用/已停用/CLI(OAuth)/CLI(配置)）+ 「+ 添加成员」按钮。
@@ -207,7 +207,7 @@
 
 ### 5.2 三文件隔离（与账户同根）
 
-> 凭证隔离机制与 0600 权限以《账户与密钥》`SG-ACC-001` §5.1 为准；本表为成员 catalog 字段的**完整真相**（ACC §5.1 已反向指向此处，避免双写）。
+> 凭证隔离机制与 0600 权限以《账户与密钥》`FT-ACC-001` §5.1 为准；本表为成员 catalog 字段的**完整真相**（ACC §5.1 已反向指向此处，避免双写）。
 
 | 文件 | 内容 | 权限 | 管理方 | 落盘根 |
 |---|---|---|---|---|
@@ -233,7 +233,7 @@
 
 ---
 
-## 6. 首启空 Catalog + 凭据就绪闸门（D1–D4，原 SG-MEM-002）
+## 6. 首启空 Catalog + 凭据就绪闸门（D1–D4，原 FT-MEM-002）
 
 > 用户反馈（2026-08-13）：「我没配置密钥，为什么蛮多狗狗都是开启的？正常理解我第一次用，没有密钥，狗狗清单应该也是空的。只有在成员管理添加了成员才会有狗狗。」本决策推翻了早先「种子默认启用」的首启策略。
 
@@ -475,11 +475,11 @@ DELETE /api/settings/accounts/{id}       → 200 nil | 409(bound_member_ids) | 4
 - **2026-08-12（seed 修复）**：种子化强制 `Enabled=true` 修复整队误判停用；后续被 D1 推翻。
 - **2026-08-12（客户安全三改）**：根目录拆分 / 编辑时 `.bak` / 追加式升级同步（见《账户与密钥》设计 §5.4）。
 - **2026-08-13（PATCH 字段白名单补全）**：`UpdateBreed` 白名单补 `color/nickname/caution/default_variant_id/features/restrictions/relationship_key`。
-- **2026-08-13（首启空 + 凭据就绪闸门，原 SG-MEM-002）**：推翻「种子默认启用」，全新安装首启空 catalog（D1）；`seen_template_breeds` 统一 D1+D3；`MergedBreeds` 仅 catalog；`credential_ready` 派生三态；`router.go` 空 patterns 友好报错；`VISION.md` §5.1 + ADR-001。
+- **2026-08-13（首启空 + 凭据就绪闸门，原 FT-MEM-002）**：推翻「种子默认启用」，全新安装首启空 catalog（D1）；`seen_template_breeds` 统一 D1+D3；`MergedBreeds` 仅 catalog；`credential_ready` 派生三态；`router.go` 空 patterns 友好报错；`VISION.md` §5.1 + ADR-001。
 - **2026-08-13（合并与代码对齐）**：合并 MEM-001 + MEM-002 为本文件；修正：`DEFAULT_SECTION='accounts'`、`RAW_SECTIONS` 顺序、`breedOrder` 无独立键（排序=breeds[] 顺序）、`GetTemplates` 返 `BreedConfig[]`、补充 `/bark` `/status` `/env*` 端点、catalog 含 `deleted_breeds`/`seen_template_breeds`。
-- **2026-08-13（剔除 Makefile/守护内容）**：经用户确认，构建/守护进程生命周期（原 SG-DEV-001）应独立成文，故从本文件剔除附录 A，恢复为独立文档 `SG-DEV-001-makefile-daemon-reclaim.md`。
+- **2026-08-13（剔除 Makefile/守护内容）**：经用户确认，构建/守护进程生命周期（原 FT-DEV-001）应独立成文，故从本文件剔除附录 A，恢复为独立文档 `FT-DEV-001-makefile-daemon-reclaim.md`。
 - **2026-08-16（与 ACC 理清先后关系 + 一致性校正）**：明确「先凭证后角色」前置依赖（§2）；§5.2 标注本表为成员 catalog 字段完整真相、反向指向 ACC §5.1；修正 §7.1「breedOrder 追加」措辞（→ 追加到 breeds[] 数组末尾，与 §5.1 排序真相一致）；§6.4 澄清 kimi 走 api_key、oauth 二进制探测集为 4 个（与 §4.6 的 5 个内置 OAuth client 不冲突）。
 
 ---
 
-> 关联文档：`SG-ACC-001-accounts-keys-auth.md`（账户与密钥/客户配置安全，成员经 `account_ref` 反向引用）、`SG-DEV-001-makefile-daemon-reclaim.md`（构建/守护进程生命周期，独立成文）、`VISION.md` §5.1、`internal/platform/breeds_merge.go`、`internal/platform/router.go`。
+> 关联文档：`FT-ACC-001-accounts-keys-auth.md`（账户与密钥/客户配置安全，成员经 `account_ref` 反向引用）、`FT-DEV-001-makefile-daemon-reclaim.md`（构建/守护进程生命周期，独立成文）、`VISION.md` §5.1、`internal/platform/breeds_merge.go`、`internal/platform/router.go`。

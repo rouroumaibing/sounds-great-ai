@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"sounds-great-ai/internal/capability"
 	"sounds-great-ai/internal/config"
 	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
 	custodyServices "sounds-great-ai/internal/domains/custody/services"
@@ -174,6 +176,40 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 			transport.NewThreadstoreAuthorizer(pl.ThreadStore, pl.MessageStore), pl.PeopleMemoryHub)
 		mux.Handle("/api/people-memory", auth.Wrap(peopleHandler.Routes()))
 		mux.Handle("/api/people-memory/", auth.Wrap(peopleHandler.Routes()))
+	}
+
+	// Persistent Identity (Shared Memory): typed-lane registry disposition +
+	// truth recall. Pending candidates are produced at session close (P2) and
+	// disposed here by a human (M5 提交权); approved truth is recalled into dog
+	// prompts (P4). Mounted under /api/memory/lanes so it shares the evidence
+	// store's namespace; the more specific /api/memory/lanes/ subtree wins over
+	// the /api/memory/ evidence handler for these paths (Go 1.22 ServeMux).
+	if pl != nil && pl.SharedMemory != nil {
+		lanesOperator := "operator"
+		if pl.Leader != nil && pl.Leader.Name != "" {
+			lanesOperator = pl.Leader.Name
+		}
+		// P2-6 LLM reflection: opt-in synthesis service (irreversible-decisions
+		// §4.8). Built from SG_REFLECT_* env; nil when unset so the platform
+		// stays deterministic and the endpoint degrades to a clear 501.
+		var lanesReflector transport.MemoryReflector
+		if chat, rerr := capability.NewReflectModelFromEnv(context.Background()); rerr == nil && chat != nil {
+			lanesReflector = capability.NewMemoryReflect(chat)
+		}
+		lanesHandler := transport.NewLanesHandler(pl.SharedMemory, pl.LaneDispositions, pl.LaneRecall, lanesOperator, lanesReflector)
+		// Gap3 semantic recall: opt-in embedding model (SG_EMBED_API_KEY). Nil
+		// when unset so semantic search degrades to 501 and lexical FTS5 stays.
+		if emb, eerr := capability.NewEmbedModelFromEnv(context.Background()); eerr == nil && emb != nil {
+			lanesHandler.SetEmbedder(capability.NewMemoryEmbed(emb))
+		}
+		// P1 hybrid RRF embed mode (off/shadow/on), homologous clowder
+		// EmbedConfig.embedMode. SG_EMBED_MODE overrides; otherwise the registry
+		// default (on when a vector store exists) applies.
+		if mode := os.Getenv("SG_EMBED_MODE"); mode != "" {
+			pl.SharedMemory.SetEmbedMode(mode)
+		}
+		mux.Handle("/api/memory/lanes", auth.Wrap(lanesHandler.Routes()))
+		mux.Handle("/api/memory/lanes/", auth.Wrap(lanesHandler.Routes()))
 	}
 
 	notificationsHandler := transport.NewNotificationsHandler()

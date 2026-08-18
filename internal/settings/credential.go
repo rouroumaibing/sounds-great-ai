@@ -183,7 +183,7 @@ func (s *FileCredentialStore) Has(id string) bool {
 //   - oauth account: the CLI binary is present on PATH (exec.LookPath)
 //   - no bound account, or unknown auth type: false
 //
-// Known limitation (per SG-MEM-002 §4.1.c): oauth only checks binary presence,
+// Known limitation (per FT-MEM-002 §4.1.c): oauth only checks binary presence,
 // not login state — "installed CLI but not logged in" still reports ready and
 // fails only at first execution.
 func CredentialReady(b *pack.BreedConfig, acct *Account, cred CredentialStore) bool {

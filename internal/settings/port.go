@@ -104,7 +104,7 @@ type SettingsStore interface {
 	// ListSeenTemplateBreeds returns the IDs of template breeds the catalog has
 	// already been "exposed to". Breeds in this set are never auto-added again
 	// (no resurrection). It unifies D1 (empty first run) and D3 (auto-add new
-	// template breeds on upgrade); see docs/DESIGN-STORYS/SG-MEM-002.
+	// template breeds on upgrade); see docs/designs/FT-MEM-002.
 	ListSeenTemplateBreeds() ([]string, error)
 	// AddSeenTemplateBreeds marks the given template breed IDs as seen and
 	// persists them. Called by the upgrade sync when a new template breed is

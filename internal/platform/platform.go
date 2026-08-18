@@ -89,6 +89,22 @@ type Platform struct {
 	ThreadStore   threadPorts.IThreadStore
 	SettingsStore settings.SettingsStore
 	EvidenceStore memory.EvidenceStore
+	// SharedMemory is the typed-lane registry (Persistent Identity layer,
+	// homologous clowder F102/F152/F221/F227/F231). Lane entries are submitted
+	// as pending candidates at session close (P2), disposed by a human (P3),
+	// and the approved subset is recalled into dog prompts (P4). SQLite-persisted
+	// via NewLaneRegistryAt so typed memory survives restarts.
+	SharedMemory *memory.LaneRegistry
+	// LaneSupply detects typed deltas at session close and submits them as
+	// pending lane candidates. Deterministic pattern matching — no LLM (VISION §3).
+	LaneSupply *memory.DeltaProducer
+	// LaneDispositions records human dispositions on lane candidates and applies
+	// them to the registry (approve/reject/modify -> lane status transitions).
+	LaneDispositions *memory.DispositionRecorder
+	// LaneRecall records memory-recall events (injection observability,
+	// homologous clowder recall_events / RecallFeed). Backs the frontend
+	// RecallFeed/RecallLedger so the operator can see what memory was surfaced.
+	LaneRecall *memory.RecallStore
 	// Profiles persists relationship capsules (Persistent Identity P1,
 	// homologous F231). Kept separate from SettingsStore on purpose:
 	// capsules live in their own directory, never in dog-catalog.json.
@@ -326,6 +342,19 @@ func New(cfg Config) (*Platform, error) {
 		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), "evidence.json"),
 	)
 
+	// Persistent Identity (Shared Memory): typed-lane registry. Lane entries are
+	// submitted as pending candidates at session close (P2) and disposed by a
+	// human (P3); the approved subset is recalled into dog prompts (P4). Stored
+	// next to memory.json/evidence.json under the same ConfigRoot so a single
+	// directory holds all durable identity state. SQLite-persisted so typed
+	// memory survives restarts (NewLaneRegistryAt, homologous clowder F102).
+	sharedMemory := memory.NewLaneRegistryAt(
+		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), "lanes.json"),
+	)
+	// Recall-event store (injection observability, homologous clowder
+	// recall_events). Persisted as recall-events.jsonl under ConfigRoot.
+	laneRecall := memory.NewRecallStore(filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), "lanes.json"))
+
 	promptBuilder := prompt.NewBuilder(breeds, skillMgr)
 	contextAssembler := prompt.NewContextAssembler()
 
@@ -412,6 +441,16 @@ func New(cfg Config) (*Platform, error) {
 	continuity := settings.NewContinuityStore(settings.ConfigRoot(cfg.WorkspaceDir))
 	promptBuilder.SetContinuity(continuity)
 
+	// Persistent Identity (Shared Memory): recall approved lane truth into the
+	// dog's system prompt (homologous clowder F296). Only human-approved
+	// entries are injected (M5 submission boundary); pending candidates never
+	// enter the prompt.
+	promptBuilder.SetLaneTruth(sharedMemory, operator)
+	// Gap4 cue-plane: wire the relevance-ranked truth reader so the builder
+	// injects opportunity-scored truth instead of a flat dump. *memory.LaneRegistry
+	// satisfies LaneCueReader (CueMemory), so sharedMemory is passed directly.
+	promptBuilder.SetLaneCue(sharedMemory)
+
 	// Persistent Identity (F276): owner-private
 	// third-party people & relationship memory. Multi-operator: every operator's
 	// data is partitioned by operatorID. File-backed by default (zero-dependency);
@@ -449,6 +488,10 @@ func New(cfg Config) (*Platform, error) {
 		ThreadStore:   threadStorePort,
 		SettingsStore: settingsStore,
 		EvidenceStore: evidenceStore,
+		SharedMemory:  sharedMemory,
+		LaneSupply:    memory.NewDeltaProducer(),
+		LaneDispositions: memory.NewDispositionRecorder(),
+		LaneRecall:        laneRecall,
 		Profiles:      profiles,
 		Continuity:    continuity,
 		PeopleMemory:  peopleMemory,

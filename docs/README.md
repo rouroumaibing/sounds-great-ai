@@ -27,7 +27,7 @@
 | `designs/` | 子系统"代码级 Tech Story"（FT-XXX-001，带 `文件:行号` 锚点） |
 | `plans/` | 实现计划 / 实现记录 |
 | `brand/` | 产品叙事与品牌（故事、角色设定、头像图） |
-| `features/` | 特性文档占位（F-XXX）；当前特性设计见 `designs/` 的 SG-XXX |
+| `features/` | 特性文档占位（F-XXX）；当前特性设计见 `designs/` 的 FT-XXX-001 |
 
 ## 命名约定
 

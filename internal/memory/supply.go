@@ -26,9 +26,11 @@ type SessionDelta struct {
 
 // DeltaCandidate is a LaneEntry candidate produced by the delta producer.
 type DeltaCandidate struct {
-	Lane    LaneType
-	Content string
-	Source  string
+	Lane         LaneType
+	Content      string
+	Source       string
+	Sensitivity  string // optional data-sensitivity tag (F186); "" = none
+	CollectionID string // optional collection/namespace; "" = default
 }
 
 // DeltaProducer detects deltas at session close and produces LaneEntry candidates.
@@ -95,25 +97,49 @@ func (dp *DeltaProducer) Produce(delta *SessionDelta) []DeltaCandidate {
 }
 
 // SubmitCandidates submits all candidates to the LaneRegistry as pending entries.
-// Returns the IDs of submitted entries.
-func (dp *DeltaProducer) SubmitCandidates(reg *LaneRegistry, candidates []DeltaCandidate) []string {
+// Returns the IDs of submitted entries. Duplicate candidates (same content+source
+// already present in the lane) are skipped so a session re-sealed after a
+// held→resume cycle does not produce redundant pending entries. operator scopes
+// the submitted entries for multi-operator partitioning (homologous clowder
+// ownerUserId); "" means shared across operators.
+func (dp *DeltaProducer) SubmitCandidates(reg *LaneRegistry, candidates []DeltaCandidate, operator string) []string {
 	var ids []string
 	for _, c := range candidates {
 		lane := reg.Lane(c.Lane)
 		if lane == nil {
 			continue
 		}
+		if lane.HasContent(c.Content, c.Source) {
+			continue
+		}
 		entry := lane.Submit(c.Content, c.Source)
+		dirty := false
+		if operator != "" {
+			entry.OperatorID = operator
+			dirty = true
+		}
+		if c.Sensitivity != "" {
+			entry.Sensitivity = c.Sensitivity
+			dirty = true
+		}
+		if c.CollectionID != "" {
+			entry.CollectionID = c.CollectionID
+			dirty = true
+		}
+		if dirty {
+			lane.onMutated()
+		}
 		ids = append(ids, entry.ID)
 	}
 	return ids
 }
 
 // DetectAndSubmit is a convenience method: detect + produce + submit.
-func (dp *DeltaProducer) DetectAndSubmit(reg *LaneRegistry, sessionID string, messages []SessionMessage) []string {
+// operator scopes submitted entries for multi-operator partitioning ("" = shared).
+func (dp *DeltaProducer) DetectAndSubmit(reg *LaneRegistry, sessionID string, messages []SessionMessage, operator string) []string {
 	delta := dp.Detect(sessionID, messages)
 	candidates := dp.Produce(delta)
-	return dp.SubmitCandidates(reg, candidates)
+	return dp.SubmitCandidates(reg, candidates, operator)
 }
 
 // --- Typed pattern extractors (deterministic, no LLM) ---

@@ -49,6 +49,18 @@ jobs:
         with:
           go-version: '1.26'
           cache: false
+      - uses: actions/setup-node@v5
+        with:
+          # Must match the frontend job. The gate runs `tsc -b` + `vite build`,
+          # which require node_modules to be populated (npm ci below).
+          node-version: '22'
+          # Disable automatic npm caching to avoid the same tar restore
+          # failures seen on the backend job.
+          package-manager-cache: false
+      - name: Install frontend deps
+        # The gate script invokes web/node_modules/.bin/{tsc,vite}; without this
+        # step node_modules is empty and the gate fails with "No such file".
+        run: cd web && npm ci
       - name: Pre-merge gate
         # Consolidated gate (build + vet + test + frontend build). Mirrors
         # clowder's pre-push / CI gate. --no-rebase because CI checks out a

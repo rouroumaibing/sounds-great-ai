@@ -128,7 +128,7 @@ type catalogDocument struct {
 	// SeenTemplateBreeds records template breed IDs the catalog has already been
 	// "exposed to". Persisting it unifies D1 (empty first run) and D3 (auto-add
 	// new template breeds on upgrade) — a breed in this set is never re-added
-	// after a later deletion. See docs/DESIGN-STORYS/SG-MEM-002.
+	// after a later deletion. See docs/designs/FT-MEM-002.
 	SeenTemplateBreeds []string `json:"seen_template_breeds,omitempty"`
 }
 
@@ -686,7 +686,7 @@ func (s *FileSettingsStore) ListDeletedBreeds() ([]string, error) {
 }
 
 // ListSeenTemplateBreeds returns the template breed IDs this catalog has already
-// been exposed to (never re-added). See SG-MEM-002 §4.1.
+// been exposed to (never re-added). See FT-MEM-002 §4.1.
 func (s *FileSettingsStore) ListSeenTemplateBreeds() ([]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -53,6 +53,20 @@ var (
 	// PeopleMemoryDrillInvoked — an on-demand recall drill was requested
 	// (F276 drill discipline; status label: ok | not_available | budget_exceeded).
 	PeopleMemoryDrillInvoked metric.Int64Counter
+
+	// Lane* counters are the Shared Memory (typed-lane) governance eval
+	// counters (homologous clowder CrossCatMetricsComputer / F200 / F263). They
+	// observe the candidate→approved→recalled lifecycle per lane, and how
+	// often approved truth is injected into dog prompts (by breed).
+	LaneCandidateSubmitted metric.Int64Counter
+	LaneApproved          metric.Int64Counter
+	LaneRejected          metric.Int64Counter
+	LaneRetired           metric.Int64Counter
+	LaneForgotten         metric.Int64Counter
+	LaneDeferred          metric.Int64Counter
+	LaneUndone            metric.Int64Counter
+	LaneWithdrawn         metric.Int64Counter
+	LaneTruthInjected     metric.Int64Counter
 )
 
 // warmupCounters pre-touches low-frequency counters so they appear with 0
@@ -104,5 +118,45 @@ func warmupCounters() {
 	}
 	if PeopleMemoryDrillInvoked != nil {
 		PeopleMemoryDrillInvoked.Add(context.Background(), 0)
+	}
+	// Shared Memory (typed-lane) governance eval counters (homologous
+	// clowder CrossCatMetricsComputer): pre-touch so they appear with value 0
+	// in the first Prometheus scrape (eval distinguishes "fired N times,
+	// processed 0" from "never fired").
+	if LaneCandidateSubmitted != nil {
+		LaneCandidateSubmitted.Add(context.Background(), 0,
+			metric.WithAttributes(attribute.String("lane", "_warmup")))
+	}
+	if LaneApproved != nil {
+		LaneApproved.Add(context.Background(), 0,
+			metric.WithAttributes(attribute.String("lane", "_warmup")))
+	}
+	if LaneRejected != nil {
+		LaneRejected.Add(context.Background(), 0,
+			metric.WithAttributes(attribute.String("lane", "_warmup")))
+	}
+	if LaneRetired != nil {
+		LaneRetired.Add(context.Background(), 0,
+			metric.WithAttributes(attribute.String("lane", "_warmup")))
+	}
+	if LaneForgotten != nil {
+		LaneForgotten.Add(context.Background(), 0,
+			metric.WithAttributes(attribute.String("lane", "_warmup")))
+	}
+	if LaneDeferred != nil {
+		LaneDeferred.Add(context.Background(), 0,
+			metric.WithAttributes(attribute.String("lane", "_warmup")))
+	}
+	if LaneUndone != nil {
+		LaneUndone.Add(context.Background(), 0,
+			metric.WithAttributes(attribute.String("lane", "_warmup")))
+	}
+	if LaneWithdrawn != nil {
+		LaneWithdrawn.Add(context.Background(), 0,
+			metric.WithAttributes(attribute.String("lane", "_warmup")))
+	}
+	if LaneTruthInjected != nil {
+		LaneTruthInjected.Add(context.Background(), 0,
+			metric.WithAttributes(attribute.String("agent.id", "_warmup")))
 	}
 }

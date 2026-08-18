@@ -353,6 +353,143 @@ export interface MemoryEvidenceApi {
   created_at: number;
 }
 
+// Typed-lane Shared Memory entry (backend snake_case). Returned by
+// /api/memory/lanes/{pending,truth,search} and consumed by the disposition endpoints.
+export interface LaneEntryApi {
+  id: string;
+  type: string; // lane type: taste|profile|entity|person|event|decision|lesson
+  content: string;
+  source: string;
+  timestamp: number; // unix milli
+  status: string; // pending|approved|retired|forgotten|deferred
+  operator_id?: string; // owner operator; "" = shared
+  sensitivity?: string; // data-sensitivity tag (F186); "" = none
+  collection_id?: string; // collection/namespace; "" = default
+}
+
+// A single memory-recall observation (injection observability, homologous
+// clowder recall_events). Content-free metadata only.
+export interface RecallEventApi {
+  id: string;
+  operator_id: string;
+  timestamp: number; // unix milli
+  kind: string; // push | pull
+  trigger: string; // session_bootstrap | cold_context | seal | manual
+  entry_ids: string[];
+  count: number;
+  outcome?: string; // "" | used | ignored (consumption verification, P0-1)
+}
+
+// Per-day-window consumption view (homologous clowder RecallLedger funnel +
+// CrossCatMetricsComputer unverifiedConsumptionRate + RecallLedgerThreeAxis).
+// The three axes (beneficial / unmet / attention) are the semantic quality of
+// recall; maturity labels how trustworthy each measurement is.
+export interface RecallWindowStatApi {
+  total: number;
+  used: number;
+  ignored: number;
+  unverified: number;
+  rate: number; // unverified / total, 0..1
+  beneficial: number; // used → useful, low attention cost
+  unmet: number; // unverified → estimated unmet demand
+  attention: number; // ignored → attention cost
+  maturity: Record<string, number>; // measured/estimated/lower_bound/none counts
+}
+
+// Recall counts within day-windows (homologous clowder RecallLedger funnel).
+export type RecallLedgerApi = Record<string, RecallWindowStatApi>; // key "7d"|"14d"|"30d" -> stat
+
+// A single cue-consumption ledger event (Gap4, homologous clowder memCueEvents).
+export interface CueEventApi {
+  id: string;
+  entry_id: string;
+  lane: string;
+  rank: number;
+  score: number;
+  consumed: boolean;
+  operator_id: string;
+  timestamp: number;
+}
+
+// An append-only lifecycle-trace record (P1 three-axis / Task #39,
+// homologous clowder lifecycle_traces).
+export interface LifecycleTraceApi {
+  axis: string; // creation|consumption|correction
+  entry_id: string;
+  lane: string;
+  detail: string;
+  maturity: string; // measured|estimated|lower_bound|none
+  timestamp: number;
+}
+
+// LLM abstractive reflection request (P2-6, sanctioned synthesis service).
+export interface ReflectRequestApi {
+  lane?: string; // optional lane filter
+  focus?: string; // optional reflection focus directive
+  seed?: boolean; // submit reflection as a pending candidate (human disposition)
+  max_chars?: number;
+}
+
+// LLM abstractive reflection response (P2-6).
+export interface ReflectResponseApi {
+  reflection: string;
+  count: number; // truth entries reflected over
+  seeded_ids?: string[]; // present when seed=true
+}
+
+// Typed relationship edge between two memory entries (Gap1, homologous clowder
+// edges). 10 relations + edge-level sensitivity/provenance/traversal (clowder
+// V18 edge columns).
+export interface LaneEdgeApi {
+  id: string;
+  from_id: string;
+  to_id: string;
+  relation: string; // one of the 10 LANE_RELATIONS
+  edge_sensitivity?: string; // inherit ("") | public|internal|private|restricted
+  provenance?: string; // session_seal|manual|import
+  traversal_count?: number;
+  last_traversed_at?: number;
+  operator_id: string;
+  timestamp: number;
+}
+
+// Normalized signal attached to an entry (Gap1, homologous clowder marker:
+// captured/normalized/approved/rejected).
+export interface LaneMarkerApi {
+  id: string;
+  entry_id: string;
+  marker_type: string; // e.g. decision|lesson|correction
+  content: string;
+  status: string; // captured|normalized|approved|rejected
+  operator_id: string;
+  timestamp: number;
+}
+
+// 4-tier sensitivity levels (Gap2, homologous clowder CollectionSensitivity).
+export type SensitivityLevel = 'public' | 'internal' | 'private' | 'restricted';
+
+// Relationship kinds offered in the UI — matches the 10 clowder edge relations.
+export const LANE_RELATIONS: string[] = [
+  'evolved_from',
+  'blocked_by',
+  'supersedes',
+  'invalidates',
+  'related',
+  'related_to',
+  'promoted_from',
+  'wikilink',
+  'doc_link',
+  'feature_ref',
+];
+
+// Sensitivity levels offered in the UI (Gap2).
+export const SENSITIVITY_LEVELS: SensitivityLevel[] = [
+  'public',
+  'internal',
+  'private',
+  'restricted',
+];
+
 // --- Thread types (backend snake_case) ---
 export interface ThreadApi {
   id: string;

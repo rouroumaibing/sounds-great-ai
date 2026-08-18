@@ -18,6 +18,7 @@ import (
 	sopPorts "sounds-great-ai/internal/domains/sop/ports"
 	routingPorts "sounds-great-ai/internal/domains/routing/ports"
 	"sounds-great-ai/internal/platform"
+	"sounds-great-ai/internal/memory"
 	"sounds-great-ai/pkg/protocol"
 
 	"github.com/cloudwego/eino/schema"
@@ -103,6 +104,64 @@ func (h *WSHandler) maybeAutoDistill(sessionID, breedID string) {
 	go h.profiles.AutoDistillSession(context.Background(), sessionID, breedID)
 }
 
+// maybeSupplyLanes triggers typed-lane candidate extraction at session close.
+// It is fire-and-forget and fail-closed (mirrors maybeAutoDistill): a supply
+// failure can never break a dog run. The DeltaProducer is deterministic pattern
+// matching — no LLM is called (VISION §3 compliance). Detected candidates land
+// as pending lane entries (persisted via NewLaneRegistryAt) awaiting human
+// disposition (P3).
+func (h *WSHandler) maybeSupplyLanes(sessionID, breedID string) {
+	if h.platform == nil || h.platform.SharedMemory == nil || h.platform.LaneSupply == nil {
+		return
+	}
+	if h.platform.MessageStore == nil {
+		return
+	}
+	history, err := h.platform.MessageStore.GetByThread(sessionID, 50)
+	if err != nil {
+		return
+	}
+	if len(history) == 0 {
+		return
+	}
+	msgs := make([]memory.SessionMessage, 0, len(history))
+	for _, m := range history {
+		msgs = append(msgs, memory.SessionMessage{
+			Role:    m.Role,
+			Content: m.Content,
+			Time:    m.Timestamp.UnixMilli(),
+		})
+	}
+	reg := h.platform.SharedMemory
+	supply := h.platform.LaneSupply
+	operator := "operator"
+	if h.platform.Leader != nil && h.platform.Leader.Name != "" {
+		operator = h.platform.Leader.Name
+	}
+	go func() {
+		// Fail-closed: a supply panic must never propagate into the session path.
+		defer func() { _ = recover() }()
+		delta := supply.Detect(sessionID, msgs)
+		candidates := supply.Produce(delta)
+		// Count the producer's intended submissions per lane for the
+		// lane_candidate_submitted eval counter (homologous clowder
+		// CrossCatMetricsComputer). Dedup on submit may drop some, but this
+		// reflects supply pressure per lane.
+		byLane := map[memory.LaneType]int64{}
+		for _, c := range candidates {
+			byLane[c.Lane]++
+		}
+		supply.SubmitCandidates(reg, candidates, operator)
+		if telemetry.IsInitialized() {
+			for lane, n := range byLane {
+				if n > 0 && telemetry.LaneCandidateSubmitted != nil {
+					telemetry.LaneCandidateSubmitted.Add(context.Background(), n, metric.WithAttributes(attribute.String("lane", string(lane))))
+				}
+			}
+		}
+	}()
+}
+
 // tryDispatch performs a guarded dispatch disposition (G1): it converges the
 // ball from `from` to `to` only if `from` is still the current holder. Returns
 // false when the guard rejects the disposition (stale/duplicate callback), so
@@ -152,6 +211,34 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 		systemPrompt = h.platform.PromptBuilder.Build(prompt.BuildRequest{
 			BreedID: breedID, VariantID: variant.ID, RAGContext: ragContext,
 		})
+	}
+	// Emit the truth-injected counter and record a recall event when approved
+	// shared memory was recalled into this breed's system prompt (homologous
+	// clowder CrossCatMetricsComputer cross-cat consumption spread + recall_events
+	// observability). Only entries visible to this operator are recalled.
+	if h.platform.SharedMemory != nil {
+		operator := "operator"
+		if h.platform.Leader != nil && h.platform.Leader.Name != "" {
+			operator = h.platform.Leader.Name
+		}
+		if entries, ok := h.platform.SharedMemory.RecallEntries(20, operator); ok && len(entries) > 0 {
+			ids := make([]string, 0, len(entries))
+			for _, e := range entries {
+				ids = append(ids, e.ID)
+			}
+			if h.platform.LaneRecall != nil {
+				h.platform.LaneRecall.Record(&memory.RecallEvent{
+					OperatorID: operator,
+					Kind:       "push",
+					Trigger:    "session_bootstrap",
+					EntryIDs:   ids,
+					Count:      len(ids),
+				})
+			}
+			if telemetry.IsInitialized() && telemetry.LaneTruthInjected != nil {
+				telemetry.LaneTruthInjected.Add(context.Background(), 1, metric.WithAttributes(attribute.String("agent.id", breedID)))
+			}
+		}
 	}
 	systemPrompt, systemPromptL0 := h.injectHooks(systemPrompt, breedID, breed.DisplayName, breed.RoleDescription, breed.Personality, sessionID)
 
@@ -367,6 +454,8 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 		})
 		// Session seal (held): fire the distillation trigger counter.
 		h.fireProfileDistillationTrigger(sessionID, breedID, "held")
+		// Session seal (held): extract typed-lane candidates (P2).
+		h.maybeSupplyLanes(sessionID, breedID)
 		if h.platform != nil && h.platform.HoldScheduler != nil {
 			_ = h.platform.HoldBall(ctx, sessionID, breedID, cond, query)
 		}
@@ -396,6 +485,8 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 	})
 	// Session seal (task done): fire the distillation trigger counter.
 	h.fireProfileDistillationTrigger(sessionID, breedID, "task_done")
+	// Session seal (task done): extract typed-lane candidates (P2).
+	h.maybeSupplyLanes(sessionID, breedID)
 
 	resultEvent := protocol.NewEvent(protocol.EventBarkResult, sessionID, &protocol.BarkResultPayload{
 		Breed:   breedID,

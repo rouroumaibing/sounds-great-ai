@@ -43,3 +43,16 @@ CLI adapter 在保持「平台 spawn 外部 CLI、不内置 reasoning」（§4.1
 代价与回滚见 ADR-002：持久池带来僵尸/lease/MCP 重建（R2）、PTY 增加伪终端复杂度（R3）、Redis 为**新外部依赖**（R6，默认内存实现、可配置切 Redis，无 Redis 时零新增依赖）。
 
 carrier 抽象**按 provider 区分默认链**（2026-08-15 细化，仍为 §4.1 细化而非推翻）：**claude/codex/gemini 默认 `bg_daemon → print_sdk`（优先长会话，per-provider 长会话成熟度）**，各自 warm 池 + PTY runner 经 `WireWarmPools` 仅 `-tags pty` 编译接入、按 provider 构造专属 spawn func（claude/codex/gemini 三种 CLI 各一）；未接入 warm 池时 registry 透明回退 one-shot（gating/standby，零新增依赖、行为等价旧版）；opencode/kimi 因 CLI 自身不支持长会话，维持单 transport one-shot。持久池可经配置回退 one-shot；Redis 默认内存实现。
+
+### 4.8 受控的 LLM 记忆反省服务（memory_reflect，2026-08-18 新增，放开原 §4.1/VISION §3 红线）
+
+原 VISION §3「三层原则」红线「在 `internal/` 层调 LLM 做**推理**」于 2026-08-18 经 operator 决策**修订**，新增本受控例外。
+
+- **保留禁令（不变）**：平台**不内置 agent reasoning**（不替人类做工作流/DAG 决策、不对记忆语义做自主判断）；候选生产仍由确定性 `DeltaProducer` 负责（无 LLM）；记忆 truth 的**提交权仍在人类**（LLM 反省输出绝不自动成为 truth，仅可经人类 disposition 落为 pending 候选）。
+- **放开范围**：允许一个**受控的 LLM 合成服务** `internal/capability/memory_reflect`（同源 clowder `ReflectionService`/`AbstractiveSummaryClient`），对**已批准 truth** 做抽象摘要/跨条目反思。此为不可逆决策 §4.4 明确允许的「平台自身需要的 LLM 调用（**合成**）走 Eino」的具体落地，而非 agent 推理。
+- **硬约束**：
+  1. 落点限 `internal/capability/`（既有 LLM 边界，与 `context_assemble`/`agent_dispatch` 同级）；**不新增 `internal/` 顶层目录**、不进入 `internal/memory/` 推理路径。
+  2. **opt-in**：模型仅经 env（`SG_REFLECT_API_KEY`+`SG_REFLECT_MODEL` 或 `SG_REFLECT_CLI`）配置可用；未配置时端点返回明确「未配置」错误，平台零隐性 LLM 调用。
+  3. **非自主**：反省是「合成」不是「决策」；输出不落地（除非显式 `seed` 且经人类 approve 才成 truth）。
+- **修订动因**：clowder 真实 LLM 反省位于独立 `ReflectionService`/`AbstractiveSummaryClient`（SG 候选主路径本就与之同构、同为确定性）；补齐该独立合成服务使 SG 在「记忆抽象反省」维度与 clowder 同构，且不触碰 §3 的 agent-reasoning 红线。
+- **回滚**：删除 `internal/capability/memory_reflect.go` + 撤销 `LanesHandler` 的 `reflector` 字段/路由 + 移除 `cmd/memory reflect` 即可回到全确定性状态；无数据迁移、无 schema 变更。

@@ -80,6 +80,18 @@ func initOTel() (func(), error) {
 	PeopleMemoryApproved, _ = meter.Int64Counter("dog_pack.people_memory.approved")
 	PeopleMemoryRejected, _ = meter.Int64Counter("dog_pack.people_memory.rejected")
 	PeopleMemoryDrillInvoked, _ = meter.Int64Counter("dog_pack.people_memory.drill_invoked")
+	// Shared Memory (typed-lane) governance eval counters (homologous clowder
+	// CrossCatMetricsComputer / F200 / F263). Per-lane candidate/approve/reject
+	// lifecycle + per-breed truth injection.
+	LaneCandidateSubmitted, _ = meter.Int64Counter("dog_pack.lane.candidate_submitted")
+	LaneApproved, _ = meter.Int64Counter("dog_pack.lane.approved")
+	LaneRejected, _ = meter.Int64Counter("dog_pack.lane.rejected")
+	LaneRetired, _ = meter.Int64Counter("dog_pack.lane.retired")
+	LaneForgotten, _ = meter.Int64Counter("dog_pack.lane.forgotten")
+	LaneDeferred, _ = meter.Int64Counter("dog_pack.lane.deferred")
+	LaneUndone, _ = meter.Int64Counter("dog_pack.lane.undone")
+	LaneWithdrawn, _ = meter.Int64Counter("dog_pack.lane.withdrawn")
+	LaneTruthInjected, _ = meter.Int64Counter("dog_pack.lane.truth_injected")
 	warmupCounters()
 
 	// Global stores

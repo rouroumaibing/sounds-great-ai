@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: dev prod daemon backend frontend build stop restart clean install upgrade help deep qc install-git-hooks
+.PHONY: dev prod daemon backend frontend build stop restart clean install upgrade help deep qc install-git-hooks tools
 
 .DEFAULT_GOAL := help
 
@@ -158,6 +158,13 @@ clean:
 qc:
 	@go run ./cmd/qc --author "$(AUTHOR)" --workdir "$(CURDIR)"
 
+tools:
+	@mkdir -p bin
+	go build -o bin/memory ./cmd/memory/
+	go build -o bin/mcp-server ./cmd/mcp-server/
+	go build -o bin/sg-cli-supervisor ./cmd/sg-cli-supervisor/
+	@echo "Built tools -> bin/memory, bin/mcp-server, bin/sg-cli-supervisor"
+
 install-git-hooks:
 	@mkdir -p .git/hooks
 	@cp scripts/pre-merge-check.sh .git/hooks/pre-push
@@ -193,4 +200,5 @@ help:
 	@echo "  make backend       Start Go backend only"
 	@echo "  make frontend      Start Vite dev server only"
 	@echo "  make qc AUTHOR=<breed>   Run the 7-step QC loop locally (cross-model review gate)"
+	@echo "  make tools               Build auxiliary Go tools into bin/ (memory, mcp-server, sg-cli-supervisor)"
 	@echo "  make install-git-hooks   Install scripts/pre-merge-check.sh as .git/hooks/pre-push"

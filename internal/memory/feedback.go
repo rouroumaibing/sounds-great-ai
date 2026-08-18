@@ -14,6 +14,11 @@ const (
 	DispositionAccept  DispositionAction = "accept"
 	DispositionReject  DispositionAction = "reject"
 	DispositionModify  DispositionAction = "modify"
+	DispositionRetire  DispositionAction = "retire"
+	DispositionForget  DispositionAction = "forget"
+	DispositionDefer   DispositionAction = "defer" // snooze a pending candidate (not-now)
+	DispositionUndo    DispositionAction = "undo"  // revert the last disposition
+	DispositionWithdraw DispositionAction = "withdraw" // re-open approved/deferred to pending
 )
 
 // HumanDisposition records a human's feedback on a candidate lane entry.
@@ -71,6 +76,16 @@ func (dr *DispositionRecorder) Record(reg *LaneRegistry, entryID string, lane La
 		entry.Content = modified
 		dr.mu.Unlock()
 		l.Approve(entryID)
+	case DispositionRetire:
+		l.Retire(entryID)
+	case DispositionForget:
+		l.Forget(entryID)
+	case DispositionDefer:
+		l.Defer(entryID)
+	case DispositionUndo:
+		l.Undo(entryID)
+	case DispositionWithdraw:
+		l.Withdraw(entryID)
 	}
 
 	dr.mu.Lock()

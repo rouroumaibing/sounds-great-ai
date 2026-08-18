@@ -164,7 +164,7 @@ E. 日常修 bug / 小改动 → 直接做，提交前查时刻 2
 | `AGENTS.md` | 所有犬共享的铁律、限制、红旗、Vision Check Protocol、Magic Words、决策漏斗、治理协议 |
 | `docs/governance/decisions/` | Architecture Decision Records (ADR-XXX) |
 | `docs/plans/` | 实施计划 |
-| `docs/features/` | Feature 文档占位（F-XXX）；当前特性设计见 `docs/designs/` 的 SG-XXX |
+| `docs/features/` | Feature 文档占位（F-XXX）；当前特性设计见 `docs/designs/` 的 FT-XXX-001 |
 
 ## Review Protocol
 

@@ -64,7 +64,7 @@ func TestDeltaProducerSubmitCandidates(t *testing.T) {
 		{Lane: LaneDecision, Content: "decided to use Go", Source: "session:s1"},
 		{Lane: LaneTaste, Content: "prefer dark mode", Source: "session:s1"},
 	}
-	ids := dp.SubmitCandidates(reg, candidates)
+	ids := dp.SubmitCandidates(reg, candidates, "")
 	if len(ids) != 2 {
 		t.Fatalf("expected 2 ids, got %d", len(ids))
 	}
@@ -87,7 +87,7 @@ func TestDeltaProducerDetectAndSubmit(t *testing.T) {
 	messages := []SessionMessage{
 		{Role: "user", Content: "I decided to use React for frontend."},
 	}
-	ids := dp.DetectAndSubmit(reg, "session-1", messages)
+	ids := dp.DetectAndSubmit(reg, "session-1", messages, "")
 	if len(ids) == 0 {
 		t.Fatal("expected at least 1 submitted entry")
 	}

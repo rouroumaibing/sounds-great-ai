@@ -249,7 +249,9 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	repoHandler := transport.NewRepoTrajectoryHandler(pl)
 	mux.Handle("/api/repo/", repoHandler.Routes())
 
-	mux.HandleFunc("GET /api/skills", SkillsHandler(pl))
+	skillsHandler := transport.NewSkillsHandler(pl.Skills, workspaceDir, "")
+	mux.Handle("/api/skills", auth.Wrap(skillsHandler.Routes()))
+	mux.Handle("/api/skills/", auth.Wrap(skillsHandler.Routes()))
 	mux.HandleFunc("GET /api/mcp/servers", MCPServersHandler(pl))
 	mux.HandleFunc("GET /api/ops/health", OpsHealthHandler(startTime))
 	mux.HandleFunc("GET /api/ops/logs", OpsLogsHandler(logBuf))
@@ -276,26 +278,6 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	}
 
 	return telemetry.TraceMiddleware(cors(mux))
-}
-
-func SkillsHandler(pl *platform.Platform) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		type skillItem struct {
-			Name   string `json:"name"`
-			Source string `json:"source"`
-		}
-		if pl == nil || pl.Skills == nil {
-			json.NewEncoder(w).Encode([]skillItem{})
-			return
-		}
-		all := pl.Skills.All()
-		items := make([]skillItem, 0, len(all))
-		for _, s := range all {
-			items = append(items, skillItem{Name: s.ID + ".md", Source: "packs/default/skills"})
-		}
-		json.NewEncoder(w).Encode(items)
-	}
 }
 
 func MCPServersHandler(pl *platform.Platform) http.HandlerFunc {

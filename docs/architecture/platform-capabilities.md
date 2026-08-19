@@ -57,7 +57,7 @@
 | Continuity Bootstrap | 跨 spawn/会话续接：续接前任务 digest 注入，防长协作冷启动 | `internal/memory/` + `internal/threadstore/` |
 | Memory Lanes | 6-organ typed memory lanes + delta producer + human disposition + consumption tracker + lifecycle trace + private initiative | `internal/memory/lanes.go` `internal/memory/supply.go` `internal/memory/feedback.go` `internal/memory/initiative.go` |
 | Cue Plane | F287 recall opportunity catalog + cue envelope + lane resolver registry + consumption episode ledger + source invalidation (fail-closed) | `internal/cue/` |
-| Skills Manifest | 按需 skill prompt 加载 | `internal/skills/` |
+| Skills Manifest | skill 加载/注入/管理：源扫描 + 持久化意图（`skills-config.json`，global 基线 + project 覆盖两级）+ 多 carrier 物理挂载（claude/codex/gemini/kimi 原生目录 per-skill 符号链接）+ 逻辑挂载（启用即注入 prompt）+ 安全层（内外源权限隔离 / 内容指纹 / 隔离门禁）+ sync 调谐 + 7 类漂移检测/解决（含配置层 config-new/config-orphan）+ HTTP API + 前端面板。详见 `docs/plans/skills-framework-governance-spec.md`（Phase 8） | `internal/skills/` |
 | MCP Bridge | MCP server + client 桥接 | `internal/mcp/` |
 | RAG Store | 向量存储、embedding、检索 | `internal/ragstore/` |
 | Thread Store | 线程、会话、事件存储（扁平包保留，运行时经 domains/threads 适配） | `internal/threadstore/` |
@@ -74,7 +74,7 @@
 |------|------|--------|
 | Transport | HTTP/WS handler、handoff 执行、context-transport 装配、eval/config handler | `internal/transport/` |
 | Prompt Builder | prompt 组装、上下文保护（`ProtectRecentPairs`） | `internal/prompt/` |
-| Agent Runtime | coder agent 执行器 + skill manager | `internal/agent/` |
+| Agent Runtime | coder agent 执行器（**注：`internal/agent/skill_manager.go` 为死代码，Phase 8.1 废弃，skill 管理统一收归 `internal/skills/`**） | `internal/agent/` |
 | Aspects | approval / command guard / tracing 切面 | `internal/aspect/` |
 | Capabilities | agent_dispatch / command_check / context_assemble 等可组合能力 | `internal/capability/` |
 | Components | embedding / model 组件封装（Eino component） | `internal/component/` |

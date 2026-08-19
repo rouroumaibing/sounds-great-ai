@@ -310,8 +310,21 @@ func New(cfg Config) (*Platform, error) {
 	}
 
 	// Initialize platform services
-	skillMgr := skills.NewManager(cfg.SkillsDir)
-	_ = skillMgr.LoadFromDir() // best effort
+	// 技能意图分两层：home（全局基线 + 权威禁用）与 workspace（工作区覆盖），
+	// 合并后驱动注入与级联挂载（详见 internal/skills）。
+	homeDir, _ := os.UserHomeDir()
+	homeCfg := filepath.Join(homeDir, ".sounds-great-ai", "skills-config.json")
+	projCfg := filepath.Join(cfg.WorkspaceDir, ".sounds-great-ai", "skills-config.json")
+	skillMgr := skills.NewManagerWithConfig(homeCfg, projCfg, map[string]string{cfg.SkillsDir: "packs"})
+	_ = skillMgr.Config().Load() // best effort
+	_ = skillMgr.Scan()          // best effort
+	// G1：接线上 skills-config.json 热加载——外部进程编辑后自动刷新内存态
+	// （Watch 内部 3s 轮询 + 30s 防抖；ReloadAll 重载 global+project 两层并重扫源）。
+	skillMgr.Config().Watch(func() {
+		if err := skillMgr.ReloadAll(); err != nil {
+			log.Printf("Warning: skills reload after hot-reload failed: %v", err)
+		}
+	})
 
 	mcpReg := mcp.NewRegistry()
 
@@ -364,7 +377,11 @@ func New(cfg Config) (*Platform, error) {
 	if err := hookReg.Scan(); err != nil {
 		log.Printf("Warning: hooks scan failed: %v", err)
 	}
-	hookPipeline := hooks.NewPipeline(hookReg, hooks.DefaultResolvers())
+	// 8.4：把技能管理器注入 d11 skill-trigger resolver，使其能按当前查询动态
+	// 匹配已启用的 skill（动态选择，非硬编码 DAG，对齐 §4.2）。
+	resolvers := hooks.DefaultResolvers()
+	resolvers["SkillTriggerResolver"] = &hooks.SkillTriggerResolver{Skills: skillMgr}
+	hookPipeline := hooks.NewPipeline(hookReg, resolvers)
 
 	// Initialize hook trace store (graceful degradation on failure)
 	var hookTraceStore *hooks.TraceStore

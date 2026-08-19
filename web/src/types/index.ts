@@ -268,6 +268,42 @@ export interface LoadedSkill {
   source: string;
 }
 
+// Skill (Skills Framework 管理面板)
+export interface SkillItem {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  triggers: string[];
+  source: string;
+  enabled: boolean;
+  scope: string;
+  mountPoints: string[];
+  mountHealth: string;
+  security?: string; // approved | pending | quarantined | revoked
+}
+
+export interface SkillDetail extends SkillItem {
+  content: string;
+  path: string;
+}
+
+export interface SkillSecurityState {
+  id: string;
+  source: string;
+  trusted: boolean;
+  fingerprint: string;
+  status: string;
+  reviewedBy?: string;
+}
+
+export interface SkillDriftIssue {
+  skillId: string;
+  type: string;
+  carrier?: string;
+  detail: string;
+}
+
 // MCP Server
 export interface McpServer {
   name: string;

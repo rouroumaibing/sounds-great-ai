@@ -208,8 +208,11 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 	systemPrompt := variant.SystemPrompt
 	ragContext := h.retrieveRAGContext(ctx, breedID, query)
 	if h.platform.PromptBuilder != nil {
+		// 8.3：把当前 carrier（variant.ClientID）下启用并挂载的 skill 注入正文，
+		// 修复此前执行流不传 SkillIDs 导致 buildSkills 永不触发的死路径。
+		skillIDs := h.enabledSkillIDs(variant.ClientID)
 		systemPrompt = h.platform.PromptBuilder.Build(prompt.BuildRequest{
-			BreedID: breedID, VariantID: variant.ID, RAGContext: ragContext,
+			BreedID: breedID, VariantID: variant.ID, RAGContext: ragContext, SkillIDs: skillIDs,
 		})
 	}
 	// Emit the truth-injected counter and record a recall event when approved
@@ -240,7 +243,7 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 			}
 		}
 	}
-	systemPrompt, systemPromptL0 := h.injectHooks(systemPrompt, breedID, breed.DisplayName, breed.RoleDescription, breed.Personality, sessionID)
+	systemPrompt, systemPromptL0 := h.injectHooks(systemPrompt, breedID, breed.DisplayName, breed.RoleDescription, breed.Personality, query, sessionID)
 
 	// Persistent Identity F276 (homologous recall injection): when the
 	// user's message references a known third-party person, inject a token-bounded
@@ -656,6 +659,15 @@ func (h *WSHandler) ResumeHeldThread(ctx context.Context, sessionID string, kind
 	return nil
 }
 
+// enabledSkillIDs 返回当前 carrier 下已启用并挂载的 skill ID 集合，供 Prompt Builder
+// 注入正文。pl.Skills 为 nil 时安全返回空切片。
+func (h *WSHandler) enabledSkillIDs(carrier string) []string {
+	if h.platform == nil || h.platform.Skills == nil {
+		return nil
+	}
+	return h.platform.Skills.EnabledForCarrier(carrier)
+}
+
 func (h *WSHandler) executeSerial(ctx context.Context, breedIDs []string, sessionID, query, invID string) {
 	previousOutput := ""
 	for i, breedID := range breedIDs {
@@ -748,11 +760,12 @@ func (h *WSHandler) executeParallel(ctx context.Context, breedIDs []string, sess
 			systemPrompt := variant.SystemPrompt
 			ragContext := h.retrieveRAGContext(ctx, bid, query)
 			if h.platform.PromptBuilder != nil {
+				skillIDs := h.enabledSkillIDs(variant.ClientID)
 				systemPrompt = h.platform.PromptBuilder.Build(prompt.BuildRequest{
-					BreedID: bid, VariantID: variant.ID, RAGContext: ragContext,
+					BreedID: bid, VariantID: variant.ID, RAGContext: ragContext, SkillIDs: skillIDs,
 				})
 			}
-			systemPrompt, systemPromptL0 := h.injectHooks(systemPrompt, bid, breed.DisplayName, breed.RoleDescription, breed.Personality, sessionID)
+			systemPrompt, systemPromptL0 := h.injectHooks(systemPrompt, bid, breed.DisplayName, breed.RoleDescription, breed.Personality, query, sessionID)
 			req := agentsPorts.ExecuteRequest{
 				ClientID:             variant.ClientID,
 				Messages:             sharedSchemaMsgs,

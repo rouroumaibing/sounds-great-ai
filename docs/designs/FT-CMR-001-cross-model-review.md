@@ -30,7 +30,7 @@
 | QC 状态机 | stateless→stateful（stale/幂等） | `qc_state.go:20-105` | reviewedSha / idempotencyKey / staleFlag |
 | eval:qc 遥测 | 逐次 JSONL + 聚合控制面 | `qc_metrics.go:18-90` | 喂 eval:qc 域 |
 | pre-merge 门禁 | 合并前强制护栏 | `scripts/pre-merge-check.sh` | 4 项硬化护栏 |
-| server 自动触发 | 后台周期巡检 + 端点 | `qc_autorun.go` + `routes.go:226-228` | 对齐 clowder F192 调度 |
+| server 自动触发 | 后台周期巡检 + 端点 | `qc_autorun.go` + `routes.go:226-228` | 参考 clowder F192 调度 |
 | 开发者门禁入口 | `make qc` / report | `cmd/qc/main.go` | 显式跑 + 聚合报告 |
 
 ---
@@ -118,9 +118,9 @@ SG 的三层设计对应 clowder F253 的 Maine Coon 三层（具名猫）模型
 - 无文件清单 → `full`（保守默认）；
 - 触碰任意 `.go` → `full`（共享能力，跑满 7 步）；
 - 仅 `docs/*.md`/`README` → `light`（只跑 hygiene + fresh_context + sign_off，跳过 review/evidence/ci，`qc_loop.go:110-119`）。
-对齐 clowder 按 `shared/` vs doc-polish 路由的 trigger strategy。
+参考 clowder 按 `shared/` vs doc-polish 路由的 trigger strategy。
 
-**状态机持久化（stateless→stateful 缺口已闭环）**：在真实 git 仓库内（`headSHA != ""`），`Run` 把 `reviewedSha` / `idempotencyKey` / `staleFlag` / `phase` 落盘到 `.qc-state.json`（`qc_loop.go:141-152`）；`phase` 取 `qc.archived`（通过）或 `qc.verdict_blocked`（不通过），对齐 clowder `qc.idle→…→qc.archived`。HEAD 变化由 `ComputeStale`（`qc_state.go:85-87`）判定 stale，重置 verdict。非 git 目录（测试 temp dir）无副作用、不落盘（`qc_loop.go:140-141`）。
+**状态机持久化（stateless→stateful 缺口已闭环）**：在真实 git 仓库内（`headSHA != ""`），`Run` 把 `reviewedSha` / `idempotencyKey` / `staleFlag` / `phase` 落盘到 `.qc-state.json`（`qc_loop.go:141-152`）；`phase` 取 `qc.archived`（通过）或 `qc.verdict_blocked`（不通过），参考 clowder `qc.idle→…→qc.archived`。HEAD 变化由 `ComputeStale`（`qc_state.go:85-87`）判定 stale，重置 verdict。非 git 目录（测试 temp dir）无副作用、不落盘（`qc_loop.go:140-141`）。
 
 ---
 
@@ -138,7 +138,7 @@ SG 的三层设计对应 clowder F253 的 Maine Coon 三层（具名猫）模型
 
 ## 6. pre-merge 门禁（`scripts/pre-merge-check.sh`）
 
-保留 SG 原有 5 步精神（分支/脏检查 → rebase → `go build` → `go vet`+`go test` → web → 报告），并硬化 4 项护栏（对齐 clowder，纯 bash 零新增依赖）：
+保留 SG 原有 5 步精神（分支/脏检查 → rebase → `go build` → `go vet`+`go test` → web → 报告），并硬化 4 项护栏（参考 clowder，纯 bash 零新增依赖）：
 
 - **A. Worktree 位置守卫**（`scripts/pre-merge-check.sh:58-68`）：禁止在主仓库内部 worktree 跑 gate（防 Node 向上解析兄弟目录 node_modules 造成 web build 假红）。
 - **B. Gate 单飞锁**（`scripts/pre-merge-check.sh:77-100`）：`mkdir` 原子抢锁 + 持锁 pid 存活互斥 + 过期锁接管 + `trap` 释放。
@@ -149,7 +149,7 @@ SG 的三层设计对应 clowder F253 的 Maine Coon 三层（具名猫）模型
 
 ## 7. server 内自动触发（`qc_autorun.go` + `routes.go`）
 
-对齐 clowder eval:qc 的「按时跑、出 verdict」调度形态（`qc_autorun.go:10-19`）。
+参考 clowder eval:qc 的「按时跑、出 verdict」调度形态（`qc_autorun.go:10-19`）。
 
 - **装配**：`cmd/server/main.go` 创建 `sop.NewAutoRunner`，`BuildMuxWithHandler` 新增 `qcRunner *sop.AutoRunner` 参数（`routes.go:41`），并在 `qcRunner != nil` 时注册路由（`routes.go:226-228`）。
 - **周期巡检**：`AutoRunner.Start`（`qc_autorun.go:46-71`）启动后 ~5s 先跑一次填充状态，随后按 `interval` ticker 跑；`ctx` 取消即停（独立于 eval scheduler）。

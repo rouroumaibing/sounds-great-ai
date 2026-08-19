@@ -53,16 +53,25 @@ func (h *WSHandler) populateLeaderContext(input *hooks.AssemblerInput) {
 	input.LeaderHandles = strings.Join(parts, " / ")
 }
 
-func (h *WSHandler) injectHooks(basePrompt, breedID, breedName, roleDesc, personality, sessionID string) (string, string) {
+func (h *WSHandler) injectHooks(basePrompt, breedID, breedName, roleDesc, personality, query, sessionID string) (string, string) {
 	systemPrompt := basePrompt
 	systemPromptL0 := ""
 	if h.platform.HookPipeline == nil {
 		return systemPrompt, systemPromptL0
 	}
+	// G5：解析当前执行目标 carrier（variant.ClientID），注入 AssemblerInput 供
+	// skill-trigger resolver 按挂载范围过滤。未知 carrier 时置空，resolver 降级为不过滤。
+	carrier := ""
+	if b := h.platform.GetBreed(breedID); b != nil {
+		if v := b.DefaultVariant(); v != nil {
+			carrier = v.ClientID
+		}
+	}
 	hookInput := &hooks.AssemblerInput{
 		BreedID: breedID, BreedName: breedName, RoleDescription: roleDesc,
 		Personality: personality, CurrentPhase: currentPhase(),
-		ToolCallCount: h.countToolCalls(sessionID), TaskID: sessionID,
+		ToolCallCount: h.countToolCalls(sessionID), TaskID: sessionID, Query: query,
+		Carrier: carrier,
 	}
 	h.populateLeaderContext(hookInput)
 	initResult := h.platform.HookPipeline.ExecuteStage("session-init", hookInput)

@@ -1,6 +1,6 @@
 domainId: eval:qc
 displayName: "QC 流水线质量评估"
-descriptionForHuman: "评估 QC 流水线是否真的拦住坏改动——跨模型 reviewer delta（正式评审相对 fresh-context 预审的增量发现率）、fresh-context 覆盖率、合入后缺陷率、误报率。对齐 clowder eval:qc 度量域。"
+descriptionForHuman: "评估 QC 流水线是否真的拦住坏改动——跨模型 reviewer delta（正式评审相对 fresh-context 预审的增量发现率）、fresh-context 覆盖率、合入后缺陷率、误报率。（度量域参考 clowder eval:qc）"
 evalBreed: bianmu
 frequency: weekly
 sourceAdapter: telemetry

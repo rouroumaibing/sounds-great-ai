@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"sounds-great-ai/internal/agent"
 	"sounds-great-ai/internal/component"
 	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/ops"
@@ -40,12 +39,6 @@ func main() {
 	if err != nil {
 		log.Printf("Warning: model init failed (server still starts): %v", err)
 	}
-	sm := &agent.SkillManager{}
-	skillDir := GetenvDefault("SKILL_DIR", "internal/agent/skills")
-	if err := sm.Load(skillDir); err != nil {
-		log.Printf("Warning: skill load failed: %v", err)
-	}
-
 	workspaceDir := GetenvDefault("WORKSPACE_DIR", "")
 	if workspaceDir == "" {
 		if wd, err := os.Getwd(); err == nil {

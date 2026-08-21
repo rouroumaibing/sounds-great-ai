@@ -12,7 +12,7 @@ import (
 	"unicode"
 )
 
-// RelationshipCapsule is the homologous "user-profile capsule": a
+// RelationshipCapsule is the "user-profile capsule": a
 // persisted primer describing the long-term relationship between the operator
 // and a specific relationship-keyed context (a family/platform/breed). Unlike
 // breed config (which lives in dog-catalog.json), capsules live in their own
@@ -42,7 +42,7 @@ type RelationshipCapsule struct {
 	// never corrected). Keeps the relationship from re-learning a mistake.
 	CorrectionPath string `json:"correction_path,omitempty"`
 	// EvalApprovals / EvalRejections are the Approval-Hub counters
-	// (homologous "养熟" governance): how often a proposed update for
+	// ("养熟" governance): how often a proposed update for
 	// this capsule was approved / rejected by the operator.
 	EvalApprovals int `json:"eval_approvals,omitempty"`
 	EvalRejections int `json:"eval_rejections,omitempty"`
@@ -60,7 +60,7 @@ type RelationshipCapsule struct {
 	UpdatedAt int64 `json:"updated_at,omitempty"`
 }
 
-// On-disk layout (homologous):
+// On-disk layout:
 //
 //	<ConfigRoot>/profiles/<operator>/relationship/<relationshipKey>-primer.md
 //

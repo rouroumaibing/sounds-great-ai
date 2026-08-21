@@ -47,8 +47,8 @@ const (
 )
 
 // ClerkInvokeFunc re-invokes a dog (CLI client) one-shot and returns its final
-// text. Used so the daily clerk lets the ORIGINAL dog re-derive the F276
-// proposal from the exact sources — homologous: the dog (not the
+// text. Used so the daily clerk lets the ORIGINAL dog re-derive the
+// proposal from the exact sources — the dog (not the
 // platform) does the reasoning. clientID selects the CLI adapter
 // (claude/codex/gemini/opencode/kimi); workDir is the dog's working directory.
 type ClerkInvokeFunc func(ctx context.Context, clientID, prompt, workDir string) (string, error)
@@ -60,7 +60,7 @@ type ClerkSourceResolver func(operatorID string, ref SourceRef) (string, bool)
 // PeopleMemoryClerkDeps are the optional capabilities the daily clerk needs to
 // re-invoke the original dog. When Invoke is nil the clerk degrades to the
 // simpler "promote receipt to a staged (empty) candidate" behaviour (the
-// original SG F276 dual path). DefaultClientID is used when a receipt carries
+// original SG dual path). DefaultClientID is used when a receipt carries
 // no usable requester client id.
 type PeopleMemoryClerkDeps struct {
 	Invoke          ClerkInvokeFunc
@@ -127,7 +127,7 @@ func RunPeopleMemoryClerkOnce(ctx context.Context, store PeopleMemoryStore, deps
 			processed++
 			if deps.Invoke == nil {
 				// Degraded mode: promote to a staged (empty) candidate, exactly
-				// like the original SG F276 dual path.
+				// like the original SG dual path.
 				if _, err := store.ClaimDeferredReceipt(op, r.ReceiptID, "clerk"); err != nil {
 					log.Printf("[people-memory-clerk] operator=%s receipt=%s claim failed: %v", op, r.ReceiptID, err)
 				}
@@ -205,11 +205,11 @@ type clerkProposal struct {
 
 // buildClerkReinvokePrompt builds the hidden re-derivation prompt for the
 // original dog, faithfully mirroring the triggerContent: exact sources
-// only, no thread-history scanning, output a single rejectable F276 proposal as
+// only, no thread-history scanning, output a single rejectable proposal as
 // JSON, never materialize directly.
 func buildClerkReinvokePrompt(operatorID string, r *DeferredPersonMemoryReceipt, deps PeopleMemoryClerkDeps) string {
 	var b strings.Builder
-	b.WriteString("[F276 deferred person-memory daily clerk]\n")
+	b.WriteString("[deferred person-memory daily clerk]\n")
 	fmt.Fprintf(&b, "receiptId=%s\n", r.ReceiptID)
 	fmt.Fprintf(&b, "claimId=%s\n", "clerk")
 	fmt.Fprintf(&b, "subject=%s\n", jsonString(r.Subject))

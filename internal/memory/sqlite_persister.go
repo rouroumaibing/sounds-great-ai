@@ -17,8 +17,8 @@ import (
 //
 // 2026-08-17: NewMemoryStoreAt / NewEvidenceStoreAt prefer SQLite and fall back
 // to JSON when the sqlite driver cannot be initialized (e.g. a stripped build
-// without the driver). This matches clowder's "memory store is SQLite by
-// default" posture while keeping JSON as a zero-dependency fallback.
+// without the driver). SQLite is the default store, with JSON kept as a
+// zero-dependency fallback.
 type persister interface {
 	load() (*memoryDocument, error)
 	save(doc *memoryDocument) error

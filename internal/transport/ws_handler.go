@@ -32,7 +32,7 @@ type WSHandler struct {
 	sem         chan struct{}
 	rateMonitor *RateMonitor
 	// profiles optionally enables the on-session-seal autonomous distill
-	// trigger (KD-10 F276 maturity). Nil = disabled (no-op on seal).
+	// trigger (KD-10 maturity). Nil = disabled (no-op on seal).
 	profiles *ProfilesHandler
 }
 

@@ -1,5 +1,5 @@
 // Command qc runs the Sounds Great AI 7-step QC loop (internal/sop.QCLoop) as a
-// developer-facing gate, mirroring clowder's `pnpm qc`. It is the runtime
+// developer-facing gate. It is the runtime
 // wiring for the QC loop (previously dead code) and the caller that exercises
 // SelectReviewPanel to auto-pick the three-role cross-model review panel
 // (Layer 2 reviewer + Layer 3 final approver) when not supplied explicitly.
@@ -33,7 +33,7 @@ func main() {
 		workDir   = flag.String("workdir", ".", "repository / working directory")
 		feature   = flag.String("feature", "", "feature name for evidence manifest")
 		template  = flag.String("template", "packs/default/breeds/dog-template.json", "breed template file")
-		fix       = flag.Bool("fix", false, "auto-fix hygiene via gofmt -w (clowder F253 A1)")
+		fix       = flag.Bool("fix", false, "auto-fix hygiene via gofmt -w")
 		fixCommit = flag.Bool("fix-commit", false, "commit auto-fixes with [qc-bot] (implies --fix)")
 	)
 	flag.Parse()
@@ -141,7 +141,7 @@ func main() {
 }
 
 // runReport prints the aggregated eval:qc telemetry (the control-plane consumer
-// that closes the "no aggregation" gap vs clowder's F192 rollup).
+// that closes the "no aggregation" gap).
 func runReport(workDir string) {
 	agg, err := sop.AggregateQCMetrics(qcMetricsPath(workDir))
 	if err != nil {

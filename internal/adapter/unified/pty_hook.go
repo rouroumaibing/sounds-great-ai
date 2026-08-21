@@ -1,7 +1,7 @@
 package unified
 
 // pty_hook.go implements the Claude Code Hook side-channel, the
-// structural output path used by its PtyDriver (F230) for claude >= 2.1.172,
+// structural output path used by its PtyDriver for claude >= 2.1.172,
 // where the interactive TUI no longer writes transcript files.
 //
 // Mechanism (faithful to the upstream pty/hook-setup.ts + HookSidechannelConsumer.ts design):

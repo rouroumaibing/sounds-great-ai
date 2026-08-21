@@ -234,7 +234,7 @@ Handlers: `internal/transport/memory_handler.go`. Base path: `/api/memory`.
 | GET | `/api/memory/evidence` | List evidence records |
 | POST | `/api/memory/evidence` | Add an evidence record |
 
-Evidence records power the shared memory system (decisions, lessons, proofs). See `docs/architecture/memory-system-overview.md`.
+Evidence records power the shared memory system (decisions, lessons, proofs). See `docs/features/FT-SM-001-shared-memory.md`.
 
 ## People Memory API
 

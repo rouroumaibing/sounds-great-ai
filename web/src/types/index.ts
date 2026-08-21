@@ -1,7 +1,7 @@
 // Navigation types
 export type PrimaryNavType = 'threads' | 'tasks' | 'memory' | 'settings' | 'about' | 'custody' | 'profiles' | 'people';
 export type SettingsTabType = 'members' | 'accounts' | 'personas' | 'im' | 'skills' | 'mcp' | 'plugins' | 'market' | 'marketplace' | 'ball' | 'concierge' | 'voice' | 'config' | 'rules' | 'notifications' | 'system' | 'ops' | 'eval' | 'about';
-export type DrawerTabType = 'plan' | 'mcp' | 'memory' | 'files' | 'session-chain';
+export type DrawerTabType = 'plan' | 'mcp' | 'memory' | 'files' | 'session-chain' | 'sop';
 export type ThreadFilterType = 'all' | 'escalated' | 'active';
 export type MemberFilterType = 'all' | 'enabled' | 'disabled' | 'oauth' | 'config';
 
@@ -308,6 +308,32 @@ export interface SkillDriftIssue {
 export interface McpServer {
   name: string;
   tools: string[];
+  display_name?: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>; // masked on read (values are "***")
+  // Remote (HTTP/SSE) transport. When url is set the server is reached over
+  // the network instead of spawned locally.
+  url?: string;
+  headers?: Record<string, string>; // masked on read (values are "***")
+  // callback_url is the HTTP fallback surfaced when the primary transport is
+  // unreachable.
+  callback_url?: string;
+  fallback_available?: boolean;
+  enabled?: boolean;
+  builtin?: boolean;
+  breeds?: string[];
+  status?: string; // ok | empty | error | unknown
+  error?: string;
+}
+
+// MCP fallback (HTTP callback) surface returned by
+// GET /api/mcp/servers/{name}/fallback.
+export interface McpFallback {
+  name: string;
+  callback_url?: string;
+  tools?: { name: string; method: string; path: string; sample: string }[];
+  note?: string;
 }
 
 // Shared Memory

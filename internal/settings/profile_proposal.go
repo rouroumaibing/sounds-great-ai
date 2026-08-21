@@ -9,12 +9,12 @@ import (
 )
 
 // This file holds the Approval-Hub machinery for relationship capsules
-// (Persistent Identity P1-b, homologous "养熟" governance). A capsule
+// (Persistent Identity P1-b, "养熟" governance). A capsule
 // update is never applied blindly: a candidate is written as a *pending
 // proposal* file, and only an explicit operator approval promotes it to the
 // active capsule. This mirrors the propose → Approval Hub → write flow
 // without ever invoking an LLM inside the platform (reasoning about *what* to
-// write is delegated to the operator or a CLI agent, per docs/decisions/irreversible-decisions.md §4.1).
+// write is delegated to the operator or a CLI agent, per 不可逆决策 §4.1).
 
 func (r *ProfileRepository) proposalPath(key string) string {
 	return filepath.Join(r.root, sanitizeKey(key)+proposalSuffix)

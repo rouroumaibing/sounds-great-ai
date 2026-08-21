@@ -1,7 +1,7 @@
 // Command memory is an opt-in operations tool for the typed-lane Shared Memory
 // subsystem. It is NOT auto-wired to the running server; operators run it
 // deliberately to seed candidates from repository Markdown (a second candidate
-// source beyond session-close text, homologous clowder GenericRepoScanner).
+// source beyond session-close text).
 //
 // Usage:
 //
@@ -65,7 +65,7 @@ func runScan(args []string) {
 }
 
 // runReflect synthesizes an abstractive reflection over approved truth via the
-// sanctioned LLM synthesis service (irreversible-decisions §4.8). It is opt-in:
+// sanctioned LLM synthesis service (不可逆决策 §4.8). It is opt-in:
 // the model is built from SG_REFLECT_* env and the output is printed (it never
 // auto-becomes truth). With -seed it is submitted as a PENDING candidate that
 // still requires human disposition (M5 提交权).

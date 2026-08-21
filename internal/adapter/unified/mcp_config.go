@@ -10,10 +10,16 @@ type mcpConfigFile struct {
 	MCPServers map[string]mcpServerEntry `json:"mcpServers"`
 }
 
+// mcpServerEntry mirrors the CLI-native MCP server schema. Local servers use
+// command/args/env; remote servers use type="http"/"sse" with url + optional
+// headers. type is omitted for local servers (defaults to stdio).
 type mcpServerEntry struct {
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
+	Type    string            `json:"type,omitempty"`
+	Command string            `json:"command,omitempty"`
+	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
+	URL     string            `json:"url,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
 }
 
 // WriteMCPConfigFile writes the MCP server configuration to an ephemeral temp
@@ -31,9 +37,12 @@ func WriteMCPConfigFile(mcp *MCPConfig, _ string) (string, error) {
 	file := mcpConfigFile{MCPServers: make(map[string]mcpServerEntry)}
 	for _, s := range mcp.Servers {
 		file.MCPServers[s.Name] = mcpServerEntry{
+			Type:    s.Type,
 			Command: s.Command,
 			Args:    s.Args,
 			Env:     s.Env,
+			URL:     s.URL,
+			Headers: s.Headers,
 		}
 	}
 

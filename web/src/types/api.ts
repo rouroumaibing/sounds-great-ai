@@ -518,3 +518,22 @@ export interface SyncProgressApi {
   status: 'running' | 'completed' | 'error';
   error?: string;
 }
+
+// --- SOP workflow bulletin board (backend snake_case) ---
+export type WorkflowCheckStatus = 'attested' | 'verified' | 'unknown';
+
+export interface WorkflowCheck {
+  name: string;
+  status: WorkflowCheckStatus;
+  at: string;
+}
+
+export interface WorkflowSopState {
+  feature_id: string;
+  stage: string;
+  baton_holder: string;
+  next_skill: string;
+  resume_capsule: string;
+  checks: WorkflowCheck[];
+  updated_at: string;
+}

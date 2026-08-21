@@ -16,8 +16,7 @@ import (
 
 // MemoryReflect is the LLM abstractive-summary capability for the typed-lane
 // Shared Memory subsystem. It is a SANCTIONED platform synthesis service under
-// irreversible-decisions §4.8 (and §4.4 "平台合成走 Eino"), homologous to
-// clowder's ReflectionService / AbstractiveSummaryClient.
+// 不可逆决策 §4.8 (and §4.4 "平台合成走 Eino").
 //
 // It does NOT perform agent reasoning (VISION §3): it only synthesizes an
 // abstractive reflection over already-approved truth. The output never

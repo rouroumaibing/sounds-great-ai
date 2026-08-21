@@ -13,12 +13,12 @@
 - **复杂度**: L（跨 CLI adapter + 状态机 + server 后台 + 脚本护栏 + 遥测聚合）
 - **目标**:
   - As a **平台运行时（The Pack）与开发者**,
-  - I want to **让「一只狗的产出由另一只狗（不同 breed / CLI 身份）独立评审」成为可执行、可度量、可自动巡检的流水线**,
+  - I want to **让「一只狗狗的产出由另一只狗狗（不同 breed / CLI 身份）独立评审」成为可执行、可度量、可自动巡检的流水线**,
   - So that **任何提交进入合并前都经过 hygiene → 跨犬评审 → 证据 → CI → 裁决 → 签核 的闭环，且评审价值（Reviewer Delta）被结构化记录，而不是黑盒或纯人工 trust-me**。
 
 ### 1.1 Cross-Model Review 的定义
 
-「Cross-Model Review」= 一个模型/犬的产出，由**身份不同**的另一个模型/犬评审。SG 的身份粒度是 **`dog_id`**（variant 级，狗 + 绑定的 CLI adapter），而非 breed 标签（`review.go:158-173` 的 `ReviewCycle` 以 `AuthorDogID` / `AssignedReviewerDogID` 校验，因此跨 breed 但不是同一只真实狗也成立）。这与 clowder 的 `catId`（个体级猫）对齐。
+「Cross-Model Review」= 一个模型/犬的产出，由**身份不同**的另一个模型/犬评审。SG 的身份粒度是 **`dog_id`**（variant 级，狗狗 + 绑定的 CLI adapter），而非 breed 标签（`review.go:158-173` 的 `ReviewCycle` 以 `AuthorDogID` / `AssignedReviewerDogID` 校验，因此跨 breed 但不是同一只真实狗狗也成立）。这与 clowder 的 `catId`（个体级猫）对齐。
 
 ### 1.2 特性拼图（子系统 → 代码落点）
 
@@ -85,14 +85,14 @@ SG 的三层设计对应 clowder F253 的 Maine Coon 三层（具名猫）模型
 | 层 | 角色 | 身份要求 | SG 代码 |
 |----|------|----------|---------|
 | **L1 · Hygiene** | 自动化格式/lint 修复 | 无需具名身份 | `qc_loop.go:step1Hygiene`（gofmt） |
-| **L2 · Reviewer** | 具名狗，审逻辑/架构/安全/风格 | **必须 ≠ author** | `SelectReviewPanel` 选出的 `Reviewer`（`review.go:135-156`） |
-| **L3 · Final Approver** | 具名狗，确认 final HEAD 覆盖全部 findings | **必须 ≠ author 且 ≠ reviewer** | `ReviewPanel.FinalApprover`（`review.go:135-156`） |
+| **L2 · Reviewer** | 具名狗狗，审逻辑/架构/安全/风格 | **必须 ≠ author** | `SelectReviewPanel` 选出的 `Reviewer`（`review.go:135-156`） |
+| **L3 · Final Approver** | 具名狗狗，确认 final HEAD 覆盖全部 findings | **必须 ≠ author 且 ≠ reviewer** | `ReviewPanel.FinalApprover`（`review.go:135-156`） |
 
 **为什么 SG 比 clowder 更严**：clowder F253 明文「L3 可 = L2 reviewer」（`readonly-docs/clowder-ai/docs/features/F253-qc-loop.md:139`）；SG 在 `SelectReviewPanel`（`review.go:140-154`）里**先把选中的 reviewer 从候选中剔除，再选 approver**，因此 `FinalApprover` 物理上不能等于 `Reviewer`。
 
 **写回失败闭合（fail-closed）**：`ReviewCycle.RecordReview`（`review.go:214-232`）按 `dog_id` 校验三种拒绝：
 - `ErrSelfReview`（`review.go:218-220`）：reviewer == author；
-- `ErrWrongPrincipal`（`review.go:221-223`）：非指派的狗写 verdict；
+- `ErrWrongPrincipal`（`review.go:221-223`）：非指派的狗狗写 verdict；
 - `ErrWrongCarrier`（`review.go:224-226`）：verdict 回写到了非指派线程。
 比 clowder 的代码层更显式——clowder 在文档层声明，SG 在类型层强制。
 

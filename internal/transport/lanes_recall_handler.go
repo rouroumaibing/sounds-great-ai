@@ -11,7 +11,7 @@ import (
 )
 
 // matchesSensitivity reports whether an entry passes an optional sensitivity
-// filter ("" = any). Homologous clowder F186 collection sensitivity.
+// filter ("" = any).
 func matchesSensitivity(e *memory.LaneEntry, sensitivity string) bool {
 	if sensitivity == "" {
 		return true
@@ -20,7 +20,7 @@ func matchesSensitivity(e *memory.LaneEntry, sensitivity string) bool {
 }
 
 // RecallEvents returns recent memory-recall observations (injection
-// observability, homologous clowder RecallFeed). ?limit= caps the count.
+// observability). ?limit= caps the count.
 func (h *LanesHandler) RecallEvents(w http.ResponseWriter, r *http.Request) {
 	limit := 20
 	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
@@ -35,8 +35,8 @@ func (h *LanesHandler) RecallEvents(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, h.recall.Recent(limit))
 }
 
-// RecallLedger returns recall counts within 7/14/30-day windows (homologous
-// clowder RecallLedger funnel). ?windows=7,14,30 overrides the defaults.
+// RecallLedger returns recall counts within 7/14/30-day windows.
+// ?windows=7,14,30 overrides the defaults.
 func (h *LanesHandler) RecallLedger(w http.ResponseWriter, r *http.Request) {
 	windows := []int{7, 14, 30}
 	if v := strings.TrimSpace(r.URL.Query().Get("windows")); v != "" {
@@ -62,8 +62,7 @@ func (h *LanesHandler) RecallLedger(w http.ResponseWriter, r *http.Request) {
 }
 
 // MarkOutcome records the consumption outcome (used/ignored) of a recall event,
-// completing the consumption-verification loop (P0-1, homologous clowder
-// RecallFeed used/ignored marking).
+// completing the consumption-verification loop (P0-1).
 func (h *LanesHandler) MarkOutcome(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var body struct {
@@ -87,8 +86,8 @@ func (h *LanesHandler) MarkOutcome(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// PullRecall surfaces approved truth on demand (the "pull" half of clowder's
-// RecallFeed push/pull duality, P2-7). With ?query= it returns approved entries
+// PullRecall surfaces approved truth on demand (the "pull" half of the
+// push/pull duality, P2-7). With ?query= it returns approved entries
 // matching the query (FTS5); without it returns all approved truth visible to
 // the operator. Records a pull recall event for observability.
 func (h *LanesHandler) PullRecall(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +132,7 @@ func (h *LanesHandler) PullRecall(w http.ResponseWriter, r *http.Request) {
 }
 
 // Lifecycle returns the append-only lifecycle-trace records (P1 three-axis /
-// Task #39, homologous clowder lifecycle_traces). ?limit= caps the count.
+// Task #39). ?limit= caps the count.
 func (h *LanesHandler) Lifecycle(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
@@ -148,8 +147,7 @@ func (h *LanesHandler) Lifecycle(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, h.recall.RecentLifecycle(limit))
 }
 
-// Search returns lane entries whose content matches the query (FTS5, P1-5),
-// homologous clowder full-text memory search.
+// Search returns lane entries whose content matches the query (FTS5, P1-5).
 func (h *LanesHandler) Search(w http.ResponseWriter, r *http.Request) {
 	op := h.operatorFilter(r)
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -160,9 +158,9 @@ func (h *LanesHandler) Search(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, h.registry.Search(query, op))
 }
 
-// Reflect synthesizes an abstractive reflection over approved truth (P2-6),
-// homologous clowder ReflectionService. It is a SANCTIONED platform synthesis
-// service (irreversible-decisions §4.8), never agent reasoning. The output is
+// Reflect synthesizes an abstractive reflection over approved truth (P2-6). It
+// is a SANCTIONED platform synthesis
+// service (不可逆决策 §4.8), never agent reasoning. The output is
 // returned to the caller and does NOT auto-become truth; with ?seed=true it is
 // submitted as a PENDING candidate that still requires human disposition (M5).
 // When the reflector is unconfigured (SG_REFLECT_* env unset) it returns a

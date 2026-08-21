@@ -1,7 +1,7 @@
 package unified
 
 // pty_tmux.go implements the "tmux-transcript + Hook side-channel"
-// architecture (F230 PtyDriver, faithful to the actual code rather than
+// architecture (PtyDriver, faithful to the actual code rather than
 // guessed). Per the verified upstream design:
 //
 //   - claude is launched inside a DETACHED tmux session (a real TTY), not a

@@ -12,7 +12,7 @@
 - **责任人**: PO: @operator | Dev: @bianmu | QA: @demu
 - **故事点/复杂度**: [ L (8分) ] —— 核心治理子系统，跨前后端 + 多包（skills / prompt / hooks / transport / platform）
 - **业务/技术目标**:
-  - As a **用户(Operator)/犬队成员**,
+  - As a **用户(Operator)/狗狗队伍成员**,
   - I want to **在一个面板里启用/禁用技能、按 carrier 挂载、检查并解决挂载漂移、查看并管理技能的安全/权限状态，且这些技能能在对话中按触发词或显式 `skill:` 指令被自动注入到对应 carrier 的 system prompt**,
   - So that **技能成为"文件即配置 + 持久化意图 + 漂移自愈 + 安全隔离"的可治理资产，而非散落在各 CLI 配置目录的手工符号链接**.
 - **关键指标/埋点**: 无前端埋点；可观测性来自 `GET /api/skills`（含 `mountHealth`/`security`）、`GET /api/skills/security` 与 Ops 面板。

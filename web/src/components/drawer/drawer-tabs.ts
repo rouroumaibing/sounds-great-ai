@@ -6,4 +6,5 @@ export const DRAWER_TABS: DrawerTabItem[] = [
   { id: 'memory', label: 'Memory', icon: 'fa-solid fa-database' },
   { id: 'files', label: 'Files', icon: 'fa-solid fa-folder-tree' },
   { id: 'session-chain', label: 'Chain', icon: 'fa-solid fa-link' },
+  { id: 'sop', label: 'SOP', icon: 'fa-solid fa-clipboard-list' },
 ];

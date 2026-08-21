@@ -6,6 +6,7 @@ import { McpTab } from './tabs/McpTab';
 import { MemoryTab } from './tabs/MemoryTab';
 import { FilesTab } from './tabs/FilesTab';
 import { SessionChainTab } from './tabs/SessionChainTab';
+import { SopTab } from './tabs/SopTab';
 
 export function ToolPanel() {
   const activeDrawerTab = useAppStore((s) => s.activeDrawerTab);
@@ -27,6 +28,7 @@ export function ToolPanel() {
         <div className={activeDrawerTab === 'memory' ? 'block' : 'hidden'}><MemoryTab /></div>
         <div className={activeDrawerTab === 'files' ? 'block' : 'hidden'}><FilesTab /></div>
         <div className={activeDrawerTab === 'session-chain' ? 'block' : 'hidden'}><SessionChainTab /></div>
+        <div className={activeDrawerTab === 'sop' ? 'block' : 'hidden'}><SopTab /></div>
       </div>
     </aside>
   );

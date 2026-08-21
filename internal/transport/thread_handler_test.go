@@ -307,3 +307,88 @@ func TestAddThreadEvent_Validation(t *testing.T) {
 		t.Fatalf("invalid JSON: status = %d, want 400", rec.Code)
 	}
 }
+
+func TestPostMessage(t *testing.T) {
+	h, threadID := setupTestHandler(t)
+	mux := h.Routes()
+
+	body, _ := json.Marshal(map[string]string{"content": "hello from mcp", "role": "user", "sender": "mcp"})
+	req := httptest.NewRequest("POST", "/api/threads/"+threadID+"/messages", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201", rec.Code)
+	}
+	var resp threadstore.Message
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.Content != "hello from mcp" {
+		t.Fatalf("content = %q, want %q", resp.Content, "hello from mcp")
+	}
+	if resp.Role != "user" || resp.Sender != "mcp" {
+		t.Fatalf("role/sender = %q/%q", resp.Role, resp.Sender)
+	}
+	if resp.ID == "" {
+		t.Fatal("expected generated message id")
+	}
+
+	// The posted message must appear in the thread's message history.
+	listReq := httptest.NewRequest("GET", "/api/threads/"+threadID+"/messages", nil)
+	listRec := httptest.NewRecorder()
+	mux.ServeHTTP(listRec, listReq)
+	var listResp struct {
+		Messages []*threadstore.Message `json:"messages"`
+	}
+	json.NewDecoder(listRec.Body).Decode(&listResp)
+	found := false
+	for _, m := range listResp.Messages {
+		if m.ID == resp.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("posted message not found in thread list")
+	}
+}
+
+func TestPostMessage_DefaultsAndMissingContent(t *testing.T) {
+	h, threadID := setupTestHandler(t)
+	mux := h.Routes()
+
+	// Defaults: role=user, sender=mcp when omitted, content required.
+	body, _ := json.Marshal(map[string]string{"content": "plain"})
+	req := httptest.NewRequest("POST", "/api/threads/"+threadID+"/messages", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201", rec.Code)
+	}
+	var resp threadstore.Message
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.Role != "user" || resp.Sender != "mcp" {
+		t.Fatalf("defaults: role/sender = %q/%q, want user/mcp", resp.Role, resp.Sender)
+	}
+
+	// Missing content → 400.
+	bad, _ := json.Marshal(map[string]string{"role": "user"})
+	req2 := httptest.NewRequest("POST", "/api/threads/"+threadID+"/messages", bytes.NewReader(bad))
+	rec2 := httptest.NewRecorder()
+	mux.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusBadRequest {
+		t.Fatalf("missing content status = %d, want 400", rec2.Code)
+	}
+}
+
+func TestPostMessage_NoMessageStore(t *testing.T) {
+	ts := threadstore.NewInMemoryThreadStore()
+	h := NewThreadHandler(threadStores.NewThreadStoreAdapter(ts)) // no message store
+	mux := h.Routes()
+	thread, _ := ts.CreateThread("Test")
+	body, _ := json.Marshal(map[string]string{"content": "x"})
+	req := httptest.NewRequest("POST", "/api/threads/"+thread.ID+"/messages", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotImplemented {
+		t.Fatalf("status = %d, want 501", rec.Code)
+	}
+}

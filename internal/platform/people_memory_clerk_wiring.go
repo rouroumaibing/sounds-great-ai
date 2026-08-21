@@ -13,7 +13,7 @@ import (
 )
 
 // peopleMemoryClerkDeps wires the daily people-memory clerk to the platform's
-// dog-invocation path so the clerk can re-invoke the ORIGINAL dog (F276
+// dog-invocation path so the clerk can re-invoke the ORIGINAL dog (dual-path
 // parity): the dog re-derives the proposal from the exact sources; the
 // platform only persists the returned, rejectable candidate. Reasoning stays
 // in the CLI adapter (AGENTS.md §3 three-layer discipline) — the platform never

@@ -11,7 +11,7 @@ import (
 )
 
 // LaneEmbedder produces a dense vector for a single text (Gap3 semantic
-// recall, homologous clowder vec0 / sqlite-vec). It is an interface so the
+// recall). It is an interface so the
 // transport handler stays decoupled and is trivially testable with a stub.
 type LaneEmbedder interface {
 	Embed(ctx context.Context, text string) ([]float32, error)
@@ -47,8 +47,8 @@ func (m *memoryEmbed) Embed(ctx context.Context, text string) ([]float32, error)
 	return out, nil
 }
 
-// NewEmbedModelFromEnv builds an embedding model from env (opt-in, homologous
-// to NewReflectModelFromEnv). SG_EMBED_API_KEY (+ optional SG_EMBED_MODEL,
+// NewEmbedModelFromEnv builds an embedding model from env (opt-in, like
+// NewReflectModelFromEnv). SG_EMBED_API_KEY (+ optional SG_EMBED_MODEL,
 // SG_EMBED_BASE_URL) must be set; otherwise returns an error and the platform
 // stays deterministic (semantic search degrades to a clear 501).
 func NewEmbedModelFromEnv(ctx context.Context) (embedding.Embedder, error) {

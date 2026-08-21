@@ -20,7 +20,7 @@ var errNoSpawnFunc = errors.New("warm pool: no spawn func configured")
 //
 // A WarmProcess is "warm" when Alive() && leaseCount==0 (no active lease). A
 // bg_daemon transport acquires one or more leases against it; with
-// SupportsMultiplexing (F149 Phase C) a single OS process serves many
+// SupportsMultiplexing a single OS process serves many
 // concurrent leases — the prerequisite for multiple agents conversing in the
 // same warm session. BgDaemonTransport acquires one, marks it leased, runs a
 // turn, then releases the lease so the process can be reused, skipping the
@@ -209,7 +209,7 @@ type WarmPoolConfig struct {
 	// Ignored when SupportsMultiplexing is true (multiple concurrent leases are
 	// legitimate, never force-released).
 	MaxLeaseMs int64
-	// SupportsMultiplexing mirrors F149 Phase C: a single OS process may
+	// SupportsMultiplexing mirrors Phase C: a single OS process may
 	// serve many concurrent leases (multiple agents in one warm session). When
 	// false (default, single-flight), a process is reused only when fully idle
 	// (leaseCount==0). Opt-in because it requires the carrier/framing layer to
@@ -235,7 +235,7 @@ func DefaultWarmPoolConfig() WarmPoolConfig {
 // and recycles live processes, with LRU/TTL eviction, a background zombie
 // reaper, cwd-integrity guarding (#1203), session affinity + sealing, and
 // stale-lease recovery (#992). When SupportsMultiplexing is set it permits
-// multiple concurrent leases against one process (F149 Phase C).
+// multiple concurrent leases against one process.
 // When nil/unused, callers fall back to one-shot Spawn — behavior is
 // identical to the pre-R2 path.
 type WarmPool struct {

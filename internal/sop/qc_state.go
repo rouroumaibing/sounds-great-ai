@@ -9,14 +9,14 @@ import (
 	"time"
 )
 
-// QCState is the persisted state machine for the QC loop (clowder F253:
-// qc.idle → … → qc.archived). SG's QCLoop is otherwise a stateless one-shot;
+// QCState is the persisted state machine for the QC loop (qc.idle → … →
+// qc.archived). SG's QCLoop is otherwise a stateless one-shot;
 // this record adds stale-detection and idempotency so a re-run on a moved HEAD
 // is recognised and the prior verdict is invalidated rather than reused.
 //
-// This closes the "stateless QC" gap identified in the SG↔clowder comparison:
-// clowder tracks reviewedSha / idempotencyKey / staleFlag per change; SG now
-// tracks the same three signals against a persisted file.
+// This closes the "stateless QC" gap: SG now persists reviewedSha /
+// idempotencyKey / staleFlag per change (stateful QC) against a persisted
+// file.
 type QCState struct {
 	Phase          string    `json:"phase"`
 	ReviewedSha    string    `json:"reviewed_sha"`
@@ -80,7 +80,7 @@ func headSHA(workDir string) string {
 }
 
 // ComputeStale reports whether a prior QC state is invalidated by a moved HEAD.
-// It mirrors clowder's staleFlag: when the reviewed SHA no longer matches the
+// When the reviewed SHA no longer matches the
 // current HEAD, the prior verdict must be re-derived rather than reused.
 func ComputeStale(state QCState, sha string) bool {
 	return sha != "" && state.ReviewedSha != "" && state.ReviewedSha != sha

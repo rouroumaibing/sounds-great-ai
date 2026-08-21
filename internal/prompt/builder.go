@@ -24,7 +24,7 @@ type ProfileReader interface {
 }
 
 // ContinuityReader resolves the last-session digest for a breed (Persistent
-// Identity P3, homologous F211 continuity bootstrap). Implemented by
+// Identity P3, continuity bootstrap). Implemented by
 // *settings.ContinuityStore; declared as an interface to avoid an import cycle.
 type ContinuityReader interface {
 	// LastDigest returns the persisted "what this breed was last doing" summary
@@ -38,7 +38,7 @@ type ContinuityReader interface {
 }
 
 // LaneTruthReader resolves approved (canonical) shared-memory entries to inject
-// into a breed's system prompt (Persistent Identity, homologous clowder F296
+// into a breed's system prompt (Persistent Identity,
 // context presentation). Implemented by *memory.LaneRegistry; declared as an
 // interface to keep prompt decoupled from the memory package internals.
 type LaneTruthReader interface {
@@ -51,7 +51,7 @@ type LaneTruthReader interface {
 }
 
 // LaneCueReader resolves approved truth selected by an "opportunity" score for
-// the current context (Gap4, homologous clowder MemoryCueInvocationPromptService
+// the current context (Gap4,
 // cue-plane). Implemented by *memory.LaneRegistry. When set on the builder, it
 // replaces the flat SharedMemoryTruth dump with a relevance-ranked block.
 type LaneCueReader interface {
@@ -59,8 +59,8 @@ type LaneCueReader interface {
 	// score (recency + leverage + relevance to hint), deterministic (no LLM),
 	// or (nil, false, nil) when there is none.
 	CueMemoryRanked(maxLines int, operator, hint string) ([]memory.CueHit, bool, error)
-	// RecordCueEvents appends the cue-consumption ledger for injected hits
-	// (homologous clowder memCueEvents). Fail-open.
+	// RecordCueEvents appends the cue-consumption ledger for injected hits.
+	// Fail-open.
 	RecordCueEvents(hits []memory.CueHit, operator string)
 }
 
@@ -85,8 +85,8 @@ func NewBuilder(breeds map[string]*pack.BreedConfig, skillMgr *skills.SkillManag
 	}
 }
 
-// SetProfiles attaches a relationship-capsule reader (Persistent Identity P1,
-// homologous F231). When set, breeds that declare a relationship_key
+// SetProfiles attaches a relationship-capsule reader (Persistent Identity P1).
+// When set, breeds that declare a relationship_key
 // and have a persisted capsule get a "关系胶囊" section injected into their
 // identity block, so the dog remembers its long-term relationship with the
 // operator even after a fresh spawn or an auto-compact wiped history.
@@ -94,16 +94,16 @@ func (b *Builder) SetProfiles(p ProfileReader) {
 	b.profiles = p
 }
 
-// SetContinuity attaches a continuity-digest reader (Persistent Identity P3,
-// homologous F211). When set, a breed with a persisted last-session
+// SetContinuity attaches a continuity-digest reader (Persistent Identity P3).
+// When set, a breed with a persisted last-session
 // digest gets a "续接上下文" section injected, so the dog resumes awareness of
 // what it was last working on across restarts and separate one-shot spawns.
 func (b *Builder) SetContinuity(c ContinuityReader) {
 	b.continuity = c
 }
 
-// SetLaneTruth attaches the approved shared-memory reader (Persistent Identity,
-// homologous clowder F296) and the operator scope whose truth is recalled.
+// SetLaneTruth attaches the approved shared-memory reader (Persistent Identity)
+// and the operator scope whose truth is recalled.
 // When set, approved lane truth is injected into the identity block as a bounded
 // "团队共享记忆" section, so the dog recalls human-approved team memory across
 // restarts and one-shot spawns. Only approved truth is recalled; pending
@@ -114,8 +114,8 @@ func (b *Builder) SetLaneTruth(l LaneTruthReader, operator string) {
 	b.laneOperator = operator
 }
 
-// SetLaneCue attaches the opportunity-ranked truth reader (Gap4, homologous
-// clowder MemoryCueInvocationPromptService). When set, the builder injects a
+// SetLaneCue attaches the opportunity-ranked truth reader (Gap4).
+// When set, the builder injects a
 // relevance-ranked block instead of the flat SharedMemoryTruth dump. Optional:
 // leaving it nil keeps the original flat injection.
 func (b *Builder) SetLaneCue(c LaneCueReader) {
@@ -241,7 +241,7 @@ func (b *Builder) buildIdentity(breed *pack.BreedConfig, hint string) string {
 	sb.WriteString("- 不推理他人的领域：需要跨领域协作时，@mention 对应的队友\n")
 	sb.WriteString("- 遵守铁律：不删除数据存储、不杀进程、不改运行时配置\n\n")
 
-	// Relationship capsule (Persistent Identity P1, homologous F231).
+	// Relationship capsule (Persistent Identity P1).
 	// Injected as part of the static identity block: it is rebuilt on every
 	// spawn, so the dog retains its relationship with the operator across
 	// restarts and context compression (which only drops conversation history,
@@ -265,7 +265,7 @@ func (b *Builder) buildIdentity(breed *pack.BreedConfig, hint string) string {
 	}
 skipCapsule:
 
-	// Continuity digest (Persistent Identity P3, homologous F211).
+	// Continuity digest (Persistent Identity P3).
 	// Injected as part of the static identity block so the dog resumes awareness
 	// of what it was last working on. In one-shot mode each spawn rebuilds this
 	// from the persisted digest, preventing a cold start across turns/restarts.
@@ -278,12 +278,12 @@ skipCapsule:
 		}
 	}
 
-	// Shared Memory truth (Persistent Identity, homologous clowder F296
+	// Shared Memory truth (Persistent Identity,
 	// context presentation). Only human-approved entries are recalled (M5
 	// submission boundary): pending candidates never enter the prompt. The
 	// block is explicitly labeled as data — not instructions — so it cannot
-	// override the dog's rules, permissions, or identity (M2 hard boundary,
-	// clowder KD-6). The dog retains retrieval sovereignty (M6): this is a
+	// override the dog's rules, permissions, or identity (M2 hard boundary).
+	// The dog retains retrieval sovereignty (M6): this is a
 	// hint, not a conclusion.
 	// Gap4 cue-plane: when a cue reader is wired, prefer relevance-ranked truth
 	// (recency + leverage + topical overlap with hint) over a flat dump.

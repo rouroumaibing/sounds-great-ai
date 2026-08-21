@@ -28,7 +28,7 @@ var (
 	A2AHandoffCount metric.Int64Counter
 
 	// ProfileUpdateProposed — relationship capsule proposal created
-	// (homologous "养熟" governance, KD-10 eval counter).
+	// ("养熟" governance, KD-10 eval counter).
 	ProfileUpdateProposed metric.Int64Counter
 
 	// ProfileUpdateApproved — proposal approved and written to the active capsule.
@@ -43,19 +43,19 @@ var (
 	ProfileDistillationTriggered metric.Int64Counter
 
 	// PeopleMemoryProposed / PeopleMemoryApproved / PeopleMemoryRejected are the
-	// F276 (People & Relationship Memory) eval counters, kept INDEPENDENT from
-	// the F231 relationship-capsule ProfileUpdate* counters so each feature's
+	// People & Relationship Memory eval counters, kept INDEPENDENT from
+	// the relationship-capsule ProfileUpdate* counters so each feature's
 	// governance eval is observable on its own (KD-10).
 	PeopleMemoryProposed metric.Int64Counter
 	PeopleMemoryApproved metric.Int64Counter
 	PeopleMemoryRejected metric.Int64Counter
 
 	// PeopleMemoryDrillInvoked — an on-demand recall drill was requested
-	// (F276 drill discipline; status label: ok | not_available | budget_exceeded).
+	// (drill discipline; status label: ok | not_available | budget_exceeded).
 	PeopleMemoryDrillInvoked metric.Int64Counter
 
 	// Lane* counters are the Shared Memory (typed-lane) governance eval
-	// counters (homologous clowder CrossCatMetricsComputer / F200 / F263). They
+	// counters. They
 	// observe the candidate→approved→recalled lifecycle per lane, and how
 	// often approved truth is injected into dog prompts (by breed).
 	LaneCandidateSubmitted metric.Int64Counter
@@ -85,7 +85,7 @@ func warmupCounters() {
 			attribute.String("from", "_warmup"),
 			attribute.String("to", "_warmup"),
 		))
-	// Profile-update governance eval counters (homologous KD-10):
+	// Profile-update governance eval counters (KD-10):
 	// pre-touch so they appear with value 0 in the first Prometheus scrape
 	// (eval can distinguish "fired N times, processed 0" from "never fired").
 	if ProfileUpdateProposed != nil {
@@ -104,7 +104,7 @@ func warmupCounters() {
 				attribute.String("seal.reason", "warmup"),
 			))
 	}
-	// F276 people-memory eval counters (KD-10): pre-touch so they appear with
+	// people-memory eval counters (KD-10): pre-touch so they appear with
 	// value 0 in the first Prometheus scrape (eval distinguishes "fired N times,
 	// processed 0" from "never fired").
 	if PeopleMemoryProposed != nil {
@@ -119,8 +119,8 @@ func warmupCounters() {
 	if PeopleMemoryDrillInvoked != nil {
 		PeopleMemoryDrillInvoked.Add(context.Background(), 0)
 	}
-	// Shared Memory (typed-lane) governance eval counters (homologous
-	// clowder CrossCatMetricsComputer): pre-touch so they appear with value 0
+	// Shared Memory (typed-lane) governance eval counters:
+	// pre-touch so they appear with value 0
 	// in the first Prometheus scrape (eval distinguishes "fired N times,
 	// processed 0" from "never fired").
 	if LaneCandidateSubmitted != nil {

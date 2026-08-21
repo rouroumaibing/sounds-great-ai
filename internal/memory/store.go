@@ -52,7 +52,7 @@ func NewMemoryStore() *MemoryStore {
 // NewMemoryStoreAt returns a store whose experience memory survives restarts.
 // Since 2026-08-17 it prefers a SQLite-backed persister (modernc.org/sqlite,
 // pure Go, no server) and falls back to the legacy JSON file if SQLite cannot
-// be initialized. This is the Persistent Identity layer (F231/F287): learned
+// be initialized. This is the Persistent Identity layer: learned
 // experience (evidence/lessons/decisions) survives restarts instead of being
 // lost with the process.
 func NewMemoryStoreAt(path string) *MemoryStore {

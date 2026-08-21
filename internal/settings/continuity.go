@@ -12,10 +12,10 @@ import (
 )
 
 // ContinuityDigest is a short, persistent note of what a breed was last doing
-// (Persistent Identity P3, homologous F211 continuity bootstrap). In
+// (Persistent Identity P3, continuity bootstrap). In
 // long cascade sessions the digest is re-injected when a cascade
-// rotates personas mid-flight (F211 AC-A13), so the next leg does not
-// cold-start. SG is one-shot (each task is a fresh process), so by default we
+	// rotates personas mid-flight, so the next leg does not
+	// cold-start. SG is one-shot (each task is a fresh process), so by default we
 // persist a per-breed, per-rotation "last session" note and inject it on the
 // next spawn. The store keeps a short ring of rotation checkpoints so that once
 // a long (warm) session exists, each rotation can re-bootstrap from its own
@@ -150,8 +150,8 @@ func (s *ContinuityStore) Record(breedID, summary, threadID string) error {
 // RecordNextRotation is the rotation-aware spawn entry point. It writes the
 // digest at (latest rotation index + 1), so each spawn becomes its own
 // rotation and the ring fills with the last maxCheckpoints spawns. This makes
-// continuity genuinely rotation-aware (F211 AC-A13: a continuity
-// bootstrap fires on every rotation, re-injecting the prior rotation's digest)
+	// continuity genuinely rotation-aware (a continuity
+	// bootstrap fires on every rotation, re-injecting the prior rotation's digest)
 // instead of the one-shot degenerate case where every spawn overwrites a
 // single index-0 slot. Because the prompt builder reads the digest BEFORE this
 // call (it runs at spawn start), the next spawn re-injects THIS spawn's summary

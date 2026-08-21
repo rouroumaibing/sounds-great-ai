@@ -28,7 +28,7 @@ type lanePersister interface {
 	save(doc *laneDocument) error
 	close()
 	// search returns lane entries whose content matches query (FTS5 on SQLite,
-	// substring on JSON), visible to operator. Homologous clowder FTS5.
+	// substring on JSON), visible to operator.
 	search(query, operator string) ([]*LaneEntry, error)
 }
 

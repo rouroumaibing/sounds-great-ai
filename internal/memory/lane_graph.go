@@ -11,9 +11,7 @@ import (
 	_ "modernc.org/sqlite" // pure-Go SQLite driver (shared with lane persister)
 )
 
-// LaneRelation is the typed relationship between two entries (homologous
-// clowder edges). clowder defines 10 relations; SG now matches the full set so
-// relationship semantics are as rich as clowder's knowledge graph.
+// LaneRelation is the typed relationship between two entries.
 type LaneRelation string
 
 const (
@@ -40,9 +38,9 @@ func ValidRelation(rel LaneRelation) bool {
 	return false
 }
 
-// LaneEdge is a directed typed link between two entries (clowder edge). It
-// carries edge-level sensitivity + provenance + traversal telemetry (clowder
-// V18 edge columns), so a private link can stay hidden even when both endpoints
+// LaneEdge is a directed typed link between two entries. It
+// carries edge-level sensitivity + provenance + traversal telemetry (V18
+// edge columns), so a private link can stay hidden even when both endpoints
 // are visible, and traversal frequency surfaces the most-traveled paths.
 type LaneEdge struct {
 	ID             string      `json:"id"`
@@ -57,8 +55,8 @@ type LaneEdge struct {
 	Timestamp      int64       `json:"timestamp"`
 }
 
-// LaneMarker is a normalized signal attached to an entry (homologous clowder
-// marker: captured/normalized/approved/rejected). It records *why* an entry
+// LaneMarker is a normalized signal attached to an entry
+// (captured/normalized/approved/rejected). It records *why* an entry
 // matters (a decision signal, a lesson signal, a correction) without promoting
 // the marker to a full lane entry.
 type LaneMarker struct {
@@ -172,7 +170,7 @@ func (g *graphStore) edges(fromID string) []*LaneEdge {
 	return out
 }
 
-// touchEdge bumps traversal telemetry (homologous clowder last_traversed_at).
+// touchEdge bumps traversal telemetry (last_traversed_at).
 func (g *graphStore) touchEdge(id string) {
 	now := time.Now().UnixMilli()
 	_, _ = g.db.Exec(`UPDATE lane_edge SET traversal_count = traversal_count + 1, last_traversed_at = ? WHERE id = ?`, now, id)
@@ -215,7 +213,7 @@ func (r *LaneRegistry) AddEdge(from, to string, rel LaneRelation, operator strin
 }
 
 // AddEdgeFull links from→to with a typed relation plus edge-level sensitivity
-// and provenance (homologous clowder V18 edge columns). Both IDs must be known
+// and provenance (V18 edge columns). Both IDs must be known
 // entries; the relation must be one of the 10 LaneRelation constants.
 func (r *LaneRegistry) AddEdgeFull(from, to string, rel LaneRelation, edgeSensitivity, provenance, operator string) (*LaneEdge, error) {
 	if r.graph == nil {
@@ -260,7 +258,7 @@ func (r *LaneRegistry) Edges(from string) []*LaneEdge {
 }
 
 // TouchEdge records that an edge was traversed (recall/inspection), updating
-// traversal telemetry (homologous clowder last_traversed_at).
+// traversal telemetry (last_traversed_at).
 func (r *LaneRegistry) TouchEdge(id string) {
 	if r.graph == nil {
 		return
@@ -299,8 +297,7 @@ func (r *LaneRegistry) Markers(entryID string) []*LaneMarker {
 	return r.graph.markers(entryID)
 }
 
-// Graph returns the outgoing edges and markers for an entry (homologous
-// clowder edge/marker inspection). Used by the frontend to render the
+// Graph returns the outgoing edges and markers for an entry. Used by the frontend to render the
 // relationship graph around a memory entry.
 func (r *LaneRegistry) Graph(id string) (edges []*LaneEdge, markers []*LaneMarker) {
 	return r.Edges(id), r.Markers(id)

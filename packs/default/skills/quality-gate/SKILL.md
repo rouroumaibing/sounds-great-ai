@@ -21,7 +21,7 @@ triggers:
 ### 1. 愿景对照
 
 - 这个交付物服务了 VISION.md §0 的哪个目标？
-- 与 `docs/governance/decisions/irreversible-decisions.md` 的不可逆决策兼容？（不重新引入 DAG / 内置 reasoning / 非 CLI 架构）
+- 与不可逆决策兼容？（不重新引入 DAG / 内置 reasoning / 非 CLI 架构）
 - 与 §3 三层原则兼容？（不把推理放进平台层）
 
 ### 2. Spec 合规
@@ -49,7 +49,7 @@ triggers:
 ### 5. 红旗自检
 
 - 是否引入了红旗模式表中的任何模式？
-- 是否新增 `internal/` 顶层目录而未更新 `docs/architecture/platform-capabilities.md` §6？
+- 是否新增 `internal/` 顶层目录而未更新 `平台能力清单` §6？
 - 是否跨了 Phase 边界？
 
 **任何一项 ❌ → 不交付，先修。**

@@ -1,50 +1,19 @@
-# Roadmap
+# Sounds Great AI Feature Roadmap
 
-> 本文件承接原 `docs/VISION.md` §7（2026-08-17 拆出）。VISION 现只保留方向与理念（§0–§3）。
+> 维护者：狗狗队伍
+>
+> 本 roadmap 反映 SG 实际梳理的代码级设计故事（Tech Story）。每条对应 `docs/features/FT-XXX-*.md`，
+> 均基于 `internal/` + `web/src/` + `cmd/` 真实代码实读，锚点可回源。
 
-## Phase 进度总表
-
-| Phase | 目标 | 状态 |
-|-------|------|------|
-| **1. Platform Infra** | CLI adapter + config + router + SOP + skills + memory + MCP + hooks | **完成** |
-| **2. RAG Integration** | 向量存储接入平台、context_assemble、FTS5 混合检索 | **完成** |
-| **3. A2A Coordination** | 多 agent 动态协作、@mention 路由 | **完成** |
-| **4. Skills System** | skill 加载、注入、外部 skill 吸收 | **完成** |
-| **5. SOP Gates** | 质量门禁、review 流程、安全策略 | **完成** |
-| **6. Transport** | WebSocket + HTTP API + 前端 | **完成** |
-| **7. Polish** | 文档、示例、性能优化、hook 模板、Memory System + Cue Plane + ACP Pool + PWA | **主体完成，剩余子项** |
-| **8. Skills Framework 治理化** | 持久化意图 + carrier 挂载 + sync 调谐 + drift 治理 + HTTP API + 前端面板（扩展 Phase 4） | **Planned** |
-
-## Phase 7: Polish (In Progress)
-
-| Item | Status |
-|------|--------|
-| 45 hook templates | Completed |
-| Memory System (Lanes + Cue Plane) | Completed |
-| ACP Process Pool | Completed |
-| PWA | Completed |
-| 文档治理 (AGENTS.md governance) | Completed |
-| Skills (5→42) | Completed |
-| RAG on-demand retrieval | Planned |
-| SOP basic gates | Planned |
-
-## Future
-
-- Eval framework
-- Telemetry dashboard
-- Multi-project support
-
-## Phase 8: Skills Framework 治理化 (Planned)
-
-> 设计 Spec：`docs/plans/skills-framework-governance-spec.md`。扩展 Phase 4（Skills System 已完成），前置 Phase 1–7 已满足。
-> 关键架构分歧（D1–D5）：clowder 靠 CLI 原生 symlink 读 skill 正文；SG 经 Prompt Builder 注入为主、claude 可选 symlink 为辅。不引入新不可逆决策。
-
-| Item | Status |
-|------|--------|
-| 8.1 数据模型 + 持久化（skills-config.json + SkillManager 重写 + 废弃 agent.SkillManager） | **Done (2026-08-18)** |
-| 8.2 HTTP API 扩展（GET 全量/:id / PATCH / sync / drift） | **Done (2026-08-18)** |
-| 8.3 Build 集成（SkillIDs 注入生产流 + 删死路由 helper） | **Done (2026-08-18)** |
-| 8.4 d11 resolver 真实匹配（填 template 占位） | **Done (2026-08-18)** |
-| 8.5 可选物理挂载（claude `.claude/skills` symlink reconciler + drift 治理） | **Done (2026-08-18)** |
-| 8.6 前端 SkillsPanel + Drift UI | **Done (2026-08-18)** |
-| 8.7 Cross-model review + CI gate | Done (2026-08-18) |
+| ID | 主题 | 说明 |
+|----|------|------|
+| [FT-ORC-001](features/FT-ORC-001-multi-agent-orchestration.md) | Multi-Agent Orchestration | 多智能体编排总览：任务路由、球权、狗狗队伍协作的前后端逻辑 |
+| [FT-A2A-001](features/FT-A2A-001-a2a-communication.md) | A2A Communication | A2A 通信（FT-ORC-001 的 A2A 子集细化）：@mention 路由、线程隔离、结构化交接 |
+| [FT-CLI-001](features/FT-CLI-001-cli-adapter.md) | CLI Adapter | 6 个 CLI adapter（claude/codex/gemini/opencode/kimi/a2a）的 spawn contract 与 carrier 链 |
+| [FT-CMR-001](features/FT-CMR-001-cross-model-review.md) | Cross-Model Review | 跨模型评审 / QC 7 步循环（`internal/sop/qc_loop.go`）的代码级逻辑 |
+| [FT-PI-001](features/FT-PI-001-persistent-identity.md) | Persistent Identity | 持久身份：F231 关系胶囊 + F276 人物关系记忆 + Continuity |
+| [FT-SM-001](features/FT-SM-001-shared-memory.md) | Shared Memory | 共享记忆：`internal/memory/lane_*.go` 的候选生产→审批→召回注入链路 |
+| [FT-SKILL-001](features/FT-SKILL-001-skills-framework.md) | Skills Framework | Skills 框架：按需加载 prompt 系统的前后端逻辑 |
+| [FT-ACC-001](features/FT-ACC-001-accounts-keys-auth.md) | 账户与密钥 | 设置页「账户与密钥」与「客户配置安全」设计 |
+| [FT-MEM-001](features/FT-MEM-001-member-management.md) | 成员管理 | 设置页「成员管理」设计 |
+| [FT-DEV-001](features/FT-DEV-001-makefile-daemon-reclaim.md) | 构建/开发环境 | Makefile 守护生命周期设计（dev/prod/daemon 等 target） |

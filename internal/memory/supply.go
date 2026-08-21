@@ -29,7 +29,7 @@ type DeltaCandidate struct {
 	Lane         LaneType
 	Content      string
 	Source       string
-	Sensitivity  string // optional data-sensitivity tag (F186); "" = none
+	Sensitivity  string // optional data-sensitivity tag; "" = none
 	CollectionID string // optional collection/namespace; "" = default
 }
 
@@ -100,8 +100,7 @@ func (dp *DeltaProducer) Produce(delta *SessionDelta) []DeltaCandidate {
 // Returns the IDs of submitted entries. Duplicate candidates (same content+source
 // already present in the lane) are skipped so a session re-sealed after a
 // held→resume cycle does not produce redundant pending entries. operator scopes
-// the submitted entries for multi-operator partitioning (homologous clowder
-// ownerUserId); "" means shared across operators.
+// the submitted entries for multi-operator partitioning (// ownerUserId); "" means shared across operators.
 func (dp *DeltaProducer) SubmitCandidates(reg *LaneRegistry, candidates []DeltaCandidate, operator string) []string {
 	var ids []string
 	for _, c := range candidates {

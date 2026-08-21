@@ -19,11 +19,11 @@
 
 | 子系统 | 代号 | 关注对象 | 后端入口 | 前端入口 | 存储 |
 |--------|------|----------|----------|----------|------|
-| 关系胶囊（养熟） | **F231** | 狗**自己**与 operator 的长期关系画像 | `ProfilesHandler`（`/api/profiles`） | `web/src/components/profiles/*` | `ProfileRepository` |
+| 关系胶囊（养熟） | **F231** | 狗狗**自己**与 operator 的长期关系画像 | `ProfilesHandler`（`/api/profiles`） | `web/src/components/profiles/*` | `ProfileRepository` |
 | 人物与关系记忆 | **F276** | **第三方人物**的事实/判断/关系/事件 | `PeopleMemoryHandler`（`/api/people-memory`） | `web/src/components/people-memory/PeopleMemoryContent.tsx` | `PeopleMemoryStore`（file/redis） |
 | 连续性摘要 | **P3** | 每犬按 rotation 的 continuity digest | `ContinuityHandler`（`/api/continuity`，**仅 inspection，无前端**） | 无 | `ContinuityStore` |
 
-> **铁律边界（贯穿全文）**：平台层（`internal/`）**不做推理**——任何「蒸馏 / 派生提案」都由 CLI 狗执行，平台只聚合证据、解析回复、截断预算、写 *pending proposal*，必须由 operator 显式批准才生效（`docs/governance/decisions/irreversible-decisions.md` §4.1）。多 operator 通过 `operatorID` / `X-Operator-Id` 隔离；任何不可验证的 source 引用 **fail-closed 零写入**。
+> **铁律边界（贯穿全文）**：平台层（`internal/`）**不做推理**——任何「蒸馏 / 派生提案」都由 CLI 狗狗执行，平台只聚合证据、解析回复、截断预算、写 *pending proposal*，必须由 operator 显式批准才生效（`不可逆决策` §4.1）。多 operator 通过 `operatorID` / `X-Operator-Id` 隔离；任何不可验证的 source 引用 **fail-closed 零写入**。
 
 ---
 
@@ -31,7 +31,7 @@
 
 ```mermaid
 flowchart TB
-  subgraph CLI[CLI 狗 / operator]
+  subgraph CLI[CLI 狗狗 / operator]
     U[用户对话 / 手动捕获]
   end
   subgraph BE[后端]
@@ -41,7 +41,7 @@ flowchart TB
     STORE[(PeopleMemoryStore\nfile/redis + broadcast)]
     REPO[(ProfileRepository\ncapsule/proposal)]
     EVID[(EvidenceStore)]
-    CLERK[(每日 clerk\n回唤原狗重派生)]
+    CLERK[(每日 clerk\n回唤原狗狗重派生)]
     AUTH[ThreadstoreAuthorizer\n逐字段重验]
   end
   subgraph FE[前端]
@@ -58,14 +58,14 @@ flowchart TB
   U -->|distill/approve| PS
   PS --> EVID
   PS --> REPO
-  PS -->|spawn 狗| CLI
+  PS -->|spawn 狗狗| CLI
   FPS --> PS
 
   EX -->|RecallContextForQuery| STORE
   EX -->|session-seal| PS
   PS -->|AutoDistillSession| REPO
   STORE -.deferred receipt.-> CLERK
-  CLERK -->|Invoke 原狗| CLI
+  CLERK -->|Invoke 原狗狗| CLI
   CLERK -->|Propose 提案| PM
 ```
 
@@ -83,11 +83,11 @@ flowchart TB
 - `approveDrafts`：**逐草稿**物化为 canonical truth**；`agent_inference` 草稿**拒绝物化**（AC-A3）；同 `claimKey` 的旧 current claim 自动 `superseded`（版本化，不覆盖）；关系卡 upsert（追加 transition）；全部决定后 `materialized`，否则 `partially_materialized`。
 - `rejectDrafts`：逐草稿标 `rejected`，永不物化（fail-closed）。`undoDecision`：按 `DecisionReceipt` 反物化并恢复被 supersede 的 claim。
 
-**双路径（defer receipt + clerk 回唤原狗重派生）**：
+**双路径（defer receipt + clerk 回唤原狗狗重派生）**：
 - `DeferReceipt` 写**无内容**回执（仅 server-derived owner/breed/源坐标/digest，绝不存正文）。
-- 每日 04:30 clerk（`RunPeopleMemoryClerkOnce`）遍历 ready 回执 → `ReserveDeferredReceipt` → 经 `PeopleMemoryClerkDeps.Invoke` **回唤原狗**（`client_id = requesterDog`），喂入 `ResolveSource` 从 `MessageStore` 取的 exact source 正文 + 结构化提案提示（狗只输出单 JSON，不静默物化）→ 平台 `parseClerkProposal` 解析并 `Propose` 落盘为可驳回候选（`DeferredReceiptID` 回绑）。证据不足 / 狗返回 `{"defer":true}` → 释放回执次日重试；`Invoke` 为 nil → 降级旧行为（空壳卡）。**平台「狗推理 + 平台解析落盘」的 clerk 回唤方案（回执责任方分离）**。
+- 每日 04:30 clerk（`RunPeopleMemoryClerkOnce`）遍历 ready 回执 → `ReserveDeferredReceipt` → 经 `PeopleMemoryClerkDeps.Invoke` **回唤原狗狗**（`client_id = requesterDog`），喂入 `ResolveSource` 从 `MessageStore` 取的 exact source 正文 + 结构化提案提示（狗狗只输出单 JSON，不静默物化）→ 平台 `parseClerkProposal` 解析并 `Propose` 落盘为可驳回候选（`DeferredReceiptID` 回绑）。证据不足 / 狗狗返回 `{"defer":true}` → 释放回执次日重试；`Invoke` 为 nil → 降级旧行为（空壳卡）。**平台「狗狗推理 + 平台解析落盘」的 clerk 回唤方案（回执责任方分离）**。
 
-**recall 注入（聊天卡，≤160/≤600 预算）**（`people_memory_recall.go` + `execution.go:157`）：用户消息含已知人物别名时，`RecallContextForQuery(pmOp, query)` 产出「## 关系记忆」块（anchor-first，F236 预算上限），单卡 ≤160 token、全段 ≤600 token（超限逐条 pop facts / 丢 interaction / 丢 relationship line），注入狗 system prompt。`estimateTokens` 用 CJK ≈ 4 runes/token。
+**recall 注入（聊天卡，≤160/≤600 预算）**（`people_memory_recall.go` + `execution.go:157`）：用户消息含已知人物别名时，`RecallContextForQuery(pmOp, query)` 产出「## 关系记忆」块（anchor-first，F236 预算上限），单卡 ≤160 token、全段 ≤600 token（超限逐条 pop facts / 丢 interaction / 丢 relationship line），注入狗狗 system prompt。`estimateTokens` 用 CJK ≈ 4 runes/token。
 
 **drill 钻取预算（≤500/call、3 人/turn、1200 aggregate/turn）**（`people_memory_recall.go` + `people_memory_drill_test.go`）：`RecallDrill(operatorID, input)` 按 `kind`（claim/relationship/event）在文档中查 `id` + `status` 重验 + 取 `SourceRefs[0]`；per-turn 预算 key = `operatorID\x00turnID`；`callsByPerson ≥ 3` 或 `aggregate+bounded > 1200` → `budget_exceeded`；`boundedProjectionText` 按 0.8x 截断到 500 token。file + redis 双后端（read-only，只动 ephemeral 预算 map）。HTTP：`POST /api/people-memory/recall/drill`。
 
@@ -103,7 +103,7 @@ flowchart TB
 
 **Distill（平台只聚合，不推理）**（`Distill`，:287）：`evidence.ListEvidence()` 按 key 过滤，返回证据列表 + `evidence_count` + 提示 operator 走 `propose`/`PUT`。**不调用 LLM**。
 
-**DistillAgent（spawn 狗，平台只解析+截断）**（`DistillAgent`，:340）：① 派生蒸馏者——`?session_id`（当前会话的狗，即狗蒸馏自己的 primer）或 `?client_id`（operator 覆盖）；**无硬编码默认狗**，二者皆无则 400；② 聚合证据 + 当前 capsule body 拼 prompt；③ `platform` 解析 breed→CLI client（`DefaultVariant().ClientID`）+ 注入 L0 身份（`PromptBuilder.Build`）让狗「以狗的口吻」蒸馏；④ `executor.Execute` 取流文本 → `extractFencedBlock(raw,"capsule")` → `TruncateCapsuleBody`（≤300 可见 rune，KD-7）→ 写 **pending proposal**（operator 须 approve）。env/executor/evidence 任一缺 → 503/400，**绝不静默默认狗**。
+**DistillAgent（spawn 狗狗，平台只解析+截断）**（`DistillAgent`，:340）：① 派生蒸馏者——`?session_id`（当前会话的狗狗，即狗狗蒸馏自己的 primer）或 `?client_id`（operator 覆盖）；**无硬编码默认狗狗**，二者皆无则 400；② 聚合证据 + 当前 capsule body 拼 prompt；③ `platform` 解析 breed→CLI client（`DefaultVariant().ClientID`）+ 注入 L0 身份（`PromptBuilder.Build`）让狗狗「以狗狗的口吻」蒸馏；④ `executor.Execute` 取流文本 → `extractFencedBlock(raw,"capsule")` → `TruncateCapsuleBody`（≤300 可见 rune，KD-7）→ 写 **pending proposal**（operator 须 approve）。env/executor/evidence 任一缺 → 503/400，**绝不静默默认狗狗**。
 
 **AutoDistillSession（session-seal 自动触发，2026-08-16 闭环）**（`:494`）：由 `execution.go` 的 `fireProfileDistillationTrigger` fire-and-forget 调用（`maybeAutoDistill`）。env `SG_AUTO_DISTILL_ON_SEAL=false/0` 可关；`relationshipKeyForBreed(breedID)` 取 breed 的 `RelationshipKey`；`HasProposal` 跳过防堆积；有匹配证据则聚合写 pending proposal（标「自动蒸馏草稿」），递增 `ProfileUpdateProposed`；全失败 swallow。
 
@@ -132,7 +132,7 @@ flowchart TB
 ### 4.2 F231 UI（`web/src/components/profiles/*` + `web/src/services/profilesService.ts`）
 
 - **结构**：左侧关系键列表（选中即加载）；右侧 `RelationshipCapsuleCard`（active 画像 body + 主人 breed 圆点 + 赞/踩计数）；有 proposal → `ApprovalCard`（批准并写入 primer / 驳回）；无 proposal → `DistillControls`。
-- **DistillControls 三种触发**（`DistillControls.tsx:27`）：①「让当前会话的狗蒸馏」（`activeThreadId`，来自 zustand `useAppStore`）；②「指定狗狗蒸馏」（`client_id` 覆盖，来自 `breedMeta.ts` 的 `BREED_OPTIONS`）；③「仅聚合证据」（不 spawn 狗）。
+- **DistillControls 三种触发**（`DistillControls.tsx:27`）：①「让当前会话的狗狗蒸馏」（`activeThreadId`，来自 zustand `useAppStore`）；②「指定狗狗蒸馏」（`client_id` 覆盖，来自 `breedMeta.ts` 的 `BREED_OPTIONS`）；③「仅聚合证据」（不 spawn 狗狗）。
 - **ApprovalCard 状态机**：pending/busy/approved/rejected/error（:13）；终态就地折叠为「✓ 已批准并写入 primer」「已驳回该提议」（:48）。
 - **实时**：**无 SSE**，每次决策后 `handleChanged()`（ProfilesContent.tsx:55）重调 `loadDetail`+`loadList` 手动刷新。**无 token/蒸馏预算显示**。
 - **状态**：`ProfilesContent` 纯局部 `useState`；`DistillControls` 额外用 zustand `useAppStore`。**无 operator 头**（蒸馏者靠 session_id/client_id 服务端派生）。
@@ -142,13 +142,13 @@ flowchart TB
 ## 5. 前后端协作：四条端到端数据流
 
 ### 流 A — 捕获→审批→物化→召回
-`FE 提交 propose` → `PM.Propose`（SSE 广播）→ `FE 候选列表实时刷新` → `FE 逐 draft approve` → `PM.ApproveDrafts`（物化 canonical，SSE 广播）→ 下次对话 `execution.RecallContextForQuery` 注入关系卡进狗上下文。
+`FE 提交 propose` → `PM.Propose`（SSE 广播）→ `FE 候选列表实时刷新` → `FE 逐 draft approve` → `PM.ApproveDrafts`（物化 canonical，SSE 广播）→ 下次对话 `execution.RecallContextForQuery` 注入关系卡进狗狗上下文。
 
 ### 流 B — 延迟回执→clerk 回唤→提案
-`FE 提交 defer`（仅源坐标）→ `PM.DeferReceipt` → 04:30 clerk 取 ready 回执 → `ClerkDeps.Invoke(requesterDog)` 回唤原狗（exact source 正文 + 提案提示）→ 狗输出 JSON → 平台 `parseClerkProposal` → `PM.Propose`（pending，回绑 receiptID）→ `FE 候选列表出现`，operator 审批。
+`FE 提交 defer`（仅源坐标）→ `PM.DeferReceipt` → 04:30 clerk 取 ready 回执 → `ClerkDeps.Invoke(requesterDog)` 回唤原狗狗（exact source 正文 + 提案提示）→ 狗狗输出 JSON → 平台 `parseClerkProposal` → `PM.Propose`（pending，回绑 receiptID）→ `FE 候选列表出现`，operator 审批。
 
 ### 流 C — 蒸馏→审批（养熟）
-对话中/session-seal → `PS.DistillAgent`（spawn 狗）或 `execution.fireProfileDistillationTrigger→PS.AutoDistillSession`（自动）→ 写 **pending proposal** → `FE ProfilesContent` 出现待审（侧栏圆点）→ `ApprovalCard` 批准 → `PS.Approve` 写入 active capsule（狗下次以更新后画像协作）。
+对话中/session-seal → `PS.DistillAgent`（spawn 狗狗）或 `execution.fireProfileDistillationTrigger→PS.AutoDistillSession`（自动）→ 写 **pending proposal** → `FE ProfilesContent` 出现待审（侧栏圆点）→ `ApprovalCard` 批准 → `PS.Approve` 写入 active capsule（狗狗下次以更新后画像协作）。
 
 ### 流 D — 实时同步
 `BE 任何写操作 → PeopleMemoryEventHub 广播` → `FE SSE onmessage → reloadRef 重刷`；F231 走手动 reload（无 SSE）。
@@ -199,7 +199,7 @@ flowchart TB
 | POST `/api/profiles/{key}/proposal/approve` | Approve | 批准写入 active |
 | POST `/api/profiles/{key}/proposal/reject` | Reject | 驳回 |
 | POST `/api/profiles/{key}/distill` | Distill | 仅聚合证据（不推理） |
-| POST `/api/profiles/{key}/distill/agent` | DistillAgent | spawn 狗蒸馏（session_id/client_id） |
+| POST `/api/profiles/{key}/distill/agent` | DistillAgent | spawn 狗狗蒸馏（session_id/client_id） |
 
 ### 6.3 P3（`/api/continuity`，仅 inspection）
 `GET /api/continuity`、`GET /api/continuity/{breedID}`。
@@ -211,7 +211,7 @@ flowchart TB
 - [x] **AC-01 正常路径**：propose→approve 物化 canonical；defer→clerk 回唤→提案→approve；distill→proposal→approve。均有单测覆盖（`people_memory_test.go`、`people_memory_clerk_reinvoke_test.go`、`profiles_handler_test.go`）。
 - [x] **AC-02 异常/边界**：未知 thread/message→403 fail-closed；伪造 excerpt/digest→403（`TestPeopleMemorySourceFieldReverify`）；drill 超预算→`budget_exceeded`（`TestRecallDrillBudgetDiscipline`）；自动蒸馏重复 seal 不堆积（`TestAutoDistillSession`）。
 - [x] **AC-03 权限/安全**：operator 隔离（`operatorID` 首参）；source 引用 fail-closed 零写入；hard-forget person-bound fail-closed；agent_inference 永不物化。
-- [x] **平台不推理**：Distill 不调 LLM；DistillAgent/AutoDistillSession 仅聚合+解析+截断，狗执行推理。
+- [x] **平台不推理**：Distill 不调 LLM；DistillAgent/AutoDistillSession 仅聚合+解析+截断，狗狗执行推理。
 - [x] **可服务性**：独立 OTel 计数 `PeopleMemory*` / `ProfileUpdate*`（warmup 预触）；SSE 实时同步（F276）。
 - [ ] **降级**：Redis 可选（无 `SG_REDIS_URL` 时 file 后端，零新增依赖）；executor/evidence 为 nil 时 distill 端点 503 优雅降级。
 
@@ -225,7 +225,7 @@ flowchart TB
 - `internal/settings/people_memory_store.go` — `PeopleMemoryStore` 接口 + `FilePeopleMemoryStore`
 - `internal/settings/people_memory_recall.go` — recall 注入 + drill 预算
 - `internal/settings/people_memory_lifecycle.go` — correct/retire/amend/redact/hardForget
-- `internal/settings/people_memory_clerk*.go` — 双路径 clerk（回唤原狗）
+- `internal/settings/people_memory_clerk*.go` — 双路径 clerk（回唤原狗狗）
 - `internal/settings/people_memory_redis*.go` — Redis 后端 + 装饰器
 - `internal/settings/people_memory_events.go` / `people_memory_broadcast.go` — SSE hub + 广播
 - `internal/settings/people_memory_auth.go` — ThreadstoreAuthorizer 逐字段重验
@@ -280,7 +280,7 @@ flowchart TB
 在 P0–P4 之上补齐四项缺口：
 
 1. **胶囊长度上限 KD-7**：`RelationshipCapsule` 正文硬限 300 rune（`MaxCapsuleBodyLen`），`WriteCapsule` / `WriteProposal` 超长拒绝（HTTP 400）。
-2. **P1-b 关系胶囊 HTTP 端点 + 审批环（Approval Hub）**：`/api/profiles` 提供 CRUD，propose→approve→reject 治理（候选独立存 `<key>-proposal.md`，approve 才提升 active，eval 计数入 front-matter）；`/api/profiles/{key}/distill` 仅**聚合 evidence 草稿、不做推理**（`docs/governance/decisions/irreversible-decisions.md` §4.1 平台层不内置 LLM 推理，胶囊内容由 operator/CLI agent 写）。
+2. **P1-b 关系胶囊 HTTP 端点 + 审批环（Approval Hub）**：`/api/profiles` 提供 CRUD，propose→approve→reject 治理（候选独立存 `<key>-proposal.md`，approve 才提升 active，eval 计数入 front-matter）；`/api/profiles/{key}/distill` 仅**聚合 evidence 草稿、不做推理**（`不可逆决策` §4.1 平台层不内置 LLM 推理，胶囊内容由 operator/CLI agent 写）。
 3. **P5 续接会话内轮换粒度**：`continuity` 重写为按 rotation 索引的检查点环（容遗留格式迁移），`LastDigestForRotation` 支持长会话 cascade 轮换重注入，one-shot 退化为 rotation 0；`/api/continuity` 提供检视端点。
 
 ### 9.4 Persistent Identity 二次细化（9 点指令，2026-08-15）

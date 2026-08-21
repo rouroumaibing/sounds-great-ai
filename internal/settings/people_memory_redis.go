@@ -12,7 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisPeopleMemoryStore is the homologous, operator-partitioned F276
+// RedisPeopleMemoryStore is the operator-partitioned
 // store. It activates only when a Redis URL is configured (SG_REDIS_URL); the
 // file store remains the zero-dependency default. Every operator's document is
 // a JSON blob at pm:{op}:doc; the deferred-receipt dual path uses atomic Lua
@@ -71,7 +71,7 @@ type RedisPeopleMemoryStore struct {
 	drillBudgets map[string]*drillTurnBudget
 }
 
-// NewRedisPeopleMemoryStore builds a Redis-backed F276 store.
+// NewRedisPeopleMemoryStore builds a Redis-backed store.
 func NewRedisPeopleMemoryStore(client *redis.Client) *RedisPeopleMemoryStore {
 	return &RedisPeopleMemoryStore{client: client, cache: map[string]*peopleMemoryDocument{}, drillBudgets: map[string]*drillTurnBudget{}}
 }

@@ -17,7 +17,7 @@ func tokenizeQuery(s string) []string {
 }
 
 // lexicalScores returns entry_id → TF*IDF score over the visible corpus. CJK
-// is scored per-character (weighted higher, homologous clowder CJK NN weight).
+// is scored per-character (weighted higher).
 func lexicalScores(query string, entries []*LaneEntry) map[string]float64 {
 	toks := tokenizeQuery(query)
 	if len(toks) == 0 {
@@ -54,7 +54,7 @@ func lexicalScores(query string, entries []*LaneEntry) map[string]float64 {
 	return score
 }
 
-// rrf fuses ranked ID lists with k=60 (clowder hybridRRFSearch). Ties share
+// rrf fuses ranked ID lists with k=60. Ties share
 // the average rank.
 func rrf(lists ...[]string) map[string]float64 {
 	const k = 60
@@ -77,8 +77,7 @@ func rankIDs(hits []vecHit) []string {
 
 // ---- LaneRegistry vector API (Gap3 + P1 maturity) ----
 
-// SetEmbedMode sets the embedding mode (off/shadow/on), homologous clowder
-// EmbedConfig.embedMode. off → no vectors used (lexical only); shadow → vectors
+// SetEmbedMode sets the embedding mode (off/shadow/on). off → no vectors used (lexical only); shadow → vectors
 // are stored/refreshed but ranking stays lexical; on → hybrid RRF (default when
 // an embedder is configured).
 func (r *LaneRegistry) SetEmbedMode(mode string) {
@@ -156,7 +155,7 @@ func itoa(i int) string {
 }
 
 // HybridSearch returns approved entries ranked by hybrid RRF of (entry NN,
-// passage NN, BM25 lexical), homologous clowder hybridRRFSearch. embedMode
+// passage NN, BM25 lexical). embedMode
 // gates how NN contributes: off → lexical only; shadow → NN computed/stored
 // but ranking stays lexical; on → full fusion. Returns (nil, false) when no
 // hits or the vector store is unavailable and the query is non-lexical.

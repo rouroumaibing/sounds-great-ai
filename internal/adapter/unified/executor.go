@@ -57,10 +57,16 @@ type MCPConfig struct {
 	Servers []MCPServer `json:"servers"`
 }
 
-// MCPServer is one MCP server entry.
+// MCPServer is one MCP server entry. A server is either local (Command/Args,
+// the default "stdio" transport) or remote (URL + optional Headers, the
+// "http"/"sse" transport). The CLI agent receives whichever shape matches and
+// connects accordingly.
 type MCPServer struct {
 	Name    string            `json:"name"`
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
+	Command string            `json:"command,omitempty"`
+	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
+	Type    string            `json:"type,omitempty"`
+	URL     string            `json:"url,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
 }

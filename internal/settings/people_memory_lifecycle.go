@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// This file holds the F276 lifecycle mutations on materialized truth: correction
+// This file holds the lifecycle mutations on materialized truth: correction
 // (versioned supersede), retirement, interaction amendment, redaction, and
 // hard-forget. Every mutation is owner-authorized and recorded with provenance;
 // nothing is silently overwritten (KD-7 / AC-B3..B6).

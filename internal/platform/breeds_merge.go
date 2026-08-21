@@ -14,9 +14,8 @@ import (
 // available as an "add member" menu via GetTemplates, which reads
 // dog-template.json directly.
 //
-// Merge semantics follow clowder's cat-config-loader (deep merge + id-keyed
-// backfill), adopted 2026-08-17 because it is strictly better than the previous
-// "catalog wins entirely" rule:
+// Merge semantics use deep merge + id-keyed backfill, adopted 2026-08-17
+// because it is strictly better than the previous "catalog wins entirely" rule:
 //   - catalog edits win per-field (so a template upgrade never clobbers a user's
 //     catalog edits),
 //   - nested objects are recursively merged,
@@ -42,7 +41,7 @@ func MergedBreeds(templateBreeds map[string]*pack.BreedConfig, store settings.Se
 			continue
 		}
 		if tmpl, ok := templateBreeds[c.ID]; ok {
-			// clowder-style deep merge: template is the BASE, catalog is the
+			// deep merge: template is the BASE, catalog is the
 			// OVERLAY. Catalog edits win per-field; new template fields/variants
 			// are backfilled without clobbering catalog edits.
 			merged[c.ID] = deepMergeBreeds(tmpl, c)
@@ -86,14 +85,14 @@ func deepMergeBreeds(base, overlay *pack.BreedConfig) *pack.BreedConfig {
 }
 
 // breedAtomicObjectKeys are object fields replaced wholesale by the catalog
-// overlay rather than field-merged. Mirrors clowder's ATOMIC_OBJECT_KEYS to
-// prevent stale sub-fields surviving a provider/model switch.
+// overlay rather than field-merged, to prevent stale sub-fields surviving
+// a provider/model switch.
 var breedAtomicObjectKeys = map[string]bool{
 	"color":       true,
 	"voice_config": true,
 }
 
-// deepMergeConfig is a Go port of clowder's deepMergeConfig (cat-config-loader):
+// deepMergeConfig merges two config maps:
 // overlay fields override base; atomic object keys replace base entirely;
 // id-keyed arrays are merged by id (base-only items preserved); other objects
 // recurse; other arrays/primitives are replaced by overlay.

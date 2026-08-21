@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "featureId": "SG-MCP-SURFACE",
+  "targetRepository": "sounds-great-ai/sounds-great-ai",
+  "baselineDigest": "sha256:0c2f13ed959013a4c1d3f6979103afb19e839f417e6c0287217a65e062756f55",
+  "owner": "architecture-cell:mcp-surface-governance",
+  "authorizationRef": "adr:sg-mcp-surface"
+}

@@ -13,8 +13,7 @@ type migration struct {
 	apply   func(db *sql.DB) error
 }
 
-// allMigrations defines the ordered schema evolution (homologous clowder's
-// 39-version migration history, shrunk to SG's needs). Each is safe to re-run.
+// allMigrations defines the ordered schema evolution (// 39-version migration history, shrunk to SG's needs). Each is safe to re-run.
 func allMigrations() []migration {
 	return []migration{
 		{
@@ -100,8 +99,7 @@ func allMigrations() []migration {
 				if err := addColumnIfMissing(db, "recall_entry", "maturity", "TEXT DEFAULT ''"); err != nil {
 					return err
 				}
-				// Append-only lifecycle trace (homologous clowder lifecycle_traces,
-				// Task #39). Recorded at semantic points (approve / modify / retire /
+				// Append-only lifecycle trace (,				// Task #39). Recorded at semantic points (approve / modify / retire /
 				// recall) rather than via a low-level UPDATE/DELETE trigger, which
 				// would amplify audit noise on every bulk flush save.
 				_, err := db.Exec(`

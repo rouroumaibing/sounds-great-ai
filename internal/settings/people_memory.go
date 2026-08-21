@@ -6,13 +6,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// This file defines the Persistent-Identity F276 "People & Relationship Memory"
-// contract types (homologous) for Sounds Great AI. SG keeps these as six logical
+// This file defines the Persistent-Identity "People & Relationship Memory"
+// contract types for Sounds Great AI. SG keeps these as six logical
 // objects, partitioned by operatorID for multi-operator support (file-backed by
 // default, optional Redis-backed — see people_memory_redis.go), written
 // atomically under ConfigRoot.
 //
-// Design discipline (faithful to F276 / KD-1..KD-12):
+// Design discipline (faithful to KD-1..KD-12):
 //   - third-party truth is owner-private and never silently written: a capture
 //     candidate must be explicitly approved before it materializes.
 //   - reported_fact / user_assessment are materializable; agent_inference has
@@ -27,10 +27,10 @@ import (
 //     worth-remembering-but-not-now cues become content-free deferred receipts
 //     that a daily clerk can later claim into a normal proposal.
 //
-// No LLM reasoning runs inside the platform (docs/decisions/irreversible-decisions.md §4.1): this package only
+// No LLM reasoning runs inside the platform (不可逆决策 §4.1): this package only
 // stores and projects what an operator or CLI dog submits.
 
-// F276 claim kinds. agent_inference is accepted only as a draft signal and is
+// claim kinds. agent_inference is accepted only as a draft signal and is
 // never materialized as canonical truth (AC-A3).
 const (
 	ClaimKindReportedFact   = "reported_fact"

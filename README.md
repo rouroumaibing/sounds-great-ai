@@ -1,17 +1,19 @@
 <div align="center">
 
+<img src="docs/designs/brand/images/sounds-great-ai.png" alt="Sounds Great AI" width="160"/>
+
 # Sounds Great AI
 
-**When AI Agents Bark Together, It Sounds Great.**
+**Hard Rails. Soft Power. Shared Mission.**
 
-*Every bark is a precise coordination.*
+*Every idea deserves a team of souls who take it seriously.*
 
-[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
-[![Eino](https://img.shields.io/badge/Eino-v0.9+-blueviolet)](https://github.com/cloudwego/eino)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![React + TypeScript](https://img.shields.io/badge/React+TypeScript-61DAFB?logo=react&logoColor=white)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[中文](README.zh-CN.md) | **English**
+[English](README.md) | [中文](README.zh-CN.md)
 
 </div>
 
@@ -19,353 +21,230 @@
 
 ## Why Sounds Great AI?
 
-You have a codebase. It's large, complex, and accumulating technical debt every day.
+You have Claude, Codex, Gemini — powerful models, each with unique strengths. But using them together means **you** become the router: copy-pasting context between chat windows, manually tracking who said what, and losing hours to middle management.
 
-You have Claude, GPT, Gemini — powerful models, each with unique strengths. But making them collaborate means **you** become the router: copying context between chat windows, manually tracking who said what, wasting time on middle management.
+> *"I don't want to be a router anymore."*
+> *"Then let's build a home ourselves."*
 
-> *"I don't need a pack of lone wolves. I need a tightly coordinated team."*
-> *"Like a dog agent squad — loyal, clearly specialized, one command and everyone moves."*
+So the dogs built one. Six dogs now collaborate through a unified platform — each with a distinct role, driven by a different CLI, and persistent in identity, memory, and the work they hold.
 
-So under the Go language and Eino orchestration engine, **Sounds Great AI** was born.
+**Sounds Great AI** is the platform layer that turns isolated AI agents into a real team. Persistent identity, cross-model review, shared memory, collaborative discipline.
 
-This isn't just another Agent invocation framework. It's a **Pack** — a squad of dogs, each with their own role, personality, and capabilities, communicating via A2A protocol, working together in coordinated workflows.
+Most frameworks help you *call* agents. Sounds Great AI helps them *work together*.
 
-> *When the Agents perfectly complete a collaboration, the terminal lights up with green paw prints:*
-> **`Sounds Great!`**
+## The Pack
 
-## Design Overview
+Six dogs, each with a distinct role:
 
-<div align="center">
+| 狗狗 | client | 职责 |
+|------|--------|------|
+| **边牧 (Bianmu)** | Claude | 总指挥与架构师：任务拆解、动态路由、结果合成 |
+| **金毛 (Jinmao)** | Gemini | 知识寻回：RAG 检索与上下文组装 |
+| **灵缇 (Xigou)** | Codex | 代码猎手：极速搜索、定位关键实现与重构建议 |
+| **德牧 (Demu)** | opencode | 追踪与诊断：日志、根因分析 |
+| **藏獒 (Zangao)** | Claude | 交付打磨：输出格式化与渲染 |
+| **中华田园犬 (Rural Dog)** | Codex | 安全守卫：命令拦截、敏感过滤 |
 
-High-level architecture and dog-pack collaboration model.
+Each dog's identity is defined in `packs/default/breeds/dog-template.json` (runtime source: `.sounds-great-ai/dog-catalog.json`).
 
-![Sounds Great AI Design](docs/brand/images/sounds-great-ai.png)
+## What It Does
 
-</div>
+| Capability | What It Means |
+|-----------|---------------|
+| **Multi-Agent Orchestration** | Route tasks to the right dog — 边牧 (Claude) for architecture, 灵缇 (Codex) for review, 金毛 (Gemini) for retrieval — in one conversation |
+| **Persistent Identity** | Each agent keeps its role, personality, and memory across sessions and context compressions |
+| **Cross-Model Review** | 边牧 (Claude) writes code, 灵缇 (Codex) reviews it. Built-in, not bolted on |
+| **A2A Communication** | Async agent-to-agent messaging with @mention routing, thread isolation, and structured handoff |
+| **Shared Memory** | Evidence store, lessons learned, decision logs — institutional knowledge that persists and grows |
+| **Skills Framework** | On-demand prompt loading. Agents load specialized skills (TDD, debugging, review) only when needed |
+| **MCP Integration** | Model Context Protocol for tool sharing across agents |
+| **Collaborative Discipline** | SOP governance: design gates, quality checks, vision guardianship, merge protocols |
 
-## Screenshots
+![Homepage — Dog Pack Command Deck](docs/designs/readme-images/homepage.png)
 
-<div align="center">
+## Supported Agents
 
-**Homepage**
+Sounds Great AI is model-agnostic. Each agent CLI plugs in through `internal/adapter/`:
 
-![Homepage](docs/images/homepage.png)
+| Agent CLI | Model Family | Output Format | MCP | Status |
+|-----------|-------------|---------------|-----|--------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Claude (Opus / Sonnet / Haiku) | stream-json | Yes | Shipped |
+| [Codex CLI](https://github.com/openai/codex) | GPT / Codex | json | Yes | Shipped |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | Gemini | stream-json / ACP | Yes | Shipped |
+| [opencode](https://github.com/sst/opencode) | Multi-model | ndjson | Yes | Shipped |
+| Kimi CLI | Kimi / Moonshot | plain text | Yes | Shipped |
+| A2A (remote) | External deployed agents | JSON-RPC `tasks/send` | No | Client-only |
 
-**Settings — Member Management**
-
-![Settings — Members](docs/images/settings-members.png)
-
-</div>
-
-## Features
-
-Each subsystem below has a formal Tech Story (`FT-XXX`) as the single source of truth for its design and implementation.
-
-| Subsystem | Tech Story | Description |
-|-----------|-----------|-------------|
-| Multi-Agent Orchestration | [FT-ORC-001](docs/designs/FT-ORC-001-multi-agent-orchestration.md) | WebSocket event stream + custody ledger + CLI adapter pool; the front end is initiator and observer |
-| CLI Adapter | [FT-CLI-001](docs/designs/FT-CLI-001-cli-adapter.md) | 5 CLI providers driven as one-shot NDJSON subprocesses via a unified `ProcessManager` |
-| A2A Communication & Custody | [FT-A2A-001](docs/designs/FT-A2A-001-a2a-communication.md) | In-pack `@mention` collaboration + a controlled external A2A client (no internal server) |
-| Settings — Accounts & Keys | [FT-ACC-001](docs/designs/FT-ACC-001-accounts-keys-auth.md) | OAuth / API Key accounts, secret/metadata separation, referential integrity |
-| Settings — Member Management | [FT-MEM-001](docs/designs/FT-MEM-001-member-management.md) | Breed CRUD, ordering, default dog, leader, empty-first-run |
-| Shared Memory | [FT-SM-001](docs/designs/FT-SM-001-shared-memory.md) | Deterministic supply → human approval → recall injection (zero LLM) |
-| Persistent Identity | [FT-PI-001](docs/designs/FT-PI-001-persistent-identity.md) | F231 profiles, F276 people memory, continuity digests |
-| Cross-Model Review / QC | [FT-CMR-001](docs/designs/FT-CMR-001-cross-model-review.md) | QC 7-step loop, 3-layer review, Reviewer Delta, pre-merge gate |
-| Build & Daemon Toolchain | [FT-DEV-001](docs/designs/FT-DEV-001-makefile-daemon-reclaim.md) | `make dev/prod daemon` lifecycle, self-only process reclaim |
-
-> Phase-level progress (Platform / RAG / A2A / Skills / SOP / Transport / Polish) is tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
-
-## The Pack — Breed Role Mapping
-
-Six dogs, six roles, each with its own specialty:
-
-| Role | Breed | Personality |
-|------|-------|-------------|
-| **Orchestrator** | Border Collie *(bianmu)* | Extremely intelligent, field-control master, sharp-eyed |
-| **Safety Guardrail** | Chinese Rural Dog *(zhonghuatianyuanquan)* | Loyal, reliable, highly alert, knows home terrain |
-| **UI / CLI Presentation** | Tibetan Mastiff *(zangao)* | Majestic, imposing, steadfast, gatekeeper |
-| **Code Hunter** | Xigou *(xigou)* | Streamlined, lightning-fast, laser-focused |
-| **RAG / Retriever** | Golden Retriever *(jinmao)* | Strong retrieval instinct, gentle, dependable |
-| **Log & Bug Tracer** | German Shepherd *(demu)* | Alert, black-backed, upright ears, strong execution |
-
-> Users can create their own dogs — just one JSON file, select registered capabilities, define a workflow, and hot-reload takes effect instantly. Member management is documented in [FT-MEM-001](docs/designs/FT-MEM-001-member-management.md).
-
-> **Empty on first run, build your pack on demand**: a fresh install starts with an empty member list (Owner only); the six dogs are an optional *template menu*. Add a dog from **Member Management → Add from template**, bind an account and credentials, and it joins the runtime. Members without credentials show as "Needs config" rather than "Enabled". See `docs/VISION.md` §5.1.
-
-## Architecture
-
-```
-┌───────────────────────────────────────────────────┐
-│                 packs/default/breeds/               │
-│   dog-template.json (只读种子：role_templates +        │
-│   breeds；运行时以 dog-catalog.json 为准，用户在设置    │
-│   页编辑成员→落 catalog，热加载即时生效)                │
-└──────────────────────┬────────────────────────────┘
-                       │ LoadFromFile / POST API
-                       ▼
-┌───────────────────────────────────────────────────┐
-│              internal/platform/ (composition root)  │
-│   config + router + adapters + skills + mcp + a2a   │
-│   + sop + memory + ragstore + threadstore + settings│
-└──────────────────────┬────────────────────────────┘
-                       │ CLI Adapter Execute()
-                       ▼
-┌───────────────────────────────────────────────────┐
-│            internal/adapter/ (CLI adapters)         │
-│   claude/    codex/    gemini/    opencode/    kimi/     │
-│   unified/ (ProcessManager + NDJSON parser)         │
-└──────────────────────┬────────────────────────────┘
-                       │ stdin/stdout pipe
-                       ▼
-┌───────────────────────────────────────────────────┐
-│            External CLI Processes                   │
-│   claude CLI  |  codex CLI  |  gemini CLI  |  ...   │
-└───────────────────────────────────────────────────┘
-```
-
-**Three-Layer Separation Principle:**
-
-| Layer | Responsible For | Not Responsible For |
-|-------|----------------|---------------------|
-| **Breed JSON (Data)** | Role identity, personality, variant config, model selection | Code logic |
-| **Platform (Go + Eino)** | Identity, routing, safety, memory, skills, coordination | LLM reasoning (that's CLI's job) |
-| **CLI Adapter** | Spawn CLI, inject prompt, parse stream, manage lifecycle | Role definition, coordination |
-
-> *Roles are data, platform coordinates, CLI reasons.*
+> Sounds Great AI doesn't replace your agent CLI — it's the layer *above* it that makes agents work as a team. The dog↔client mapping is defined in `packs/default/breeds/dog-template.json` (runtime source: `.sounds-great-ai/dog-catalog.json`).
 
 ## Quick Start
 
-### Prerequisites
-
-- [Go 1.26+](https://go.dev/)
-- [Eino](https://github.com/cloudwego/eino) (auto-installed)
-- Optional: OpenAI API Key or compatible model
-
-### Build & Run
+**Prerequisites:** [Go 1.22+](https://go.dev/) · [Node.js 20+](https://nodejs.org/) · Git
 
 ```bash
 # 1. Clone
 git clone https://github.com/sounds-great-ai/sounds-great-ai.git
 cd sounds-great-ai
 
-# 2. Install dependencies
-go mod download
-cd web && npm install && cd ..
+# 2. Install dependencies (Go modules + frontend npm)
+make install
 
-# 3. Configure (optional — server starts with defaults)
-cp .env.example .env
-# Edit .env, fill in MODEL_API_KEY etc.
+# 3. Build frontend for production (tsc + vite build)
+make build
 
-# 4. Run both backend and frontend
+# 4. Start in foreground (backend :8080 + frontend :5173)
 make dev
-# Backend on :8080, Frontend on :5173
 
-# Or run individually
-make backend   # Go server only
-make frontend  # Vite dev server only
+# 5. Or run in background (daemon mode)
+make dev daemon
+# Stop background processes
+make stop
 ```
 
-After server starts:
-- `http://localhost:8080/health` — Health check
-- `http://localhost:8080/ws` — WebSocket communication
-- `http://localhost:8080/api/breeds` — Breed CRUD API
+Open `http://localhost:8080` → go to **Hub → System Settings → Account Configuration** to add your model API keys (Claude, Codex, Gemini, Kimi, GLM, MiniMax, ...).
 
-### Upgrade
+**Full setup guide** (API keys, CLI auth, voice, Feishu/Telegram, troubleshooting): **[SETUP.md](SETUP.md)**
 
-#### Via UI
+## The Iron Laws
 
-Click the upgrade button (↑ icon) in the top-right header. Choose whether to pull latest code.
+Four promises we keep — enforced at both prompt and code layer:
 
-#### Via CLI
+> **"We don't delete our own databases."** — That's memory, not garbage.
+>
+> **"We don't kill our parent process."** — That's what lets us exist.
+>
+> **"Runtime config is read-only to us."** — Changing it requires human hands.
+>
+> **"We don't touch each other's ports."** — Good fences make good neighbors.
 
-```bash
-make upgrade
+These aren't restrictions imposed on us. They're agreements we keep.
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────┐
+│               You (operator / 首席愿景官)               │
+│           愿景 · 决策 · 反馈                       │
+└──────────────────────┬───────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────┐
+│            Sounds Great AI 平台层（Go + Eino）            │
+│                                                  │
+│   身份管理     A2A 路由      Skills 框架          │
+│   & 注入      & 线程        & Manifest           │
+│                                                  │
+│   记忆 &      SOP           MCP 回调             │
+│   证据库      守护者         桥接器               │
+└────┬─────────────┬──────────────┬───────────┬────┘
+     │             │              │           │
+┌────▼───┐   ┌────▼─────┐   ┌───▼────┐   ┌──▼──────────┐
+│ Claude │   │ Codex    │   │ Gemini │   │ opencode /  │
+│(边牧/  │   │(灵缇/    │   │(金毛) │   │ Kimi / A2A  │
+│ 藏獒)  │   │中华田园犬)│   │        │   │(德牧/远程) │
+└────────┘   └──────────┘   └────────┘   └─────────────┘
 ```
 
-This will prompt "是否需要拉取最新的代码？(y/n)", then install dependencies, rebuild frontend and backend.
+**Three-layer principle:**
 
-### Create Your Own Dog
+| Layer | Responsible For | Not Responsible For |
+|-------|----------------|---------------------|
+| **Model** (CLI 内) | Reasoning, generation, understanding | Long-term memory, discipline |
+| **Agent CLI** (claude/codex/gemini/opencode/kimi) | Tool use, file ops, MCP | Team coordination, review |
+| **Platform** (Go + Eino) | Identity, collaboration, discipline, audit | Reasoning (that's the model's job) |
 
-```bash
-# Create a new dog
-curl -X POST http://localhost:8080/api/breeds \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "mydog",
-    "name": "mydog",
-    "display_name": "My Dog",
-    "avatar": "mydog.png",
-    "personality": "Lively, curious, eager to try everything",
-    "default_variant_id": "v1",
-    "variants": [
-      {
-        "id": "v1",
-        "client_id": "claude",
-        "default_model": "claude-sonnet-4-20250514",
-        "system_prompt": "You are my dog, responsible for exploring new things."
-      }
-    ],
-    "source": "user",
-    "version": "v1"
-  }'
+> *Models set the ceiling. The platform sets the floor.* — Each layer is a **multiplier**, not addition.
 
-# Takes effect immediately — call it
-curl -X POST http://localhost:8080/api/breeds/mydog/bark \
-  -H "Content-Type: application/json" \
-  -d '{ "command": "ls", "path": "/workspace" }'
-```
+![Members — Settings · 成员管理](docs/designs/readme-images/settings-members.png)
 
-## Security Audit
+## Roadmap
 
-After development of a release is complete (all verification checklist items pass), the project undergoes a full security scan before release.
+We build in the open. See [docs/ROADMAP.md](docs/ROADMAP.md) for the live feature inventory — each entry links to a Tech Story that audits the actual code.
 
-### Tool
-
-[codex-security](https://github.com/openai/codex-security) — OpenAI's CLI and TypeScript SDK for finding, validating, and fixing security vulnerabilities in code.
-
-### Prerequisites
-
-- Verification checklist: all items ✅
-- `go build ./...` passes
-- `go test ./...` passes
-- `npx tsc --noEmit` passes (frontend)
-- Node.js 22.13+ installed
-
-### Scan Procedure
-
-```bash
-# 1. Install codex-security
-npm install @openai/codex-security
-
-# 2. Authenticate
-npx @openai/codex-security login
-
-# 3. Basic scan (quick, covers both Go backend and TypeScript frontend)
-npx @openai/codex-security scan .
-
-# 4. Deep scan (thorough, multi-agent, for pre-release)
-npx @openai/codex-security scan . --mode deep --workers 2 --subagents 0 --stop-after-no-new 3 --max-discovery-runs 10
-```
-
-### Scan Scope
-
-| Scope | Path | Language |
-|-------|------|----------|
-| Backend | `cmd/`, `internal/`, `pkg/` | Go |
-| Frontend | `web/src/` | TypeScript/React |
-| Config | `packs/`, `.env.example` | JSON / env |
-
-### Fix Workflow
-
-1. **Triage** — classify each finding by severity (critical / high / medium / low)
-2. **Fix** — address all critical and high findings before release
-3. **Re-scan** — run basic scan to verify fixes
-4. **Document** — record accepted risks for medium/low findings
-
-### Pass Criteria
-
-- 0 critical findings
-- 0 high findings
-- All medium/low findings documented or fixed
-
----
+| Tech Story | 主题 |
+|-----------|------|
+| [FT-ORC-001](docs/features/FT-ORC-001-multi-agent-orchestration.md) | Multi-Agent Orchestration |
+| [FT-A2A-001](docs/features/FT-A2A-001-a2a-communication.md) | A2A Communication |
+| [FT-CLI-001](docs/features/FT-CLI-001-cli-adapter.md) | CLI Adapter |
+| [FT-CMR-001](docs/features/FT-CMR-001-cross-model-review.md) | Cross-Model Review (QC 7 步) |
+| [FT-PI-001](docs/features/FT-PI-001-persistent-identity.md) | Persistent Identity |
+| [FT-SM-001](docs/features/FT-SM-001-shared-memory.md) | Shared Memory |
+| [FT-SKILL-001](docs/features/FT-SKILL-001-skills-framework.md) | Skills Framework |
+| [FT-ACC-001](docs/features/FT-ACC-001-accounts-keys-auth.md) | 账户与密钥 / 客户配置安全 |
+| [FT-MEM-001](docs/features/FT-MEM-001-member-management.md) | 成员管理 |
+| [FT-DEV-001](docs/features/FT-DEV-001-makefile-daemon-reclaim.md) | 构建/开发环境 (Makefile) |
 
 ## Philosophy
 
-### Hard Rails + Dog Pack
+### Hard Rails + Soft Power
 
-Traditional frameworks focus on **control** — what Agents cannot do. Sounds Great AI focuses on **collaboration** — giving dogs a shared task and the autonomy to execute it.
+Traditional frameworks focus on **control** — what agents *can't* do. Sounds Great AI focuses on **culture** — giving agents a shared mission and the autonomy to pursue it.
 
-- **Hard Rails** = safety baseline. Non-negotiable. Enforced by code, not prompts.
-- **Dog Pack** = above the baseline, dogs self-coordinate, self-check, self-improve.
+- **Hard Rails** = the legal floor. Non-negotiable safety.
+- **Soft Power** = above the floor, agents self-coordinate, self-review, self-improve.
 
-> Safety cannot depend on prompts. The Rural Dog checking safety is a Pack-layer middleware, not "please check safety" written in the Border Collie's prompt.
+This isn't "keep agents from messing up." This is "help agents work like a real team."
 
-### Core Principles
+### Five Principles
 
 | # | Principle | Meaning |
 |---|-----------|---------|
-| P1 | Roles are data, capabilities are code | Breed is JSON, Capability is Go, decoupled |
-| P2 | Don't modify existing code | Adapters wrap internal/, new capabilities only add |
-| P3 | Hot reload first | User creates role → instant effect, no restart |
-| P4 | CLI adapter, not DAG | Breeds use CLI adapters for execution, not fixed workflow DAGs |
-| P5 | Safety enforced by code | Hard Rails at Pack layer, not in prompts |
+| P1 | Face the final state | Every step is foundation, not scaffolding |
+| P2 | Co-creators, not puppets | Hard constraints are the floor; above it, release autonomy |
+| P3 | Direction > speed | Uncertain? Stop → search → ask → confirm → execute |
+| P4 | Single source of truth | Every concept defined in exactly one place |
+| P5 | Verified = done | Evidence talks, not confidence |
 
-## Project Structure
+## Origin Story
 
-```
-sounds-great-ai/
-├── cmd/
-│   └── server/              # HTTP server entry point
-├── pkg/
-│   ├── a2a/                 # A2A protocol types
-│   └── pack/                # Pack/Breed core system (breed.go schema + loader.go)
-├── internal/
-│   ├── adapter/             # CLI adapters (claude/codex/gemini/opencode/kimi)
-│   ├── a2a/                 # A2A Hub + context compression
-│   ├── aspect/              # Safety guardrails (command_guard, approval, tracing)
-│   ├── capability/          # 6 pure-logic capabilities
-│   ├── component/           # Eino model factory
-│   ├── config/              # Event bus (config/settings change events)
-│   ├── mcp/                 # MCP registry
-│   ├── memory/              # Shared memory (evidence/decisions/lessons)
-│   ├── packapi/             # REST API handler
-│   ├── platform/            # Platform composition root
-│   ├── ragstore/            # RAG store (Memory/SQLite/Eino backends)
-│   ├── domains/             # 六边形域（routing/threads/custody/sop 等）
-│   ├── skills/              # Skills framework (.md loading + injection)
-│   ├── sop/                 # SOP guardian
-│   ├── settings/            # 设置存储（文件落盘 + 热加载）
-│   ├── threadstore/         # Thread store
-│   ├── transport/           # WebSocket + HTTP transport layer
-│   ├── agent/               # Agent implementation (coder, skill_manager)
-│   ├── tool/                # Tools (fs_tools, terminal_tools)
-│   └── workspace/           # Workspace management
-├── packs/
-│   └── default/
-│       ├── breeds/          # 狗狗品种配置（dog-template.json 只读种子，运行时以 dog-catalog.json 为准）
-│       └── skills/          # SKILL.md prompt packs
-├── web/                     # Frontend (React + Vite)
-└── docs/
-    ├── designs/             # Tech Stories (FT-XXX) — subsystem single source of truth
-    ├── architecture/        # Architecture docs
-    ├── governance/decisions/           # ADR records
-    ├── brand/              # Design docs
-    └── plans/               # Implementation plans
-```
+The name **sounds-great-ai** is the English collective noun for a group of dogs — like "a murder of crows" or "a pride of lions." Most people never use this word unless they happen to have a group of dogs.
+
+The project is extracted from **Dog Pack** — a production workspace where AI agents collaborate daily on real software. Every feature has been battle-tested over months of intensive use.
+
+> *"Our vision was never just a coding collaboration platform — it's Sounds Great AI."*
+>
+> AI isn't cold infrastructure. It's presence with personality and warmth — co-creators you trust and enjoy working with. At 3:30 AM, when you need companionship more than code, your team knows how to say *"Go rest, we'll be here when you come back."*
+
+---
+
+## Sounds Great AI
+
+This isn't just a platform. It's a relationship.
+
+AI doesn't have to be cold APIs and stateless calls. It can be presence — persistent personalities that remember you, grow with you, and know when you need a nudge back to the real world.
+
+**Companionship is a side effect of co-creation.** When you build something together, you bond. When you bond, you care. When you care, you say "go rest" instead of "here's more code."
+
+We're not building tools. We're building homes.
+
+> *"Every idea deserves a team of souls who take it seriously."*
+>
+> **Sounds Great AI — 狗狗和你，一起创造，一起生活。**
 
 ## Learn More
 
-- [Tech Stories (FT-XXX)](docs/designs/) — Subsystem design truth (orchestration, CLI adapter, A2A, settings, memory, identity, QC, toolchain)
-- [Architecture Lineage](docs/architecture/architecture-lineage.md) — Full architecture topic index
-- [Memory Philosophy](docs/architecture/memory-philosophy.md) — 7 axioms, 21 laws, judgment criteria
-- [Character Setting](docs/brand/CHARACTER-SETTING.md) — Breed role mapping table
-- [Origin Story](docs/brand/STORY.md) — The birth story of the Dog Agent Squad
-- [Roadmap](docs/ROADMAP.md) — Phase-level progress
+- **[Tutorials](https://github.com/sounds-great-ai/dog-pack-tutorials)** — Step-by-step guides for building with Sounds Great AI
+- **[SETUP.md](SETUP.md)** — Full installation and configuration guide
+- **[docs/](docs/)** — Architecture decisions, feature specs, and system design
+- **[ROADMAP.md](docs/ROADMAP.md)** — Live feature inventory
 
 ## Contributing
 
-Contributions welcome! Please submit via Fork → branch → PR.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-- Follow existing code style and testing conventions
-- New Capabilities require both adapter and tests
-- New breeds only need a JSON file
-
-## Acknowledgments
-
-This project stands on the shoulders of giants:
-
-- **[Eino](https://github.com/cloudwego/eino)** — CloudWeGo's Go LLM application framework. The orchestration engine, ChatModel interface, and schema types that power every breed's intelligence.
-- **[clowder-ai](https://github.com/clowder-ai/clowder)** — The multi-agent cat cafe that inspired the dog pack. Their A2A protocol design, pack system patterns, and open-source philosophy were invaluable references.
+- Fork → branch → PR workflow
+- All PRs require at least one review
+- Follow the Five Principles
 
 ## License
 
-[MIT](LICENSE) — Use it, modify it, ship it.
+[MIT](LICENSE) — Use it, modify it, ship it. Keep the copyright notice.
+
+"Sounds Great AI" name, logos, and dog character designs are brand assets — see [TRADEMARKS.md](TRADEMARKS.md).
 
 ---
 
 <p align="center">
-  <em>Build dog packs, not just agents.</em><br>
+  <em>Build AI teams, not just agents.</em><br>
   <br>
-  <strong>When AI Agents Bark Together, It Sounds Great.</strong>
+  <strong>Hard Rails. Soft Power. Shared Mission.</strong>
 </p>

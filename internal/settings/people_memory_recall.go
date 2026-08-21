@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// This file holds the F276 read/derive surface (RelationshipCard recall,
+// This file holds the read/derive surface (RelationshipCard recall,
 // alias resolution, listings) and the dual-path deferred-receipt machinery
 // (content-free receipts that a daily clerk claims back into proposals).
 
@@ -307,10 +307,10 @@ func firstOrEmptySource(coords []SourceRef) SourceRef {
 const PeopleMemoryRecallCardTokenCap = 160
 
 // PeopleMemoryRecallInjectionBudgetTokens is the per-turn budget for the whole
-// "关系记忆" injection block (homologous aggregate token budget).
+// "关系记忆" injection block (aggregate token budget).
 const PeopleMemoryRecallInjectionBudgetTokens = 600
 
-// F276 drill budget constants — homologous PERSON_MEMORY_LIMITS.
+// drill budget constants.
 // A drill is an on-demand, source-tied projection the dog asks for when it wants
 // the verbatim backing of a claim/relationship/event it only saw as a bounded
 // card. The per-call cap stops a single drill from bloating the context; the
@@ -358,8 +358,8 @@ type PeopleMemoryDrillResult struct {
 }
 
 // drillTurnBudget tracks the per-turn drill spend for one (operator, turn). It is
-// ephemeral process state (never persisted) — exactly homologous to the
-// in-memory PersonMemoryRecallService.budgets map.
+// ephemeral process state (never persisted); the store keeps it in its
+// in-memory drillBudgets map.
 type drillTurnBudget struct {
 	aggregateTokens int
 	callsByPerson   map[string]int
@@ -440,8 +440,8 @@ func (d *peopleMemoryDocument) drillFindItem(input PeopleMemoryDrillInput) (text
 	return "", SourceRef{}, 0, false
 }
 
-// recallContextForQuery returns a homologous "anchor-first" recall block
-// (F236): when the user's message references a known third-party person (by
+// recallContextForQuery returns an "anchor-first" recall block
+// when the user's message references a known third-party person (by
 // display name or alias), it injects a token-bounded RelationshipCard so the dog
 // "remembers" them. Returns ("", false) when nothing matches or the query is
 // empty. Cards are trimmed to PeopleMemoryRecallCardTokenCap and the whole
@@ -534,7 +534,7 @@ func formatRecallCard(card *RelationshipCard) string {
 
 // trimRecallCard renders the card but drops facts (oldest-first) until it fits
 // within tokenBudget runes/4; if still over, it drops the interaction and
-// relationship line (homologous degradation).
+// relationship line (degradation).
 func trimRecallCard(card *RelationshipCard, tokenBudget int) string {
 	trimmed := &RelationshipCard{
 		PersonID:         card.PersonID,

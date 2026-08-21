@@ -250,3 +250,60 @@ func TestSelectReviewPanelNoIndependentApprover(t *testing.T) {
 		t.Fatalf("expected ErrNoFinalApproverAvailable, got %v", err)
 	}
 }
+
+func TestSelectGuardianExcludesAuthorAndReviewer(t *testing.T) {
+	author := BreedInfo{ID: "bianmu", CLI: "claude", Available: true}
+	candidates := []BreedInfo{
+		{ID: "bianmu", CLI: "claude", Available: true}, // author
+		{ID: "xigou", CLI: "codex", Available: true},   // reviewer
+		{ID: "jinmao", CLI: "gemini", Available: true}, // eligible
+	}
+	guardian, err := SelectGuardian(author, "xigou", candidates)
+	if err != nil {
+		t.Fatalf("expected guardian, got error: %v", err)
+	}
+	if guardian.ID == "bianmu" || guardian.ID == "xigou" {
+		t.Errorf("guardian must differ from author and reviewer, got %s", guardian.ID)
+	}
+}
+
+func TestSelectGuardianPrefersCrossCLI(t *testing.T) {
+	author := BreedInfo{ID: "bianmu", CLI: "claude", Available: true}
+	candidates := []BreedInfo{
+		{ID: "demu", CLI: "claude", Available: true},  // same CLI as author
+		{ID: "jinmao", CLI: "gemini", Available: true}, // cross CLI
+	}
+	guardian, err := SelectGuardian(author, "xigou", candidates)
+	if err != nil {
+		t.Fatalf("expected guardian, got error: %v", err)
+	}
+	if guardian.ID != "jinmao" {
+		t.Errorf("cross-CLI guardian preferred, got %s", guardian.ID)
+	}
+}
+
+func TestSelectGuardianSameCLIFallback(t *testing.T) {
+	author := BreedInfo{ID: "bianmu", CLI: "claude", Available: true}
+	candidates := []BreedInfo{
+		{ID: "demu", CLI: "claude", Available: true}, // only same-CLI candidate
+	}
+	guardian, err := SelectGuardian(author, "xigou", candidates)
+	if err != nil {
+		t.Fatalf("expected degraded fallback guardian, got error: %v", err)
+	}
+	if guardian.ID != "demu" {
+		t.Errorf("expected degraded same-CLI fallback, got %s", guardian.ID)
+	}
+}
+
+func TestSelectGuardianNoneAvailable(t *testing.T) {
+	author := BreedInfo{ID: "bianmu", CLI: "claude", Available: true}
+	candidates := []BreedInfo{
+		{ID: "xigou", CLI: "codex", Available: true}, // reviewer
+		{ID: "zangao", CLI: "claude", Available: false}, // unavailable
+	}
+	_, err := SelectGuardian(author, "xigou", candidates)
+	if err != ErrNoGuardianAvailable {
+		t.Fatalf("expected ErrNoGuardianAvailable, got %v", err)
+	}
+}

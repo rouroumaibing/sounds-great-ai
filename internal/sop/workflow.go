@@ -37,14 +37,18 @@ type WorkflowState struct {
 	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
-// Valid stage transitions (rule-driven, not hardcoded DAG).
+// Valid stage transitions (rule-driven, not hardcoded DAG). fresh_context is
+// optional: a feature may skip it (quality_gate → review) or take it
+// (quality_gate → fresh_context → review), and may fall back to impl from
+// either gate when problems surface.
 var validTransitions = map[string][]string{
 	"kickoff":      {"impl"},
 	"impl":         {"quality_gate"},
-	"quality_gate": {"review", "impl"}, // can go back to impl
-	"review":       {"merge", "impl"},  // can go back to impl
-	"merge":        {"completion", "review"}, // can go back to review
-	"completion":   {}, // terminal
+	"quality_gate": {"fresh_context", "review", "impl"}, // can go back to impl
+	"fresh_context": {"review", "impl"},                 // optional pre-review refresh
+	"review":       {"merge", "impl"},                   // can go back to impl
+	"merge":        {"completion", "review"},            // can go back to review
+	"completion":   {},                                  // terminal
 }
 
 // IsValidTransition checks if a stage transition is allowed.

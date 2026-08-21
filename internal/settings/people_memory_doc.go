@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// This file holds the F276 document-level mutations on ONE operator's
+// This file holds the document-level mutations on ONE operator's
 // peopleMemoryDocument. Both the file store and the Redis store reuse these
 // exact methods; only the persistence wrapper differs.
 
@@ -221,7 +221,7 @@ func (d *peopleMemoryDocument) approveDrafts(candidateID string, draftIDs []stri
 }
 
 // rejectDrafts marks the given drafts as rejected — dropped, never
-// materialized — individually. This is the homologous per-card "reject"
+// materialized — individually. This is the per-card "reject"
 // of a profile-update action: each draft decides on its own. When every draft
 // is decided (approved or rejected) the candidate resolves. Nothing is
 // materialized here; only the per-draft decision flag and the candidate state

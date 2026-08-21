@@ -18,6 +18,7 @@ import (
 	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
 	custodyServices "sounds-great-ai/internal/domains/custody/services"
 	"sounds-great-ai/internal/hooks"
+	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/memory"
 	"sounds-great-ai/internal/ops"
 	"sounds-great-ai/internal/packapi"
@@ -33,6 +34,7 @@ import (
 	"sounds-great-ai/pkg/pack"
 
 	"github.com/cloudwego/eino/components/embedding"
+	"github.com/redis/go-redis/v9"
 )
 
 func BuildMux() http.Handler {
@@ -44,6 +46,11 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	auth := transport.NewAuthMiddleware()
 	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
 	cors := transport.CORSMiddleware(allowedOrigin)
+
+	// Shared MCP tool-introspection cache (TTL-bounded). Used by the MCP
+	// management handler to disclose each server's live tools without spawning
+	// a subprocess on every request.
+	mcpProbe := mcp.NewProbeCache(0, 0)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +149,21 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	mux.Handle("/api/rules", rulesHandler.Routes())
 	mux.Handle("/api/prompt-injection/", rulesHandler.Routes())
 
+	// SOP workflow bulletin board: feature stage / baton holder / next skill /
+	// resume capsule / check attestations, exposed so CLI agents and the UI can
+	// read and advance a handoff across sessions. Backed by the same Redis as
+	// carrier health (SG_REDIS_URL); NewWorkflowSOP degrades to in-memory when
+	// Redis is unset or unreachable. The board is information sharing, not flow
+	// control — writes are CAS-guarded and stage transitions stay rule-driven.
+	var workflowStore *sop.WorkflowSOP
+	if redisURL := os.Getenv("SG_REDIS_URL"); redisURL != "" {
+		workflowStore = sop.NewWorkflowSOP(redis.NewClient(&redis.Options{Addr: redisURL}))
+	} else {
+		workflowStore = sop.NewWorkflowSOP(nil)
+	}
+	workflowSOPHandler := transport.NewWorkflowSOPHandler(workflowStore)
+	mux.Handle("/api/backlog/", auth.Wrap(workflowSOPHandler.Routes()))
+
 	var evidenceStore memory.EvidenceStore
 	if pl != nil {
 		evidenceStore = pl.EvidenceStore
@@ -159,7 +181,7 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 		mux.Handle("/api/profiles", auth.Wrap(profilesHandler.Routes()))
 		mux.Handle("/api/profiles/", auth.Wrap(profilesHandler.Routes()))
 		// Wire the capsule handler into the WS handler so session seal can fire
-		// a best-effort autonomous distill (KD-10 F276 maturity trigger).
+		// a best-effort autonomous distill (KD-10 maturity trigger).
 		wsHandler.SetProfilesHandler(profilesHandler)
 	}
 	if pl != nil && pl.Continuity != nil {
@@ -189,7 +211,7 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 		if pl.Leader != nil && pl.Leader.Name != "" {
 			lanesOperator = pl.Leader.Name
 		}
-		// P2-6 LLM reflection: opt-in synthesis service (irreversible-decisions
+		// P2-6 LLM reflection: opt-in synthesis service (不可逆决策
 		// §4.8). Built from SG_REFLECT_* env; nil when unset so the platform
 		// stays deterministic and the endpoint degrades to a clear 501.
 		var lanesReflector transport.MemoryReflector
@@ -202,8 +224,7 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 		if emb, eerr := capability.NewEmbedModelFromEnv(context.Background()); eerr == nil && emb != nil {
 			lanesHandler.SetEmbedder(capability.NewMemoryEmbed(emb))
 		}
-		// P1 hybrid RRF embed mode (off/shadow/on), homologous clowder
-		// EmbedConfig.embedMode. SG_EMBED_MODE overrides; otherwise the registry
+		// P1 hybrid RRF embed mode (off/shadow/on),		// EmbedConfig.embedMode. SG_EMBED_MODE overrides; otherwise the registry
 		// default (on when a vector store exists) applies.
 		if mode := os.Getenv("SG_EMBED_MODE"); mode != "" {
 			pl.SharedMemory.SetEmbedMode(mode)
@@ -249,10 +270,16 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	repoHandler := transport.NewRepoTrajectoryHandler(pl)
 	mux.Handle("/api/repo/", repoHandler.Routes())
 
-	skillsHandler := transport.NewSkillsHandler(pl.Skills, workspaceDir, "")
-	mux.Handle("/api/skills", auth.Wrap(skillsHandler.Routes()))
-	mux.Handle("/api/skills/", auth.Wrap(skillsHandler.Routes()))
-	mux.HandleFunc("GET /api/mcp/servers", MCPServersHandler(pl))
+	if pl != nil {
+		skillsHandler := transport.NewSkillsHandler(pl.Skills, workspaceDir, "")
+		mux.Handle("/api/skills", auth.Wrap(skillsHandler.Routes()))
+		mux.Handle("/api/skills/", auth.Wrap(skillsHandler.Routes()))
+	}
+	if pl != nil && pl.MCPStore != nil {
+		mcpHandler := transport.NewMCPHandler(pl.MCPStore, mcpProbe)
+		mux.Handle("/api/mcp/servers", auth.Wrap(mcpHandler.Routes()))
+		mux.Handle("/api/mcp/servers/", auth.Wrap(mcpHandler.Routes()))
+	}
 	mux.HandleFunc("GET /api/ops/health", OpsHealthHandler(startTime))
 	mux.HandleFunc("GET /api/ops/logs", OpsLogsHandler(logBuf))
 	mux.HandleFunc("GET /api/diagnostics/pool", DiagnosticsPoolHandler(wsHandler, logBuf, registry))
@@ -278,27 +305,6 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	}
 
 	return telemetry.TraceMiddleware(cors(mux))
-}
-
-func MCPServersHandler(pl *platform.Platform) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		type mcpItem struct {
-			Name    string   `json:"name"`
-			Tools   []string `json:"tools"`
-			Enabled bool     `json:"enabled"`
-		}
-		if pl == nil || pl.MCP == nil {
-			json.NewEncoder(w).Encode([]mcpItem{})
-			return
-		}
-		servers := pl.MCP.All()
-		items := make([]mcpItem, 0, len(servers))
-		for _, s := range servers {
-			items = append(items, mcpItem{Name: s.Name, Tools: []string{}, Enabled: s.Enabled})
-		}
-		json.NewEncoder(w).Encode(items)
-	}
 }
 
 func OpsHealthHandler(startTime time.Time) http.HandlerFunc {

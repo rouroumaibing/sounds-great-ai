@@ -18,8 +18,8 @@ type QCStepResult struct {
 }
 
 // QCLoopResult holds the overall QC loop result plus the state-machine and
-// risk-tier metadata added to close the gaps identified in the SG↔clowder
-// comparison (stateless→stateful, no risk-tiering).
+// risk-tier metadata added to close the gaps (stateless→stateful, no
+// risk-tiering).
 type QCLoopResult struct {
 	Passed      bool           `json:"passed"`
 	Steps       []QCStepResult `json:"steps"`
@@ -33,7 +33,7 @@ type QCLoopInput struct {
 	WorkDir      string
 	AuthorBreed  string
 	ReviewerBreed string
-	// FinalApproverBreed is the Layer-3 final approver (clowder F253: a second
+	// FinalApproverBreed is the Layer-3 final approver (a second
 	// named identity, independent of both author and reviewer). Hygiene (Layer 1)
 	// is automated by step1 and needs no breed field.
 	FinalApproverBreed string
@@ -41,7 +41,7 @@ type QCLoopInput struct {
 	FeatureName  string
 	SpecDir      string
 	ChangedFiles []string
-	// Fix enables deterministic hygiene auto-fix (gofmt -w) — clowder F253 A1.
+	// Fix enables deterministic hygiene auto-fix (gofmt -w).
 	Fix bool
 	// FixCommit commits auto-fixes with a [qc-bot] signature (implies Fix).
 	FixCommit bool
@@ -80,7 +80,7 @@ func (q *QCLoop) resolveStatePath() string {
 	return DefaultQCStatePath(q.workDir)
 }
 
-// assessRisk maps changed files to a QC depth (clowder F253 trigger strategy):
+// assessRisk maps changed files to a QC depth (trigger strategy):
 //   - unknown (no file list) → "full" (conservative default)
 //   - any Go file touched     → "full"  (shared capability, full 7-step)
 //   - docs/markdown only      → "light" (hygiene + fresh_context + sign_off)
@@ -155,7 +155,7 @@ func (q *QCLoop) Run(input QCLoopInput) QCLoopResult {
 
 // Step 1: Hygiene — detect (default) or auto-fix (--fix). Auto-fix uses gofmt
 // (deterministic, allowlist-equivalent for Go); --fix-commit stamps a [qc-bot]
-// commit but refuses to swallow pre-existing user WIP (clowder dirty-before guard).
+// commit but refuses to swallow pre-existing user WIP (dirty-before guard).
 func (q *QCLoop) step1Hygiene(input QCLoopInput) QCStepResult {
 	dir := q.workDir
 	if dir == "" {
@@ -206,7 +206,7 @@ func (q *QCLoop) step2FreshContext(input QCLoopInput) QCStepResult {
 }
 
 // Step 3: Cross-breed review (Layer-2 reviewer from different breed) plus
-// Layer-3 final-approver independence (clowder F253 three-role split).
+// Layer-3 final-approver independence (three-role split).
 func (q *QCLoop) step3CrossBreedReview(input QCLoopInput) QCStepResult {
 	if input.ServerMode {
 		return QCStepResult{Step: 3, Name: "cross_breed_review", Passed: true, Message: "server auto-mode: cross-model review verified at merge gate (advisory)"}
@@ -241,8 +241,8 @@ func (q *QCLoop) step4EvidenceManifest(input QCLoopInput) QCStepResult {
 	return QCStepResult{Step: 4, Name: "evidence_manifest", Passed: true, Message: fmt.Sprintf("%d changed files tracked", len(input.ChangedFiles))}
 }
 
-// Step 5: CI repair (run go build + go test, report failures). Mirrors
-// clowder's ci_repair which gates on both build and test. Skipped (advisory)
+// Step 5: CI repair (run go build + go test, report failures).
+// Skipped (advisory)
 // when workDir is not a Go module so the loop stays usable outside a repo.
 func (q *QCLoop) step5CIRepair(input QCLoopInput) QCStepResult {
 	if input.SkipHeavy {
@@ -262,7 +262,7 @@ func (q *QCLoop) step5CIRepair(input QCLoopInput) QCStepResult {
 	if buildErr != nil {
 		return QCStepResult{Step: 5, Name: "ci_repair", Passed: false, Message: "go build failed: " + strings.TrimSpace(string(buildOut))}
 	}
-	// Run go test (parity with clowder ci_repair: build + test)
+	// Run go test
 	testCmd := exec.Command("go", "test", "./...")
 	testCmd.Dir = dir
 	testOut, testErr := testCmd.CombinedOutput()

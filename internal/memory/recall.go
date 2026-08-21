@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Recall consumption outcome (P0-1). Homologous clowder recall_events.outcome
-// ('used' | 'ignored'). SG's deterministic pipeline has no tool-consumption
+// Recall consumption outcome (P0-1), 'used' | 'ignored'. SG's deterministic
+// pipeline has no tool-consumption
 // signal, so outcome is set by the operator (or a future verification hook)
 // marking whether surfaced memory was actually useful. "" = unverified.
 const (
@@ -20,8 +20,8 @@ const (
 	RecallOutcomeIgnored = "ignored"
 )
 
-// Three-axis semantic classification of a recall (homologous clowder
-// RecallLedgerThreeAxis: 有害消费 / 错失需求 / 注意力成本). SG maps the
+// Three-axis semantic classification of a recall (有害消费 / 错失需求 /
+// 注意力成本). SG maps the
 // operator outcome onto these axes so the ledger reports recall *quality*, not
 // just volume.
 const (
@@ -30,8 +30,8 @@ const (
 	AxisAttention  = "attention"  // memory surfaced but ignored → attention cost
 )
 
-// Maturity labels how trustworthy a three-axis measurement is (homologous
-// clowder RecallLedgerThreeAxis 成熟度: 实测/估算/下界/无数据).
+// Maturity labels how trustworthy a three-axis measurement is
+// (实测/估算/下界/无数据).
 const (
 	MaturityMeasured  = "measured"
 	MaturityEstimated = "estimated"
@@ -39,8 +39,7 @@ const (
 	MaturityNone      = "none"
 )
 
-// RecallEvent is a single memory-recall observation (homologous clowder
-// recall_events / RecallFeed). It records that approved shared-memory truth was
+// RecallEvent is a single memory-recall observation. It records that approved shared-memory truth was
 // surfaced into a dog's prompt (a "push" recall) or pulled on demand (a "pull"
 // recall) so the operator can see what memory was surfaced, how often, and —
 // via Outcome / Axis / Maturity — the *quality* of that recall. Content-free
@@ -58,10 +57,9 @@ type RecallEvent struct {
 	Maturity  string `json:"maturity"`  // Maturity*
 }
 
-// RecallWindowStat is the per-day-window consumption view returned by Ledger
-// (homologous clowder RecallLedger funnel + CrossCatMetricsComputer
-// unverifiedConsumptionRate + RecallLedgerThreeAxis). It reports both the raw
-// counts and the three-axis semantic breakdown with maturity labels.
+// RecallWindowStat is the per-day-window consumption view returned by Ledger.
+// It reports both the raw counts and the three-axis semantic breakdown with
+// maturity labels.
 type RecallWindowStat struct {
 	Total      int            `json:"total"`
 	Used       int            `json:"used"`
@@ -77,8 +75,7 @@ type RecallWindowStat struct {
 // RecallStore persists recall events + lifecycle traces in the shared SQLite
 // store (recall_entry / lifecycle_trace tables), and answers recent-event,
 // ledger, and lifecycle queries. Backend for the frontend RecallFeed /
-// RecallLedger / lifecycle trace (homologous clowder RecallFeed.tsx +
-// RecallLedger.tsx + lifecycle_traces).
+// RecallLedger / lifecycle trace.
 type RecallStore struct {
 	db *sql.DB
 }
@@ -148,7 +145,7 @@ func outcomeMaturity(outcome string) string {
 
 // MarkOutcome sets the consumption outcome (used/ignored) of a recall event,
 // completing the consumption-verification loop. axis/maturity override the
-// defaults when provided (homologous clowder three-axis manual tagging).
+// defaults when provided.
 // operator, when non-empty, re-affirms the acting operator who confirmed the
 // outcome (multi-operator attribution); when empty the creation-time operator
 // is preserved so a non-scoped mark never clobbers record ownership.
@@ -213,7 +210,7 @@ func (s *RecallStore) Recent(limit int) []*RecallEvent {
 
 // Ledger returns, for each requested day-window, the recall counts and the
 // three-axis semantic breakdown (beneficial / unmet / attention) with maturity
-// labels (homologous clowder RecallLedger funnel + RecallLedgerThreeAxis).
+// labels.
 func (s *RecallStore) Ledger(windows []int) map[string]RecallWindowStat {
 	res := make(map[string]RecallWindowStat)
 	for _, w := range windows {
@@ -280,8 +277,7 @@ func (s *RecallStore) Ledger(windows []int) map[string]RecallWindowStat {
 	return res
 }
 
-// RecordLifecycle appends an append-only lifecycle-trace record (homologous
-// clowder lifecycle_traces). Used to track creation / consumption / correction
+// RecordLifecycle appends an append-only lifecycle-trace record. Used to track creation / consumption / correction
 // of a memory entry across its whole lifecycle.
 func (s *RecallStore) RecordLifecycle(axis LifecycleAxis, entryID, lane, detail, maturity string) {
 	if s.db == nil {

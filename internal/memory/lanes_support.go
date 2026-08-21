@@ -50,8 +50,7 @@ func (r *LaneRegistry) FindLaneOf(id string) (LaneType, bool) {
 	return "", false
 }
 
-// SetSensitivity re-classifies an entry's sensitivity level (Gap2, homologous
-// clowder edge/marker source_sensitivity). Rejected when the level is unknown.
+// SetSensitivity re-classifies an entry's sensitivity level (Gap2). Rejected when the level is unknown.
 // The new level takes effect on the next recall filter via EntryVisible.
 func (r *LaneRegistry) SetSensitivity(id, level string) bool {
 	if !ValidSensitivity(level) {
@@ -92,7 +91,7 @@ func (r *LaneRegistry) SensitivityOf(id string) (string, bool) {
 
 // operatorMatches reports whether an entry is visible to the given operator.
 // "" operator sees everything; a named operator sees entries it owns plus
-// shared (""-operator) entries — homologous clowder ownerUserId partitioning.
+// shared (""-operator) entries.
 func operatorMatches(e *LaneEntry, operator string) bool {
 	if operator == "" {
 		return true
@@ -126,8 +125,7 @@ func (r *LaneRegistry) RecallEntries(maxLines int, operator string) ([]*LaneEntr
 }
 
 // Search returns lane entries whose content matches query (FTS5 on SQLite,
-// substring on JSON), visible to operator. Homologous clowder FTS5 full-text
-// recall search. Returns nil when there is no match or no persister.
+// substring on JSON), visible to operator. Returns nil when there is no match or no persister.
 func (r *LaneRegistry) Search(query, operator string) []*LaneEntry {
 	if r.persister == nil {
 		return nil
@@ -147,7 +145,7 @@ func (r *LaneRegistry) Search(query, operator string) []*LaneEntry {
 
 // SharedMemoryTruth returns a token-bounded markdown block of all approved
 // (canonical) entries visible to operator, for injection into a dog's system
-// prompt (Persistent Identity, homologous clowder F296 context presentation).
+// prompt (Persistent Identity).
 // Pending candidates and retired/forgotten entries are excluded (M5 submission
 // boundary: only human-approved truth is recalled). Returns ("", false, nil)
 // when there is no approved truth. maxLines caps the block so the identity

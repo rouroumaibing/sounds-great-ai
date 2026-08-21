@@ -15,7 +15,7 @@ import (
 // vectorStore persists dense embeddings in a dedicated SQLite file (path +
 // ".vec.db") keyed by entry_id (whole-entry vector) and passage_key (passage
 // vectors). Similarity search is exact cosine computed in Go over the stored
-// vectors (homologous clowder vec0). The hybrid RRF fusion that combines these
+// vectors. The hybrid RRF fusion that combines these
 // vectors with BM25 lexical recall lives in lane_hybrid.go.
 type vectorStore struct {
 	db *sql.DB
@@ -42,7 +42,7 @@ func openVectorDB(path string) (*vectorStore, error) {
 		db.Close()
 		return nil, err
 	}
-	// Passage-level vectors (clowder passage_vectors): an entry is chunked and
+	// Passage-level vectors: an entry is chunked and
 	// each chunk embedded, so a recall can match a sub-section, not just the
 	// whole entry.
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS lane_passage_vec (

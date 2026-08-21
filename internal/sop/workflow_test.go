@@ -88,14 +88,20 @@ func TestIsValidTransition(t *testing.T) {
 		{"", "kickoff", true},
 		{"kickoff", "impl", true},
 		{"impl", "quality_gate", true},
-		{"quality_gate", "review", true},
-		{"quality_gate", "impl", true}, // can go back
+		{"quality_gate", "fresh_context", true}, // optional pre-review refresh
+		{"quality_gate", "review", true},        // skip fresh_context
+		{"quality_gate", "impl", true},          // can go back
+		{"fresh_context", "review", true},
+		{"fresh_context", "impl", true}, // can go back
 		{"review", "merge", true},
 		{"review", "impl", true}, // can go back
 		{"merge", "completion", true},
 		{"merge", "review", true}, // can go back
 		{"kickoff", "merge", false},
 		{"completion", "impl", false},
+		{"impl", "fresh_context", false}, // must pass quality_gate first
+		{"fresh_context", "merge", false},
+		{"fresh_context", "completion", false},
 	}
 	for _, tt := range tests {
 		if got := IsValidTransition(tt.from, tt.to); got != tt.valid {

@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// PeopleMemoryStore is the operator-scoped F276 contract. Both the file-backed
+// PeopleMemoryStore is the operator-scoped contract. Both the file-backed
 // (FilePeopleMemoryStore) and Redis-backed (RedisPeopleMemoryStore) stores
 // satisfy it. Every method takes operatorID first: the entire
 // people-memory keyspace is scoped by operatorID, and SG enforces that so multiple
@@ -36,11 +36,11 @@ type PeopleMemoryStore interface {
 	// Read / derive surface.
 	RecallCard(operatorID, personID string) (*RelationshipCard, bool, error)
 	// RecallContextForQuery returns a token-bounded "关系记忆" block for the
-	// given user message (homologous anchor-first recall injection), or
+	// given user message (anchor-first recall injection), or
 	// ("", false) when no known person is referenced.
 	RecallContextForQuery(operatorID, query string) (string, error)
 	// RecallDrill returns the verbatim backing of one recall item (claim/
-	// relationship/event), enforcing homologous per-turn drill budgets.
+	// relationship/event), enforcing per-turn drill budgets.
 	// It is read-only: it never mutates the persisted document, only the
 	// ephemeral (operator, turn) budget map held by the store.
 	RecallDrill(operatorID string, input PeopleMemoryDrillInput) (*PeopleMemoryDrillResult, error)
@@ -68,7 +68,7 @@ type PeopleMemoryStore interface {
 	ListOperators() ([]string, error)
 }
 
-// FilePeopleMemoryStore is the zero-dependency, owner-private F276 store. It is
+// FilePeopleMemoryStore is the zero-dependency, owner-private store. It is
 // safe for concurrent use (one RWMutex guards the whole operator map; all
 // mutations persist atomically through writeAtomicRaw). The on-disk envelope is
 // a map[operatorID]*peopleMemoryDocument under ConfigRoot/people-memory.json.
@@ -364,7 +364,7 @@ func (s *FilePeopleMemoryStore) RecallContextForQuery(operatorID, query string) 
 	return block, nil
 }
 
-// RecallDrill implements the on-demand drill with homologous per-turn
+// RecallDrill implements the on-demand drill with per-turn
 // budget discipline. It is read-only against the persisted document; it only
 // mutates the ephemeral drillBudgets map.
 func (s *FilePeopleMemoryStore) RecallDrill(operatorID string, input PeopleMemoryDrillInput) (*PeopleMemoryDrillResult, error) {

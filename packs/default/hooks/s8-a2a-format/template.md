@@ -41,6 +41,6 @@ Thread {
 }
 ```
 
-> **受控 A2A 协议客户端（§4.7）**：平台可作 **A2A 客户端**，经 Google A2A Protocol `tasks/send` JSON-RPC over HTTPS 调用**外部已部署 agent**（实现限 `internal/adapter/a2a/`，协议类型复用 `pkg/a2a/`，按 breed `variant.client_id="a2a"` + `a2a_url` 路由）。**禁止**新建 A2A HTTP **server**（暴露本地 agent 供第三方 push），也**禁止**引入 `internal/a2a/server/` 或 `internal/a2a/client/` 子目录（`docs/governance/decisions/irreversible-decisions.md` §4.1+§4.7）。
+> **受控 A2A 协议客户端（§4.7）**：平台可作 **A2A 客户端**，经 Google A2A Protocol `tasks/send` JSON-RPC over HTTPS 调用**外部已部署 agent**（实现限 `internal/adapter/a2a/`，协议类型复用 `pkg/a2a/`，按 breed `variant.client_id="a2a"` + `a2a_url` 路由）。**禁止**新建 A2A HTTP **server**（暴露本地 agent 供第三方 push），也**禁止**引入 `internal/a2a/server/` 或 `internal/a2a/client/` 子目录（`不可逆决策` §4.1+§4.7）。
 
 > **球权为编排一等状态源（§4.5）**：`BallLedger` 是 append-only 事件账本 + 纯函数 8 态投影，既服务 Trail/Brief 可观测，也参与运行守卫——`execution.go:handleA2AHandoff` 在派发前读 `BallLedger.Snapshot` 确认持球者，被第三方接管则中止 handoff（读驱动，非仅审计）。

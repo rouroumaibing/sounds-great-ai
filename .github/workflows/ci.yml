@@ -62,7 +62,6 @@ jobs:
         # step node_modules is empty and the gate fails with "No such file".
         run: cd web && npm ci
       - name: Pre-merge gate
-        # Consolidated gate (build + vet + test + frontend build). Mirrors
-        # clowder's pre-push / CI gate. --no-rebase because CI checks out a
-        # detached HEAD, not a feature branch.
+        # Consolidated gate (build + vet + test + frontend build). --no-rebase
+        # because CI checks out a detached HEAD, not a feature branch.
         run: bash scripts/pre-merge-check.sh --no-rebase

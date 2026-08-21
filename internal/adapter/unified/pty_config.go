@@ -1,6 +1,6 @@
 package unified
 
-// PtyConfig tunes the interactive_pty driver (R3 alignment with F230
+// PtyConfig tunes the interactive_pty driver (R3 alignment with
 // PtyDriver). All fields are opt-in; zero values fall back to safe defaults
 // via defaultPtyConfig. The struct is defined in an un-tagged file so both
 // pty_real.go (//go:build pty) and pty_stub.go (//go:build !pty) can reference
@@ -33,8 +33,8 @@ type PtyConfig struct {
 	// at process start). Ignored unless ResumeSupported is true.
 	ResumeSessionID string
 	// TmuxMode, when true, launches claude inside a detached tmux session and
-	// reads its output via the transcript-file + Hook side-channel architecture
-	// (F230), instead of scraping the PTY master directly. It is only
+	// reads its output via the transcript-file + Hook side-channel architecture,
+	// instead of scraping the PTY master directly. It is only
 	// effective under `-tags pty`, only when the command is `claude`, and only
 	// when `tmux` is on PATH; otherwise Spawn transparently falls back to the
 	// direct pty.Start path. Default false — keep the simpler direct path.

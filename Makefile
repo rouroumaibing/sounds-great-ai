@@ -161,9 +161,11 @@ qc:
 tools:
 	@mkdir -p bin
 	go build -o bin/memory ./cmd/memory/
-	go build -o bin/mcp-server ./cmd/mcp-server/
+	go build -o bin/sounds-great-mcp-server ./cmd/mcp-server/
+	go build -o bin/sounds-great-platform-mcp-server ./cmd/platform-mcp-server/
+	go build -o bin/gen-mcp-baseline ./cmd/gen-mcp-baseline/
 	go build -o bin/sg-cli-supervisor ./cmd/sg-cli-supervisor/
-	@echo "Built tools -> bin/memory, bin/mcp-server, bin/sg-cli-supervisor"
+	@echo "Built tools -> bin/memory, bin/sounds-great-mcp-server, bin/sounds-great-platform-mcp-server, bin/gen-mcp-baseline, bin/sg-cli-supervisor"
 
 install-git-hooks:
 	@mkdir -p .git/hooks
@@ -200,5 +202,5 @@ help:
 	@echo "  make backend       Start Go backend only"
 	@echo "  make frontend      Start Vite dev server only"
 	@echo "  make qc AUTHOR=<breed>   Run the 7-step QC loop locally (cross-model review gate)"
-	@echo "  make tools               Build auxiliary Go tools into bin/ (memory, mcp-server, sg-cli-supervisor)"
+	@echo "  make tools               Build auxiliary Go tools into bin/ (memory, sounds-great-mcp-server, sounds-great-platform-mcp-server, gen-mcp-baseline, sg-cli-supervisor)"
 	@echo "  make install-git-hooks   Install scripts/pre-merge-check.sh as .git/hooks/pre-push"

@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "featureId": "SG-MCP-SURFACE",
+  "generatedAt": "2026-08-21T10:30:58Z",
+  "tools": [
+    {
+      "name": "sg_add_evidence",
+      "family": "memory",
+      "read_only": false,
+      "destructive": false,
+      "idempotent": false,
+      "open_world": false
+    },
+    {
+      "name": "sg_create_thread",
+      "family": "collab",
+      "read_only": false,
+      "destructive": false,
+      "idempotent": false,
+      "open_world": false
+    },
+    {
+      "name": "sg_get_dog",
+      "family": "roster",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_get_thread",
+      "family": "collab",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_get_workflow_sop",
+      "family": "sop",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_list_breeds",
+      "family": "breeds",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_list_dogs",
+      "family": "roster",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_list_messages",
+      "family": "collab",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_list_threads",
+      "family": "collab",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_people_recall",
+      "family": "people",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_post_message",
+      "family": "collab",
+      "read_only": false,
+      "destructive": false,
+      "idempotent": false,
+      "open_world": false
+    },
+    {
+      "name": "sg_search_evidence",
+      "family": "memory",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_update_workflow_sop",
+      "family": "sop",
+      "read_only": false,
+      "destructive": false,
+      "idempotent": false,
+      "open_world": false
+    }
+  ],
+  "digest": "sha256:0c2f13ed959013a4c1d3f6979103afb19e839f417e6c0287217a65e062756f55"
+}

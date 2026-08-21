@@ -26,7 +26,7 @@ import (
 // requires a real TTY; the warm-pool (R2 bg_daemon) tier is now DEFAULT-ON via
 // platform.WireWarmPools.
 //
-// Alignment with F230 PtyDriver (R3 gap remediation, "不臆想，按实际代码"):
+// Alignment with PtyDriver (R3 gap remediation, "不臆想，按实际代码"):
 //   - ready probe: a fixed grace after pty.Start before injecting the prompt
 //     (PtyDriver Note 1: "no screen scraping — grace is sufficient" — the TUI
 //     reaches its ❯ prompt within 10-15s, so a grace beats scraping).

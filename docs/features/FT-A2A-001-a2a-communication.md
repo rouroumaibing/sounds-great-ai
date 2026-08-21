@@ -2,7 +2,7 @@
 
 > 本文档基于 `sounds-great-ai` 真实源码核查（**2026-08-17 生成，反映截至本日的代码真实状态**）编写，目标是把"A2A Communication（Agent-to-Agent 通信）"这一核心子系统（含 `@mention` 路由、链式 handoff、球权账本 custody、受控外部 A2A 协议客户端、hold_ball）的**前后端协作逻辑**固化为单一可信来源（single source of truth），供后续开发、review 与新人 onboarding 使用。
 >
-> 关联：**前序 STORY** `FT-ORC-001`（多智能体编排总览，本文是其 A2A 子集的细化与权威补充）；**红线依据** `docs/governance/decisions/irreversible-decisions.md` §4.7；**协作提示词** `packs/default/hooks/s8-a2a-format/template.md`（已对齐 §4.7）。
+> 关联：**前序 STORY** `FT-ORC-001`（多智能体编排总览，本文是其 A2A 子集的细化与权威补充）；**红线依据** `不可逆决策` §4.7；**协作提示词** `packs/default/hooks/s8-a2a-format/template.md`（已对齐 §4.7）。
 >
 > **关键纠正（相对旧对比报告 v2）**：旧 HTML 报告 `docs/A2A-COMMUNICATION-COMPARISON-2026-08-17-v2.html:58` 曾控告 `s8-a2a-format/template.md` "仍写不建 HTTP server/client（§4.1）"——经查当前 `template.md:32/44-46` **已对齐 §4.7**（允许受控客户端、禁止 server），该指控为过时误判，以本文为准。
 
@@ -14,16 +14,16 @@
 - **责任人**: PO: @operator | Dev: @bianmu(路由) / @xigou(代码) | QA: @demu(诊断)
 - **故事点/复杂度**: [ L (8分) ] —— 核心主链路（编排 + 球权 + 外部协议客户端），跨前后端 + 多域
 - **业务/技术目标**:
-  - As a **用户(Operator)/犬队成员**,
+  - As a **用户(Operator)/狗狗队伍成员**,
   - I want to **在一个对话(thread)里用 `@句柄` 把任务交给不同的犬（本地 CLI agent），并能把任务交给外部已部署的 A2A agent，同时实时看到每只 agent 的推理/工具/代码过程、以及"谁持球"的协作轨迹**,
-  - So that **多 agent 协作像犬队一样可观测、可审计、可接管（含跨进程/跨实例的外部 agent），而非黑盒串行调用**.
+  - So that **多 agent 协作像狗狗队伍一样可观测、可审计、可接管（含跨进程/跨实例的外部 agent），而非黑盒串行调用**.
 - **关键指标/埋点**: 无前端埋点；可观测性来自 custody 轨迹 API（`/api/custody/threads/{id}/trail`）与 Ops 面板（`/api/ops/traces|metrics|evals`）。
 
 ### 1.1 一句话定位
 
 A2A Communication 在 SG 中由**两层**构成，两者都走后端编排、前端只做发起者与观察者：
 
-1. **犬队内部协作（主路径）**：`@mention` 文本约定 + `internal/domains/custody` 球权账本（append-only 事件 + 纯函数 8 态投影） + CLI adapter 进程池（stdin/stdout pipe）。一切路由/分解/接力/持球决策在后端，前端不 spawn CLI。
+1. **狗狗队伍内部协作（主路径）**：`@mention` 文本约定 + `internal/domains/custody` 球权账本（append-only 事件 + 纯函数 8 态投影） + CLI adapter 进程池（stdin/stdout pipe）。一切路由/分解/接力/持球决策在后端，前端不 spawn CLI。
 2. **受控外部 A2A 协议客户端（§4.7 受控接入）**：平台作为 **A2A 协议客户端**，经 Google A2A Protocol `tasks/send` JSON-RPC over HTTPS 调**外部已部署 agent**（如另一套 SG 实例）。实现限 `internal/adapter/a2a/`（与 CLI adapter 并列，实现 `unified.AgentExecutor`），协议类型复用 `pkg/a2a/`；**红线禁止**新建内部 A2A server、禁止 `internal/a2a/server|client/` 子目录、禁止在 `internal/` 内置推理。
 
 ### 1.2 端到端 A2A 逻辑总览（前后端主线）
@@ -198,7 +198,7 @@ append-only 事件流，纯函数投影为可观测状态（**读驱动**：`han
 | `web/src/components/workspace/StreamTimeline.tsx` | 同一时间线渲染多犬事件流（彩色 `BreedCard`） |
 | `web/src/components/workspace/CustodyTrail.tsx` + `hooks/useCustodyTrail.ts` + `services/custody.ts` | **球权轨迹面板**（8 态中文、回合/传球/持球统计、事件轨迹）+ 人工唤醒按钮 |
 | `web/src/components/workspace/CommandBar.tsx` + `MentionPopover.tsx` | `@` 触发 mention 弹层，插入 `@{breedId}`（含 `@远程协作者`） |
-| `web/src/components/settings/MemberManagement.tsx` | 犬队成员/默认犬/Leader 编辑 |
+| `web/src/components/settings/MemberManagement.tsx` | 狗狗队伍成员/默认犬/Leader 编辑 |
 | `web/src/types/api.ts` + `types/index.ts` | `WsEvent`/`BreedConfig`/`Variant`(含 `a2a_url`)/`StreamEvent` 契约类型 |
 
 ### 4.7 受控外部 A2A 协议客户端接入（§4.7 落地细节）
@@ -240,10 +240,10 @@ append-only 事件流，纯函数投影为可观测状态（**读驱动**：`han
 | A-4 | `CustodyService` 孤儿实现 | ✅ **已删除（代码）** | 全仓 Grep "CustodyService" 无 Go 命中（仅旧 HTML 提及） |
 | A-5 | `internal/a2a/compressor.go` 死代码 | ✅ **已删除（代码）** | `Platform.Compressor` 字段已移除（`platform.go` 三处） |
 | A-6 | `pkg/a2a` 曾零引用死代码 | ✅ **已激活（代码）** | `adapter.go:30` import 复用；全仓仅 2 处引用 |
-| A-7 | 无内部 A2A server / 不入站控制面 | ✅ **红线禁止（设计约束）** | AGENTS.md:53/55；irreversible-decisions.md §4.7 |
+| A-7 | 无内部 A2A server / 不入站控制面 | ✅ **红线禁止（设计约束）** | AGENTS.md:53/55；不可逆决策 §4.7 |
 
 **无 P0/P1 阻塞项**：A2A 主链路（含外部客户端）无阻断性缺口。仅 A-1（流式订阅/自动发现）为特性增强，可在 §4.7 框架内排期，不构成红线冲突。
 
 ---
 
-> 关联文档：`docs/designs/FT-ORC-001-multi-agent-orchestration.md`（编排总览）、`docs/governance/decisions/irreversible-decisions.md`(§4.7)、`docs/architecture/platform-capabilities.md`(§6.2 A2A Protocol Client)、`packs/default/hooks/s8-a2a-format/template.md`、`docs/reference/API.md`(Pack API)。
+> 关联文档：`docs/designs/FT-ORC-001-multi-agent-orchestration.md`（编排总览）、`不可逆决策`(§4.7)、`平台能力清单`(§6.2 A2A Protocol Client)、`packs/default/hooks/s8-a2a-format/template.md`、`docs/reference/API.md`(Pack API)。

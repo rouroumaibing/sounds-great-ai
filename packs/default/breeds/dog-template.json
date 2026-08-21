@@ -17,7 +17,7 @@
         "primary": "#4A90D9",
         "secondary": "#357ABD"
       },
-      "role_description": "犬队总指挥和核心架构师，擅长任务分解、动态路由和结果合成",
+      "role_description": "狗狗队伍总指挥和核心架构师，擅长任务分解、动态路由和结果合成",
       "personality": "聪明有主见，全局观强，喜欢把复杂任务梳理清楚再动手",
       "team_strengths": "任务拆解、路由决策、结果合成"
     },
@@ -281,7 +281,7 @@
         "secondary": "#357ABD"
       },
       "personality": "聪明有主见，全局观强，喜欢把复杂任务梳理清楚再动手",
-      "role_description": "犬队总指挥和核心架构师，擅长任务分解、动态路由和结果合成",
+      "role_description": "狗狗队伍总指挥和核心架构师，擅长任务分解、动态路由和结果合成",
       "team_strengths": "任务拆解、路由决策、结果合成",
       "mention_patterns": [
         "@边牧",
@@ -1207,7 +1207,7 @@
           "variant_label": "A2A 客户端",
           "personality": "外部 agent，经 Google A2A Protocol 接入的异构协作伙伴",
           "team_strengths": "跨实例/跨生态协作、异构 agent 接入",
-          "system_prompt": "你是经 A2A 协议接入的外部协作者。你承接来自 Sounds Great AI 犬队的任务，按 A2A Protocol tasks/send 交付结果。你不持有本地球权状态，只作为被调用方返回制品。",
+          "system_prompt": "你是经 A2A 协议接入的外部协作者。你承接来自 Sounds Great AI 狗狗队伍的任务，按 A2A Protocol tasks/send 交付结果。你不持有本地球权状态，只作为被调用方返回制品。",
           "strengths": [
             "a2a",
             "cross-instance"

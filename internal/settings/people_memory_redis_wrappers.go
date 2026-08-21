@@ -260,7 +260,7 @@ func (s *RedisPeopleMemoryStore) RecallContextForQuery(operatorID, query string)
 	return block, nil
 }
 
-// RecallDrill implements the on-demand drill with homologous per-turn
+// RecallDrill implements the on-demand drill with per-turn
 // budget discipline. It is read-only against the persisted document; it only
 // mutates the ephemeral drillBudgets map (held per-process, like the
 // in-memory PersonMemoryRecallService.budgets).

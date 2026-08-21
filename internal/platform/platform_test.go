@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"sounds-great-ai/internal/adapter/unified"
+	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/settings"
 )
 
@@ -196,6 +197,43 @@ func TestPlatformBuildMCPConfigEmpty(t *testing.T) {
 	cfg := p.BuildMCPConfig()
 	if cfg != nil {
 		t.Errorf("expected nil MCP config with no servers, got %v", cfg)
+	}
+}
+
+func TestPlatformBuildMCPConfigRemote(t *testing.T) {
+	breedsDir := t.TempDir()
+	skillsDir := t.TempDir()
+
+	p, err := New(Config{BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if p.MCPStore == nil {
+		t.Fatal("MCPStore nil after New")
+	}
+	// A remote server (URL) should propagate as type=http with url + headers,
+	// and the local command/args stripped (clowder F247 remote mode).
+	if err := p.MCPStore.Add(mcp.MCPServerConfig{
+		Name:    "remote",
+		URL:     "https://mcp.example.com/mcp",
+		Headers: map[string]string{"Authorization": "Bearer tok"},
+		Enabled: true,
+	}); err != nil {
+		t.Fatalf("seed remote: %v", err)
+	}
+	cfg := p.BuildMCPConfig()
+	if cfg == nil || len(cfg.Servers) != 1 {
+		t.Fatalf("expected 1 server, got %v", cfg)
+	}
+	s := cfg.Servers[0]
+	if s.Type != "http" || s.URL != "https://mcp.example.com/mcp" {
+		t.Fatalf("remote server not emitted as http/url: %+v", s)
+	}
+	if s.Headers["Authorization"] != "Bearer tok" {
+		t.Fatalf("remote headers not emitted: %+v", s.Headers)
+	}
+	if s.Command != "" || len(s.Args) != 0 {
+		t.Fatalf("local command/args should be stripped for remote server: %+v", s)
 	}
 }
 

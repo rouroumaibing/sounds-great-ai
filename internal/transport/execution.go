@@ -74,12 +74,12 @@ func (h *WSHandler) recordBall(ctx context.Context, fn func(l custodyPorts.IBall
 }
 
 // fireProfileDistillationTrigger emits the KD-10 eval counter when a session
-// run completes — the homologous "session seal" for SG's one-shot
+// run completes — the "session seal" for SG's one-shot
 // model (ProfileDistillationTrigger.onSessionSealed). Beyond the observability
 // counter it ALSO performs a best-effort autonomous distill: the accumulated
 // evidence for the session's dog relationship key is aggregated into a pending
 // capsule proposal (never auto-applied). Reasoning stays in the CLI agent /
-// operator — the platform only aggregates what it already holds (docs/decisions/irreversible-decisions.md §4.1).
+// operator — the platform only aggregates what it already holds (不可逆决策 §4.1).
 // Both steps are fail-closed and non-blocking: a distill failure can never
 // break a dog run.
 func (h *WSHandler) fireProfileDistillationTrigger(sessionID, breedID, reason string) {
@@ -144,9 +144,8 @@ func (h *WSHandler) maybeSupplyLanes(sessionID, breedID string) {
 		delta := supply.Detect(sessionID, msgs)
 		candidates := supply.Produce(delta)
 		// Count the producer's intended submissions per lane for the
-		// lane_candidate_submitted eval counter (homologous clowder
-		// CrossCatMetricsComputer). Dedup on submit may drop some, but this
-		// reflects supply pressure per lane.
+		// lane_candidate_submitted eval counter. Dedup on submit may drop some,
+		// but this reflects supply pressure per lane.
 		byLane := map[memory.LaneType]int64{}
 		for _, c := range candidates {
 			byLane[c.Lane]++
@@ -216,9 +215,8 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 		})
 	}
 	// Emit the truth-injected counter and record a recall event when approved
-	// shared memory was recalled into this breed's system prompt (homologous
-	// clowder CrossCatMetricsComputer cross-cat consumption spread + recall_events
-	// observability). Only entries visible to this operator are recalled.
+	// shared memory was recalled into this breed's system prompt. Only entries
+	// visible to this operator are recalled.
 	if h.platform.SharedMemory != nil {
 		operator := "operator"
 		if h.platform.Leader != nil && h.platform.Leader.Name != "" {
@@ -245,10 +243,10 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 	}
 	systemPrompt, systemPromptL0 := h.injectHooks(systemPrompt, breedID, breed.DisplayName, breed.RoleDescription, breed.Personality, query, sessionID)
 
-	// Persistent Identity F276 (homologous recall injection): when the
+	// Persistent Identity (recall injection): when the
 	// user's message references a known third-party person, inject a token-bounded
 	// relationship card into the dog's context so it "remembers" them (anchor-first
-	// context entry, F236). The block is budgeted in settings so it never
+	// context entry). The block is budgeted in settings so it never
 	// bloats the prompt.
 	if h.platform != nil && h.platform.PeopleMemory != nil {
 		pmOp := "operator"
@@ -260,7 +258,7 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 		}
 	}
 
-	// Persistent Identity P2 (homologous auto-compact budget): the
+	// Persistent Identity P2 (auto-compact budget): the
 	// breed's configured compaction threshold bounds the history the platform
 	// feeds the CLI. In SG's one-shot model the platform controls context
 	// (not the CLI's in-session compaction), so this is the real consumer of
@@ -301,7 +299,7 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 	messages = prompt.ProtectRecentPairs(messages, 4)
 	messages = append(messages, schema.UserMessage(query))
 
-	// Persistent Identity P3 (homologous F211 continuity bootstrap):
+	// Persistent Identity P3 (continuity bootstrap):
 	// record this spawn as a NEW rotation so the NEXT spawn injects a
 	// "续接上下文" section (what it was working on). We advance the rotation
 	// index per spawn (RecordNextRotation) instead of hardcoding 0: in one-shot
@@ -314,7 +312,7 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 		}
 	}
 
-	// Persistent Identity (homologous distill): note which breed runs
+	// Persistent Identity (distill): note which breed runs
 	// this session so the autonomous-distill endpoint can derive the distiller
 	// from the CURRENT session instead of a hardcoded default dog. Best-effort.
 	if h.platform != nil {

@@ -14,14 +14,14 @@
 - **责任人**: PO: @operator | Dev: @bianmu(路由) / @xigou(代码) | QA: @demu(诊断)
 - **故事点/复杂度**: [ L (8分) ] —— 核心主链路，跨前后端 + 多域
 - **业务/技术目标**:
-  - As a **用户(Operator)/犬队成员**,
-  - I want to **在一个对话(thread)里用 `@句柄` 把任务路由给不同的"狗"(外部 CLI agent)，并实时看到每只狗的推理/工具/代码过程、以及"谁持球"的协作轨迹**,
-  - So that **多 agent 协作像犬队一样可观测、可审计、可接管，而非黑盒串行调用**.
+  - As a **用户(Operator)/狗狗队伍成员**,
+  - I want to **在一个对话(thread)里用 `@句柄` 把任务路由给不同的"狗狗"(外部 CLI agent)，并实时看到每只狗狗的推理/工具/代码过程、以及"谁持球"的协作轨迹**,
+  - So that **多 agent 协作像狗狗队伍一样可观测、可审计、可接管，而非黑盒串行调用**.
 - **关键指标/埋点**: 无前端埋点；可观测性来自 custody 轨迹 API（`/api/custody/threads/{id}/trail`）与 Ops 面板（`/api/ops/traces|metrics|evals`）。
 
 ### 1.1 一句话定位
 
-后端把"犬队编排"建模为 **WebSocket 事件流 + 球权账本(append-only event ledger) + CLI adapter 进程池**；前端是**发起者 + 观察者**：发原始文本、渲染流式事件、旁观球权轨迹。所有路由/分解/接力/持球决策都在**后端**完成，前端不运行任何 agent。
+后端把"狗狗队伍编排"建模为 **WebSocket 事件流 + 球权账本(append-only event ledger) + CLI adapter 进程池**；前端是**发起者 + 观察者**：发原始文本、渲染流式事件、旁观球权轨迹。所有路由/分解/接力/持球决策都在**后端**完成，前端不运行任何 agent。
 
 ### 1.2 端到端编排逻辑总览（前后端主线）
 
@@ -167,7 +167,7 @@ append-only 事件流，纯函数投影为可观测状态：
 
 | 端点 | 方法 | 用途 | 前端调用 |
 |------|------|------|----------|
-| `/api/breeds` | GET/POST/PATCH/DELETE | 狗狗(犬队)配置 CRUD | `breedService` |
+| `/api/breeds` | GET/POST/PATCH/DELETE | 狗狗(狗狗队伍)配置 CRUD | `breedService` |
 | `/api/settings/roster/{id}` | PATCH | 启用/停用成员(`available`) | `settingsService.updateRosterEntry` |
 | `/api/settings/accounts` | GET/POST/PATCH/DELETE | 账户与密钥(409=被绑定) | `AccountKeys` + `settingsService` |
 | `/api/config/leader` | PATCH | 编辑 Leader/Owner(`@You/@leader/@owner`) | `HubLeaderEditor` |
@@ -224,9 +224,9 @@ append-only 事件流，纯函数投影为可观测状态：
 
 为避免"breed / dog_id 身份理解不一致"，在此固化身份模型（本段为单一可信来源）：
 
-- **individual（个体）= 狗（dog）；species/breed（品种/容器）= `breeds[]` 这个数组桶**。
+- **individual（个体）= 狗狗（dog）；species/breed（品种/容器）= `breeds[]` 这个数组桶**。
   - `BreedConfig.dog_id` = breed 级个体 id（如 `bianmu`）；`variants[].dog_id` = variant 级个体 id（如 `bianmu-sonnet`）。
-- **两级都是同一个体的身份，不是冗余派生字段**：breed 级 `dog_id` 标识"这个 breed 所代表的狗"，variant 级 `dog_id` 覆盖为"该 variant 实际呈现的狗"；运行时以 variant 级为准。
+- **两级都是同一个体的身份，不是冗余派生字段**：breed 级 `dog_id` 标识"这个 breed 所代表的狗狗"，variant 级 `dog_id` 覆盖为"该 variant 实际呈现的狗狗"；运行时以 variant 级为准。
 - 先前出现的"理解不一致"源于 **reference/API.md 旧表述把身份说成"variant-based"、breed.go 旧注释把 breed 级 dog_id 暗示为可派生的 override**——这两处已在 2026-08-16 修正（见 `docs/reference/API.md` §Pack API 与 `pkg/pack/breed.go` 注释）。
 - **命名约定**：`breeds[]` / `BreedConfig` 保留为"品种容器"义；个体叙事统一为 dog。历史泄漏的 cat 风格术语 `requesterCat` / `ownerCat` 已彻底清理为 `requesterDog` / `ownerDog`（含持久化 front-matter 字段 `owner_cat` → `owner_dog`，旧 `owner_cat` 解析分支已移除，不再兼容）。
 
@@ -241,7 +241,7 @@ append-only 事件流，纯函数投影为可观测状态：
 | `web/src/components/workspace/BreedCard.tsx` + `BreedResponseStart/Complete.tsx` | 每只犬一次"叫唤"卡片 |
 | `web/src/components/workspace/CustodyTrail.tsx` + `hooks/useCustodyTrail.ts` + `services/custody.ts` | 球权轨迹面板(状态/持球者/回合·传球·持球统计/事件轨迹) + 人工唤醒按钮 |
 | `web/src/components/workspace/CommandBar.tsx` + `MentionPopover.tsx` | `@` 触发 mention 弹层，插入 `@{breedId}` |
-| `web/src/components/settings/MemberManagement.tsx` + `HubBreedEditor/HubLeaderEditor.tsx` | 犬队成员/默认犬/Leader 编辑 |
+| `web/src/components/settings/MemberManagement.tsx` + `HubBreedEditor/HubLeaderEditor.tsx` | 狗狗队伍成员/默认犬/Leader 编辑 |
 | `web/src/components/settings/AccountKeys.tsx` | 账户与密钥(409 强删确认) |
 | `web/src/components/drawer/tabs/PlanTab.tsx` | 任务计划面板；无 `taskPlanSteps` 时显示「暂无任务计划」空状态（诚实呈现，不误导） |
 | `web/src/lib/breed-colors.ts` | 6 犬配色(边牧蓝/西高地粉/金毛橙/德牧深灰/藏獒紫/田园犬绿) |

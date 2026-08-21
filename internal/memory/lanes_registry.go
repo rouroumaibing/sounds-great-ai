@@ -31,7 +31,7 @@ func NewLaneRegistry() *LaneRegistry {
 // (SQLite-preferred, JSON fallback — mirrors NewMemoryStoreAt /
 // NewEvidenceStoreAt). Restarting the process reloads all lanes and their
 // lifecycle statuses, so typed memory survives restarts (Persistent Identity
-// layer, F102/F231).
+// layer).
 func NewLaneRegistryAt(path string) *LaneRegistry {
 	r := &LaneRegistry{
 		lanes:     make(map[LaneType]*Lane),

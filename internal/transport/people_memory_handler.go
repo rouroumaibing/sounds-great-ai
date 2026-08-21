@@ -12,10 +12,10 @@ import (
 	"sounds-great-ai/internal/telemetry"
 )
 
-// PeopleMemoryHandler exposes the F276 "People & Relationship Memory" store over
+// PeopleMemoryHandler exposes the "People & Relationship Memory" store over
 // HTTP. Like the capsule handler, NO reasoning runs inside the platform: a
 // candidate is submitted as a proposal and only an explicit approval
-// materializes it (docs/decisions/irreversible-decisions.md §4.1). The content submitted is treated as operator/
+// materializes it (不可逆决策 §4.1). The content submitted is treated as operator/
 // CLI-authored truth; the platform stores and projects it only.
 //
 // Multi-operator: every request resolves its owner scope (operatorID) from the
@@ -122,7 +122,7 @@ func (h *PeopleMemoryHandler) StreamEvents(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// Routes mounts the F276 endpoints under /api/people-memory. Persons are
+// Routes mounts the endpoints under /api/people-memory. Persons are
 // namespaced under /person/ so the {personID} wildcard never collides with the
 // static /candidates and /deferred siblings (Go 1.22 ServeMux rule).
 func (h *PeopleMemoryHandler) Routes() *http.ServeMux {
@@ -254,7 +254,7 @@ func (h *PeopleMemoryHandler) RecallCard(w http.ResponseWriter, r *http.Request)
 }
 
 // Drill returns the verbatim backing of one recall item (claim / relationship /
-// event) on demand, enforcing homologous per-turn drill budgets. It is
+// event) on demand, enforcing per-turn drill budgets. It is
 // read-only: the store only consults the ephemeral (operator, turn) budget map,
 // never the persisted document. Response is PeopleMemoryDrillResult
 // (status: ok | not_available | budget_exceeded).
@@ -403,7 +403,7 @@ func (h *PeopleMemoryHandler) Approve(w http.ResponseWriter, r *http.Request) {
 }
 
 // RejectDrafts rejects the selected draft ids of a candidate individually
-// (homologous per-card reject) — the drafts are dropped and never
+// (per-card reject) — the drafts are dropped and never
 // materialized. The candidate resolves once every draft is decided.
 func (h *PeopleMemoryHandler) RejectDrafts(w http.ResponseWriter, r *http.Request) {
 	op := h.resolveOperator(r)

@@ -2,9 +2,8 @@ package memory
 
 import "sync"
 
-// SensitivityLevel is the 4-tier data-sensitivity classification, homologous
-// to clowder CollectionSensitivity (public/internal/private/restricted) with a
-// rank order so access can be gated by clearance. "" is treated as public for
+// SensitivityLevel is the 4-tier data-sensitivity classification
+// (public/internal/private/restricted) with a// rank order so access can be gated by clearance. "" is treated as public for
 // backward compatibility (pre-ACL entries have no sensitivity tag).
 type SensitivityLevel string
 
@@ -41,8 +40,7 @@ func ValidSensitivity(s string) bool {
 }
 
 // collectionGrants maps collectionID -> operators allowed to see its entries
-// regardless of ownership (homologous clowder authorizedCollections). A
-// non-empty CollectionID restricts visibility to its grantees + the entry's
+// regardless of ownership. A// non-empty CollectionID restricts visibility to its grantees + the entry's
 // owner; an empty CollectionID imposes no collection restriction (visibility
 // then depends only on owner scope + sensitivity clearance).
 var (
@@ -101,8 +99,7 @@ func ClearanceFor(operator string) int {
 }
 
 // EntryVisible reports whether operator may see entry under the 4-level
-// sensitivity model + collection grant ACL (homologous clowder
-// CollectionSensitivity + authorizedCollections). It combines orthogonal axes:
+// sensitivity model + collection grant ACL (// CollectionSensitivity + authorizedCollections). It combines orthogonal axes:
 //  1. scope — owner scope (operatorMatches) OR an explicit collection grant
 //             when the entry carries a non-empty CollectionID (a "" CollectionID
 //             is owner-scoped only, no grant override)

@@ -13,7 +13,7 @@ import (
 
 // InMemorySettingsStore implements SettingsStore with in-memory data structures.
 // It mirrors FileSettingsStore: breeds + roster + review_policy are the source
-// of truth (homologous); the deprecated Member methods are projected
+// of truth; the deprecated Member methods are projected
 // onto that structure via the shared helpers breedToMember/applyBreedUpdates.
 type InMemorySettingsStore struct {
 	mu            sync.RWMutex

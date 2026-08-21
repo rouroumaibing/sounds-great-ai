@@ -7,8 +7,8 @@ import (
 	"sounds-great-ai/internal/memory"
 )
 
-// SemanticSearch performs dense-vector recall over approved truth (Gap3,
-// homologous clowder vec0). It is opt-in: when the embedder is unconfigured
+// SemanticSearch performs dense-vector recall over approved truth (Gap3). It is
+// opt-in: when the embedder is unconfigured
 // (SG_EMBED_API_KEY unset) it returns a clear 501 so the platform stays
 // deterministic and lexical FTS5 search remains available.
 func (h *LanesHandler) SemanticSearch(w http.ResponseWriter, r *http.Request) {

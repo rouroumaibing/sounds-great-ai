@@ -41,7 +41,7 @@ type LaneEntry struct {
 	Timestamp     int64             `json:"timestamp"`   // unix milli
 	Status        LaneEntryStatus   `json:"status"`
 	OperatorID    string            `json:"operator_id"` // owner operator; "" = shared across operators
-	Sensitivity   string            `json:"sensitivity"` // data-sensitivity tag (F186); "" = none
+	Sensitivity   string            `json:"sensitivity"` // data-sensitivity tag; "" = none
 	CollectionID  string            `json:"collection_id"` // collection/namespace the entry belongs to
 	StatusHistory []LaneEntryStatus `json:"status_history,omitempty"` // prior statuses, for undo
 }
@@ -165,7 +165,7 @@ func (l *Lane) Forget(id string) bool {
 }
 
 // Defer snoozes a pending candidate (kept, not truth, surfaced separately as
-// "decide later"). Homologous clowder not-now semantics. Only pending entries
+// "decide later"). Only pending entries
 // can be deferred.
 func (l *Lane) Defer(id string) bool {
 	l.mu.Lock()
@@ -184,7 +184,7 @@ func (l *Lane) Defer(id string) bool {
 // Undo reverts the most recent status transition (back to the last recorded
 // status in StatusHistory). Process-local: history is not persisted across
 // restarts (the persister stores status only), so undo works within a process
-// session. Homologous clowder undo semantics.
+// session.
 func (l *Lane) Undo(id string) bool {
 	l.mu.Lock()
 	e, ok := l.entries[id]
@@ -203,8 +203,7 @@ func (l *Lane) Undo(id string) bool {
 // Withdraw re-opens an entry for human disposition: an approved or deferred
 // entry returns to pending (its truth is revoked until re-approved). Distinct
 // from Forget (terminal, excluded from recall) and Undo (reverts the single
-// last transition). Homologous clowder withdraw (pull a candidate/decision
-// back out of the materialized state without forgetting it).
+// last transition).
 func (l *Lane) Withdraw(id string) bool {
 	l.mu.Lock()
 	e, ok := l.entries[id]

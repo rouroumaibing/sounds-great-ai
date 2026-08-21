@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	threadPorts "sounds-great-ai/internal/domains/threads/ports"
 )
 
@@ -36,6 +37,7 @@ func (h *ThreadHandler) Routes() *http.ServeMux {
 	mux.HandleFunc("PATCH /api/threads/{id}", h.UpdateThread)
 	mux.HandleFunc("DELETE /api/threads/{id}", h.DeleteThread)
 	mux.HandleFunc("GET /api/threads/{id}/messages", h.ListMessages)
+	mux.HandleFunc("POST /api/threads/{id}/messages", h.PostMessage)
 	mux.HandleFunc("POST /api/threads/{id}/events", h.AddThreadEvent)
 	mux.HandleFunc("GET /api/threads/{id}/sessions", h.ListSessions)
 	mux.HandleFunc("POST /api/sessions/{id}/unseal", h.UnsealSession)
@@ -178,6 +180,54 @@ func (h *ThreadHandler) ListMessages(w http.ResponseWriter, r *http.Request) {
 		"messages": msgs,
 		"has_more": hasMore,
 	})
+}
+
+// PostMessage handles POST /api/threads/{id}/messages — append a message to a
+// thread. This is the REST counterpart of the WebSocket message flow, exposed
+// so the platform MCP server (and other non-WS clients) can post messages as a
+// first-class platform capability. role defaults to "user" and sender to
+// "mcp" when omitted.
+func (h *ThreadHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
+	if h.messageStore == nil {
+		respondJSON(w, http.StatusNotImplemented, map[string]string{"error": "message store not configured"})
+		return
+	}
+	threadID := r.PathValue("id")
+	var body struct {
+		Content string `json:"content"`
+		Role    string `json:"role"`
+		Sender  string `json:"sender"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	content := strings.TrimSpace(body.Content)
+	if content == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "content is required"})
+		return
+	}
+	role := body.Role
+	if role == "" {
+		role = "user"
+	}
+	sender := body.Sender
+	if sender == "" {
+		sender = "mcp"
+	}
+	msg := &threadPorts.Message{
+		ID:        uuid.NewString(),
+		ThreadID:  threadID,
+		Role:      role,
+		Content:   content,
+		Sender:    sender,
+		Timestamp: time.Now(),
+	}
+	if err := h.messageStore.Append(msg); err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, http.StatusCreated, msg)
 }
 
 // AddThreadEvent handles POST /api/threads/{id}/events — add custom event to thread.

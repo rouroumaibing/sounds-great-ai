@@ -19,19 +19,19 @@ import (
 // Human disposition (approve/reject/modify/retire/forget/defer/undo) is the
 // ONLY way a pending candidate becomes canonical truth (M5 提交权): the
 // platform stores and projects only what an operator explicitly approves. No
-// reasoning runs inside the platform (docs/decisions/irreversible-decisions.md
+// reasoning runs inside the platform (不可逆决策
 // §4.1). The DeltaProducer that creates candidates is deterministic pattern
 // matching — no LLM (VISION §3).
 //
 // Multi-operator partitioning: entries carry operator_id; listing endpoints
 // accept ?operator= to scope to one operator's truth plus shared ("")
-// entries (homologous clowder F186 sensitivity / KD-1). Recall events are
+// entries (KD-1). Recall events are
 // recorded by the server at injection time and exposed for the frontend
-// RecallFeed / RecallLedger (homologous clowder recall_events).
+// RecallFeed / RecallLedger.
 //
 // LLM reflection (MemoryReflector) is a SANCTIONED platform synthesis service
-// under irreversible-decisions §4.8 (and §4.4 "平台合成走 Eino"), homologous
-// to clowder ReflectionService. It is NOT agent reasoning: it only summarizes
+// under 不可逆决策 §4.8 (and §4.4 "平台合成走 Eino"). It is NOT agent
+// reasoning: it only summarizes
 // already-approved truth, and its output never auto-becomes truth (M5 提交权).
 // It is opt-in — reflector is nil when SG_REFLECT_* env is unset, and the
 // Reflect endpoint then returns a clear "not configured" error.
@@ -57,8 +57,8 @@ type LaneEmbedder interface {
 	Embed(ctx context.Context, text string) ([]float32, error)
 }
 
-// SetEmbedder installs the optional semantic-search embedder (opt-in via env,
-// homologous to SetReflector). When nil, semantic search returns 501.
+// SetEmbedder installs the optional semantic-search embedder (opt-in via env).
+// When nil, semantic search returns 501.
 func (h *LanesHandler) SetEmbedder(e LaneEmbedder) { h.embedder = e }
 
 // NewLanesHandler creates the handler. defaultOperator is the leader name (used
@@ -109,8 +109,8 @@ func (h *LanesHandler) operatorFilter(r *http.Request) string {
 	return strings.TrimSpace(r.URL.Query().Get("operator"))
 }
 
-// requestOperator resolves the *acting* operator identity for a write (homologous
-// clowder ownerUserId). Precedence: X-Operator header (auth-derived identity) >
+// requestOperator resolves the *acting* operator identity for a write.
+// Precedence: X-Operator header (auth-derived identity) >
 // ?operator= query > the configured defaultOperator (leader). This replaces the
 // previously hard-coded leader name so multi-operator systems record the real
 // actor on dispositions, edges, and recall events (Task #36).
@@ -238,8 +238,8 @@ func (h *LanesHandler) dispose(w http.ResponseWriter, r *http.Request, action me
 }
 
 // emitLaneDispositionTelemetry records the Shared Memory governance eval
-// counter for a human disposition (homologous clowder CrossCatMetricsComputer).
-// fail-open: if telemetry is uninitialized the counter is simply skipped.
+// counter for a human disposition. fail-open: if telemetry is uninitialized the
+// counter is simply skipped.
 func emitLaneDispositionTelemetry(action memory.DispositionAction, lane memory.LaneType) {
 	if !telemetry.IsInitialized() {
 		return
@@ -311,8 +311,7 @@ func (h *LanesHandler) Undo(w http.ResponseWriter, r *http.Request) {
 	h.dispose(w, r, memory.DispositionUndo, "")
 }
 
-// Withdraw re-opens an approved/deferred entry for re-disposition (P2-8),
-// homologous clowder withdraw.
+// Withdraw re-opens an approved/deferred entry for re-disposition (P2-8).
 func (h *LanesHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	h.dispose(w, r, memory.DispositionWithdraw, "")
 }

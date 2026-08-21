@@ -1,7 +1,7 @@
 # [FT-SM-001] [Tech Story] 共享记忆（Shared Memory）特性梳理与设计故事
 
 > 本文是一份**代码实读**的设计故事（story）：梳理 sounds-great-ai（SG）的 Shared Memory 特性，覆盖后端 `internal/memory/` + `internal/transport/` + `internal/prompt/` + `internal/capability/` 与前端的 `web/src/.../drawer/tabs/Memory*`、服务接线 `cmd/server/routes.go` / `internal/platform/platform.go`。
-> 所有现状判断均来自实际代码，每条附 `文件:行号`。对标 clowder 仅在 `readonly-docs/clowder-ai/` 下引用真实文件，本文只描述 **SG 自身**。
+> 所有现状判断均来自实际代码，每条附 `文件:行号`，本文只描述 **SG 自身**。
 
 ---
 
@@ -31,7 +31,7 @@ SG 的 Shared Memory 不是单一模块，而是一条**确定性流水线**，�
 候选进入 pending 后，由人或长官在 UI 上处置。后端 `DispositionRecorder.Record`（`feedback.go:48`）支持 8 种动作：`accept/reject/modify/retire/forget/defer/undo/withdraw`（`feedback.go:14-21`）。`accept` 提升为 **approved**（该 lane 的 canonical truth，`lanes.go:105 Approve`，并自动退役重叠旧 truth `:106`）；`reject` 直接遗忘（`:121`）；`defer` 稍后（not-now，`:167`）；`withdraw` 重新打开（`:203`）。每条处置记录 `HumanDisposition`，可追溯。
 
 ### 2.3 第三段 · 召回注入 prompt（cue-plane）
-每次犬 spawn，prompt 构建器 `builder.go:222 buildIdentity` 在身份段后调用 `laneCue.CueMemoryRanked(20, operator, hint)`（`builder.go:291`），按"机会分"从 approved+可见 truth 中挑出最相关片段拼入 system prompt；注入后立即 `RecordCueEvents(hits, operator)`（`:298`）写**消费账本**（fail-open）。这就是 clowder 式 cue-plane 的 SG 实现——记忆真正"进入犬的大脑"。
+每次犬 spawn，prompt 构建器 `builder.go:222 buildIdentity` 在身份段后调用 `laneCue.CueMemoryRanked(20, operator, hint)`（`builder.go:291`），按"机会分"从 approved+可见 truth 中挑出最相关片段拼入 system prompt；注入后立即 `RecordCueEvents(hits, operator)`（`:298`）写**消费账本**（fail-open）。这就是 cue-plane 的 SG 实现——记忆真正"进入犬的大脑"。
 
 ---
 
@@ -50,14 +50,14 @@ SG 的 Shared Memory 不是单一模块，而是一条**确定性流水线**，�
 ### 3.3 敏感度 ACL + 清关（SG 独有正交轴）
 - **4 级敏感度**：`public/internal/private/restricted`，`SensitivityRank` 排序（`lane_acl.go:9-20`）。
 - **`EntryVisible(e, operator)`**（`lane_acl.go:110`）：双轴判定 = `collectionAllowed`（owner∨collection grant，`lane_acl.go:61`）+ `ClearanceFor(operator)`（清关等级，`lane_acl.go:91`）。
-- **`ClearanceFor`**（`lane_acl.go:91`，空 operator=3 admin、具名默认 1）：**clowder 无此概念**——SG 多犬共享一库，需要"即便 owner/成员、清关不够也看不到"的正交闸门。
+- **`ClearanceFor`**（`lane_acl.go:91`，空 operator=3 admin、具名默认 1）：SG 多犬共享一库，需要"即便 owner/成员、清关不够也看不到"的正交闸门。
 - **放宽护栏**：`SetSensitivity`（`lanes_graph_handler.go:103`）放宽（rank 变小=更宽）而无 `confirm_visibility_widening` → 409 + `current/requested/confirm_field`（`lanes_graph_handler.go:119-126`），并在 lifecycle trace 留审计（`lanes_graph_handler.go:135-140`）。
 
-### 3.4 向量 / 混合检索（仿真 vec0）
+### 3.4 向量 / 混合检索（纯 Go 仿真）
 - `HybridSearch`（`lane_hybrid.go:163`）：RRF(k=60) 融合 **entry-NN + passage-NN + BM25 词法**（`lane_hybrid.go:57-59`），CJK 单字加权（`lexicalScores` `lane_hybrid.go:21`）。
 - **passage 向量**：`StorePassages` 把 approved truth 切块各自嵌入（`lane_hybrid.go:106`，落 `lane_passage_vec` 表 `lane_vector.go:48`）。
 - **embedMode**：`SetEmbedMode(off/shadow/on)`（`lane_hybrid.go:84`），经 `cmd/server/routes.go:208` 读 `SG_EMBED_MODE` 覆盖；无 embedder 时 `SemanticSearch` 降级 501、词法 FTS5 仍可用（`memory_embed.go:52-54`）。
-- 纯 Go 仿真（非 clowder 的 `vec0` C 扩展），构建安全取舍。
+- 纯 Go 仿真（不依赖 C 扩展），构建安全取舍。
 
 ### 3.5 召回账本 + 三轴语义
 - `RecallEvent`（`recall.go:48`）+ `RecallStore.Record`（`recall.go:99`）：每次注入记一条。
@@ -73,7 +73,7 @@ SG 的 Shared Memory 不是单一模块，而是一条**确定性流水线**，�
 ### 3.7 多操作员显式归因
 - `requestOperator`（`lanes_handler.go:117`：X-Operator > ?operator= > defaultOperator）用于读取；
 - `explicitOperator`（`lanes_handler.go:132`：**不回退 default**，避免无作用域写入覆盖归属）用于写入（`SetSensitivity` `lanes_graph_handler.go:135` + `MarkOutcome` `lanes_recall_handler.go:82`）。
-- 每条 entry/edge/recall 落 `operator_id`，逐记录可追溯（强于 clowder 的 server-derived scope）。
+- 每条 entry/edge/recall 落 `operator_id`，逐记录可追溯。
 
 ### 3.8 受控 LLM 反省（合规，非记忆推理）
 - `POST /api/memory/lanes/reflect` → `memory_reflect.go:62 Reflect`：仅在 approved truth 上摘要，产出 **pending** 候选，不自动成为 truth（VISION §3 合规：推理在 `internal/capability/`，**不碰 `internal/memory/`**）。
@@ -150,7 +150,7 @@ SG 的 Shared Memory 不是单一模块，而是一条**确定性流水线**，�
 
 ## 11. 与其他文档的关系
 
-- 对比分析见 `docs/plans/shared-memory-sg-vs-clowder-2026-08-18.md`（§9 深度分析：多操作员归因 / ClearanceFor / LLM 反省澄清）。
+- 深度分析（多操作员归因 / ClearanceFor / LLM 反省澄清）见 `docs/plans/` 下 shared-memory 相关计划文档。
 - 接线路线图历史见 `docs/plans/shared-memory-wiring.md`（注：文中"dormant"状态已被后续接线补全——`execution.go:144` 已调 `supply.Detect`，`platform.go:351` 已建 `SharedMemory`）。
 
 > 本文为代码实读梳理，未改动任何源码、未 `git commit`（延续多轮未提交）。

@@ -13,7 +13,7 @@ type SubstantiveActivity struct {
 	HadToolCall bool
 }
 
-// Ping-pong breaker thresholds (G2). Hardcoded per F167 ("Hardcoded
+// Ping-pong breaker thresholds (G2). Hardcoded per "Hardcoded
 // per KD (YAGNI — no config)"): warn at 2 consecutive same-pair handoffs, block
 // (terminate the chain) at 4. A block still allows 3 normal back-and-forths.
 const (

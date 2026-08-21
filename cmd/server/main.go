@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"sounds-great-ai/internal/component"
-	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/ops"
 	"sounds-great-ai/internal/platform"
 	"sounds-great-ai/internal/sop"
@@ -49,6 +48,7 @@ func main() {
 	skillsDir := GetenvDefault("SKILLS_DIR", "packs/default/skills")
 	sqlitePath := GetenvDefault("SQLITE_PATH", "data/sounds-great.db")
 	redisURL := GetenvDefault("SG_REDIS_URL", "")
+	port := GetenvDefault("PORT", "8080")
 
 	pl, err := platform.New(platform.Config{
 		BreedsDir: breedsDir, SkillsDir: skillsDir, WorkspaceDir: workspaceDir, SQLitePath: sqlitePath, RedisURL: redisURL,
@@ -75,9 +75,29 @@ func main() {
 		pl.Embedder = embedder
 		mcpServerPath := filepath.Join(workspaceDir, "bin", "sounds-great-mcp-server")
 		ragDBPath := filepath.Join(workspaceDir, "rag_index.db")
-		pl.MCP.Register("knowledge", &mcp.MCPServerConfig{
-			Name: "knowledge", Command: mcpServerPath, Args: []string{"--db", ragDBPath}, Enabled: true,
-		})
+		// Seed the builtin RAG "knowledge" server into the persistent store.
+		// Operators can add/remove/toggle their own servers via the MCP panel;
+		// the builtin entry is owned by the platform and shown read-only.
+		if pl.MCPStore != nil {
+			pl.MCPStore.SeedKnowledge(mcpServerPath, []string{"--db", ragDBPath})
+
+			// Seed the builtin "platform" MCP server — the platform-as-MCP-server
+			// surface that exposes collab/memory/people/roster/breeds capabilities
+			// to CLI agents by proxying the SG REST API. It connects back to this
+			// server's own loopback address; the auth token (if any) is passed via
+			// env so the subprocess can authenticate (dev mode = auth disabled).
+			platformPath := filepath.Join(workspaceDir, "bin", "sounds-great-platform-mcp-server")
+			port = GetenvDefault("PORT", "8080")
+			apiBase := "http://localhost:" + port
+			platformEnv := map[string]string{}
+			if tok := os.Getenv("AUTH_TOKEN"); tok != "" {
+				platformEnv["SG_API_TOKEN"] = tok
+			}
+			// CallbackURL is the HTTP fallback: when the MCP stdio transport is
+			// unavailable, the agent calls the SG REST API directly at this
+			// loopback address.
+			pl.MCPStore.SeedPlatform(platformPath, []string{"--api-base", apiBase}, platformEnv, nil, apiBase)
+		}
 	}
 
 	wsHandler := transport.NewWSHandler(p)
@@ -95,7 +115,6 @@ func main() {
 
 	mux := BuildMuxWithHandler(wsHandler, p, pl, registry, embedder, workspaceDir, startTime, evalHandler, logBuf, qcRunner)
 
-	port := GetenvDefault("PORT", "8080")
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)

@@ -51,8 +51,8 @@ func keywordOverlap(content string, hintTokens []string) float64 {
 	return float64(hits) / float64(len(hintTokens))
 }
 
-// CueHit is a ranked, opportunity-scored approved-truth entry (Gap4 cue-plane),
-// homologous clowder MemoryCueInvocationPromptService ranked cue. Carries the
+// CueHit is a ranked, opportunity-scored approved-truth entry (Gap4 cue-plane).
+// Carries the
 // deterministic score so the injection path can also append a consumption
 // ledger event (mem_cue_events).
 type CueHit struct {
@@ -63,7 +63,7 @@ type CueHit struct {
 
 // CueMemory returns a token-bounded markdown block of approved truth, ranked by
 // a deterministic "opportunity" score rather than raw insertion order
-// (homologous clowder MemoryCueInvocationPromptService: surface the most
+// (surface the most
 // relevant approved truth for the current context, not a flat dump).
 //
 // The score blends three signals, all deterministic (no LLM — VISION §3):
@@ -126,7 +126,7 @@ func (r *LaneRegistry) CueMemoryRanked(maxLines int, operator, hint string) ([]C
 	return hits, true, nil
 }
 
-// ---- cue consumption ledger (mem_cue_events, homologous clowder memCueEvents) ----
+// ---- cue consumption ledger (mem_cue_events) ----
 
 // CueEvent is one append-only record that a cue was injected for an entry.
 type CueEvent struct {
@@ -169,8 +169,8 @@ func openCueDB(path string) (*cueStore, error) {
 	return &cueStore{db: db}, nil
 }
 
-// RecordCueEvents appends a cue-consumption ledger entry for each injected hit
-// (homologous clowder memCueEvents). Fail-open: errors are logged, never block.
+// RecordCueEvents appends a cue-consumption ledger entry for each injected hit.
+// Fail-open: errors are logged, never block.
 func (r *LaneRegistry) RecordCueEvents(hits []CueHit, operator string) {
 	if r.cue == nil {
 		return

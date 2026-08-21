@@ -24,13 +24,13 @@ const (
 	RepoTrajectoryFileName = "repo-trajectory.json"
 	CredentialsFileName = "credentials.json"
 	// BreedHistoryFileName holds the per-breed identity audit trail (P3-b,
-	// homologous identity history). Kept separate from dog-catalog.json
+	// identity history). Kept separate from dog-catalog.json
 	// on purpose: breed identity changes are an audit concern, not member data,
 	// and must never bloat or risk the runtime catalog.
 	BreedHistoryFileName = "breed-history.json"
 
 	// PeopleMemoryFileName holds the owner-private third-party people & relationship
-	// memory (Persistent Identity F276, homologous). Kept as a single
+	// memory (Persistent Identity). Kept as a single
 	// document under ConfigRoot so all six logical objects (person / claim /
 	// relationship / interaction / candidate / card) share one atomic-write
 	// transaction and one owner-private keyspace — no Redis, no parallel store.
@@ -113,7 +113,7 @@ type accountsDocument struct {
 }
 
 // catalogDocument is the on-disk envelope for the runtime member catalog.
-// It is homologous: breeds + roster + review_policy + leader + configs.
+// It holds: breeds + roster + review_policy + leader + configs.
 // The legacy `members` array is migrated to `breeds`+`roster` on first load.
 type catalogDocument struct {
 	Version      int                          `json:"version"`

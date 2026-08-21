@@ -9,9 +9,9 @@ import (
 	"sounds-great-ai/internal/memory"
 )
 
-// Link creates a typed relationship edge from one entry to another (Gap1,
-// homologous clowder edge). Both entry IDs must already exist in the registry.
-// Edge-level sensitivity + provenance are accepted (clowder V18 edge columns).
+// Link creates a typed relationship edge from one entry to another (Gap1).
+// Both entry IDs must already exist in the registry. Edge-level sensitivity +
+// provenance are accepted.
 func (h *LanesHandler) Link(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var body struct {
@@ -38,9 +38,9 @@ func (h *LanesHandler) Link(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, edge)
 }
 
-// Mark attaches a normalized signal (marker) to an entry (Gap1, homologous
-// clowder marker: captured → normalized → approved/rejected). The marker
-// records *why* an entry matters without promoting it to a full lane entry.
+// Mark attaches a normalized signal (marker) to an entry (Gap1: captured →
+// normalized → approved/rejected). The marker records *why* an entry matters
+// without promoting it to a full lane entry.
 func (h *LanesHandler) Mark(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var body struct {
@@ -78,9 +78,9 @@ func (h *LanesHandler) Graph(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// CueEvents returns recent cue-consumption ledger events (Gap4, homologous
-// clowder memCueEvents). Surfaced so the operator can audit which approved
-// truth was injected and at what rank/score.
+// CueEvents returns recent cue-consumption ledger events (Gap4). Surfaced so
+// the operator can audit which approved truth was injected and at what
+// rank/score.
 func (h *LanesHandler) CueEvents(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
@@ -95,11 +95,10 @@ func (h *LanesHandler) CueEvents(w http.ResponseWriter, r *http.Request) {
 // must be one of public/internal/private/restricted; the new level is enforced
 // on subsequent recall reads via EntryVisible (clearance + collection grant).
 //
-// Visibility-widening guardrail (Task #33, homologous clowder
-// confirmVisibilityWidening): relaxing an entry's sensitivity to a *wider*
-// level (e.g. private/restricted → internal/public) requires an explicit
-// confirm_visibility_widening=true, otherwise the change is rejected with a
-// 409 so a caller must consciously widen visibility.
+// Visibility-widening guardrail (Task #33): relaxing an entry's sensitivity to
+// a *wider* level (e.g. private/restricted → internal/public) requires an
+// explicit confirm_visibility_widening=true, otherwise the change is rejected
+// with a 409 so a caller must consciously widen visibility.
 func (h *LanesHandler) SetSensitivity(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var body struct {

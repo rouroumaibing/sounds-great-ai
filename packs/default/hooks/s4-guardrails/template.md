@@ -5,9 +5,9 @@
 | 红旗 | 违反 | 正确做法 |
 |------|------|----------|
 | 在 `internal/` 层调 LLM 做推理 | §3 三层原则 | 推理交给 CLI adapter |
-| 硬编码 workflow DAG（固定 pipeline） | `docs/governance/decisions/irreversible-decisions.md` §4.2 不可逆决策 | 用动态路由 |
-| 新建 A2A HTTP server/client | `docs/governance/decisions/irreversible-decisions.md` §4.1 不可逆决策 | 用 CLI adapter（stdin/stdout pipe） |
-| 在 platform 层做 agent reasoning | `docs/governance/decisions/irreversible-decisions.md` §4.1 不可逆决策 | reasoning 是 CLI 的事 |
-| 引入 `internal/a2a/server/` 或 `internal/a2a/client/` | `docs/governance/decisions/irreversible-decisions.md` §4.1 不可逆决策 | 已废弃，用 `internal/adapter/` |
-| 新增 `internal/` 顶层目录而不更新 `docs/architecture/platform-capabilities.md` §6 | §6 平台能力清单 | 先更新该文档 |
+| 硬编码 workflow DAG（固定 pipeline） | 不可逆决策 §4.2 | 用动态路由 |
+| 新建 A2A HTTP server/client | 不可逆决策 §4.1 | 用 CLI adapter（stdin/stdout pipe） |
+| 在 platform 层做 agent reasoning | 不可逆决策 §4.1 | reasoning 是 CLI 的事 |
+| 引入 `internal/a2a/server/` 或 `internal/a2a/client/` | 不可逆决策 §4.1 | 已废弃，用 `internal/adapter/` |
+| 新增 `internal/` 顶层目录而不更新 `平台能力清单` §6 | §6 平台能力清单 | 先更新该文档 |
 | 跳 Phase（如 Phase 3 代码出现在 Phase 1 期间） | `docs/ROADMAP.md` | 先完成前置 Phase |

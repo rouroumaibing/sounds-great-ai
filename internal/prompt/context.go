@@ -138,7 +138,7 @@ func estimateTokens(s string) int {
 
 // BoundContextByTokens drops the oldest messages until the estimated token
 // count of the remaining history fits within maxTokens (Persistent Identity
-// P2, homologous auto-compact budget). The most recent messages are
+// P2, auto-compact budget). The most recent messages are
 // kept; only the head (oldest) is trimmed, mirroring the platform-side
 // compression driven from each breed's contextWindow. A non-positive
 // maxTokens is a no-op (no bound applied).

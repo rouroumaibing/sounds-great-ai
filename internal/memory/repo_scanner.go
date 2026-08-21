@@ -7,8 +7,7 @@ import (
 )
 
 // RepoScanner scans repository Markdown for typed memory candidates, providing
-// a second candidate source beyond session-close text (homologous clowder
-// GenericRepoScanner). It reuses the same deterministic pattern extractors as
+// a second candidate source beyond session-close text (// GenericRepoScanner). It reuses the same deterministic pattern extractors as
 // the session DeltaProducer — no LLM is involved (VISION §3). Scanning is
 // opt-in (cmd/memory scan), never auto-wired to session seal, so it cannot
 // flood the pending queue unnoticed.

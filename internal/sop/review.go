@@ -2,6 +2,7 @@ package sop
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -117,7 +118,7 @@ func SelectReviewerFromBreeds(author BreedInfo, candidates []BreedInfo, policy R
 	return nil, ErrNoReviewerAvailable
 }
 
-// ReviewPanel is the three-role cross-model review assignment (clowder F253):
+// ReviewPanel is the three-role cross-model review assignment:
 //   - Layer 1 Hygiene: automated fixes, no named identity required.
 //   - Layer 2 Reviewer: a named cross-breed / cross-CLI reviewer.
 //   - Layer 3 FinalApprover: a second named identity, independent of both the
@@ -154,6 +155,36 @@ func SelectReviewPanel(author BreedInfo, candidates []BreedInfo, policy ReviewPo
 	}
 	return &ReviewPanel{Reviewer: reviewer, FinalApprover: finalApprover}, nil
 }
+
+// SelectGuardian selects the vision guardian for feature close. The guardian
+// must be a dog different from both the author and the reviewer (guarding
+// cannot fall back to either involved party). A cross-CLI candidate is
+// preferred — an independent model family — and a same-CLI candidate is used
+// only as a degraded fallback. Returns ErrNoGuardianAvailable when every
+// candidate is the author, the reviewer, or unavailable.
+func SelectGuardian(author BreedInfo, reviewerID string, candidates []BreedInfo) (*BreedInfo, error) {
+	var sameCLIFallback []BreedInfo
+	for i := range candidates {
+		c := &candidates[i]
+		if c.ID == author.ID || c.ID == reviewerID {
+			continue
+		}
+		if !c.Available {
+			continue
+		}
+		if c.CLI != author.CLI {
+			return c, nil
+		}
+		sameCLIFallback = append(sameCLIFallback, *c)
+	}
+	if len(sameCLIFallback) > 0 {
+		return &sameCLIFallback[0], nil
+	}
+	return nil, ErrNoGuardianAvailable
+}
+
+// ErrNoGuardianAvailable is returned when no eligible vision guardian exists.
+var ErrNoGuardianAvailable = fmt.Errorf("no eligible guardian: all candidates are the author, the reviewer, or unavailable")
 
 // ReviewCycle manages the review request/receive cycle. Identity is tracked by
 // dog_id (the canonical agent identity, resolved from the executing breed

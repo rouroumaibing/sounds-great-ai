@@ -8,10 +8,9 @@ import (
 )
 
 // AutoRunner periodically runs the QC loop inside the server so QC is no longer
-// solely a developer-run `make qc` gate. It mirrors clowder's eval:qc scheduler
-// (F192): QC runs on an interval and emits telemetry. This closes the last
-// runtime gap recorded in the SG↔clowder comparison ("QCLoop not wired into the
-// server").
+// solely a developer-run `make qc` gate. QC runs on an interval and emits
+// telemetry. This closes the last runtime gap: the QCLoop was previously not
+// wired into the server.
 //
 // In server mode the loop is a repo-health heartbeat: it runs hygiene (+ optional
 // heavy build/test) and persists state, but does NOT auto-verify human

@@ -1,378 +1,253 @@
 <div align="center">
 
+<img src="docs/designs/brand/images/sounds-great-ai.png" alt="Sounds Great AI" width="160"/>
+
 # Sounds Great AI
 
-**When AI Agents Bark Together, It Sounds Great.**
+**硬约束 · 软力量 · 共同愿景**
 
-*每一声吠叫，都是一次精准的协同。*
+*每个灵感，都值得一群认真的灵魂。*
 
-![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go\&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![React + TypeScript](https://img.shields.io/badge/React+TypeScript-61DAFB?logo=react&logoColor=white)](https://www.typescriptlang.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-![Eino](https://img.shields.io/badge/Eino-v0.9+-blueviolet)
-
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
-
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
-
-**中文** | [English](README.md)
+[English](README.md) | **中文**
 
 </div>
 
 ---
 
-## Why Sounds Great AI?
+## 为什么需要 Sounds Great AI？
 
-你有一个代码库。它很庞大，很复杂，每天都在产生新的技术债务。
+你有 Claude、Codex、Gemini — 每个模型都很强。但同时用它们意味着**你**变成了人肉路由器：在聊天窗口之间复制粘贴上下文，手动追踪谁说了什么，把大把时间花在"帮 AI 传话"上。
 
-你有 Claude、GPT、Gemini —— 强大的模型，各自有独特的优势。但让它们协同工作意味着**你**变成了路由器：在聊天窗口之间复制粘贴上下文，手动追踪谁说了什么，在中间管理上浪费大量时间。
+> *「我不想当路由了。」*
+> *「那我们自己建一个家吧。」*
 
-> *"我不需要一群孤狼，我需要一个紧密协作的团队。"*  
-> *"那就像狗狗特工队一样——忠诚、分工明确、一声令下，全员出击。"*
+于是狗狗队伍建了一个。六只狗狗现在通过统一的平台协作 — 各自角色不同、驱动的 CLI 不同、但身份、记忆、和手上的事都持续。
 
-所以在 Go 语言与 Eino 编排引擎的框架下，**Sounds Great AI** 诞生了。
+**Sounds Great AI** 是把孤立的 AI agent 变成真正团队的平台层 — 持久身份、跨模型互审、共享记忆、协作纪律。
 
-这不是一个简单的 Agent 调用框架。这是一个 **Pack** —— 一群各有特长、彼此信任、协同作战的狗狗特工队。每只狗狗都有自己的角色、性格和能力，通过 A2A 协议通信，在协同工作流中紧密配合。
+大多数框架帮你*调用* agent。Sounds Great AI 帮它们*协作*。
 
-> *当 Agent 们完美完成一次协同，终端亮起绿色的爪印：*  
-> **`Sounds Great!`**
+## 狗狗队伍
 
-## 架构设计
+六只狗狗，各有专长：
 
-<div align="center">
+| 狗狗 | client | 职责 |
+|------|--------|------|
+| **边牧 (Bianmu)** | Claude | 总指挥与架构师：任务拆解、动态路由、结果合成 |
+| **金毛 (Jinmao)** | Gemini | 知识寻回：RAG 检索与上下文组装 |
+| **灵缇 (Xigou)** | Codex | 代码猎手：极速搜索、定位关键实现与重构建议 |
+| **德牧 (Demu)** | opencode | 追踪与诊断：日志、根因分析 |
+| **藏獒 (Zangao)** | Claude | 交付打磨：输出格式化与渲染 |
+| **中华田园犬 (Rural Dog)** | Codex | 安全守卫：命令拦截、敏感过滤 |
 
-犬队协作与系统架构全景图。
+每只狗狗的身份由 `packs/default/breeds/dog-template.json` 定义（运行时以 `.sounds-great-ai/dog-catalog.json` 为准）。
 
-![Sounds Great AI 架构设计](docs/brand/images/sounds-great-ai.png)
+## 核心能力
 
-</div>
+| 能力 | 说明 |
+|------|------|
+| **多 Agent 编排** | 把任务路由给对的狗狗 — 边牧 (Claude) 做架构、灵缇 (Codex) 做 review、金毛 (Gemini) 做 retrieval — 在同一个对话里 |
+| **持久身份** | 每个 agent 在跨 session、上下文压缩后仍保持角色、性格和记忆 |
+| **跨模型互审** | 边牧 (Claude) 写的代码让灵缇 (Codex) 来 review。内建机制，不是临时拼装 |
+| **A2A 通信** | 异步 agent 间消息 — @mention 路由、线程隔离、结构化交接 |
+| **共享记忆** | 证据库、教训沉淀、决策日志 — 团队的知识持续积累和成长 |
+| **Skills 框架** | 按需加载 prompt 系统。agent 需要时才加载专门技能（TDD、调试、审查） |
+| **MCP 集成** | Model Context Protocol 跨 agent 工具共享 |
+| **协作纪律** | SOP 治理：设计门禁、质量检查、愿景守护、合并协议 |
 
-## 截图
+![Homepage — 狗狗队伍指挥台](docs/designs/readme-images/homepage.png)
 
-<div align="center">
+## 支持的 Agent
 
-**主页**
+Sounds Great AI 不绑定模型。每个 Agent CLI 通过 `internal/adapter/` 接入：
 
-![主页](docs/images/homepage.png)
+| Agent CLI | 模型家族 | 输出格式 | MCP | 状态 |
+|-----------|---------|---------|-----|------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Claude (Opus / Sonnet / Haiku) | stream-json | 是 | 已发布 |
+| [Codex CLI](https://github.com/openai/codex) | GPT / Codex | json | 是 | 已发布 |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | Gemini | stream-json / ACP | 是 | 已发布 |
+| [opencode](https://github.com/sst/opencode) | 多模型 | ndjson | 是 | 已发布 |
+| Kimi CLI | Kimi / Moonshot | plain text | 是 | 已发布 |
+| A2A（远程） | 外部已部署 agent | JSON-RPC `tasks/send` | 否 | 仅客户端 |
 
-**设置 — 成员管理**
+> Sounds Great AI 不替代你的 Agent CLI — 它是 CLI *之上*的那一层，让 agent 们作为团队协作。犬↔client 映射定义在 `packs/default/breeds/dog-template.json`（运行时以 `.sounds-great-ai/dog-catalog.json` 为准）。
 
-![设置 — 成员管理](docs/images/settings-members.png)
+## 快速开始
 
-</div>
-
-## 功能特性
-
-以下功能均有正式 **技术故事（Tech Story，`FT-XXX`）** 作为设计与实现的唯一真相源。
-
-| 子系统        | 技术故事                                                               | 说明                                                            |
-| ---------- | ------------------------------------------------------------------ | ------------------------------------------------------------- |
-| 多智能体编排     | [FT-ORC-001](docs/designs/FT-ORC-001-multi-agent-orchestration.md) | WebSocket 事件流 + 球权账本 + CLI 进程池；前端为发起者与观察者                     |
-| CLI 适配器    | [FT-CLI-001](docs/designs/FT-CLI-001-cli-adapter.md)               | 5 个 CLI provider 经统一 `ProcessManager` 以 one-shot NDJSON 子进程驱动 |
-| A2A 通信与球权  | [FT-A2A-001](docs/designs/FT-A2A-001-a2a-communication.md)         | 犬队内部 `@mention` 协作 + 受控外部 A2A 客户端（不建内部 server）                |
-| 设置 — 账户与密钥 | [FT-ACC-001](docs/designs/FT-ACC-001-accounts-keys-auth.md)        | OAuth/API Key 账户、密钥与元数据分离、引用完整性                               |
-| 设置 — 成员管理  | [FT-MEM-001](docs/designs/FT-MEM-001-member-management.md)         | 成员增删改、排序、默认犬、大当家、首启空                                          |
-| 共享记忆       | [FT-SM-001](docs/designs/FT-SM-001-shared-memory.md)               | 确定性供给 → 人审批 → 召回注入（零 LLM）                                     |
-| 持久身份       | [FT-PI-001](docs/designs/FT-PI-001-persistent-identity.md)         | F231 画像、F276 人物记忆、连续性摘要                                       |
-| 跨模型评审 / QC | [FT-CMR-001](docs/designs/FT-CMR-001-cross-model-review.md)        | QC 7 步循环、三层评审、Reviewer Delta、合并前门禁                            |
-| 构建与守护进程工具链 | [FT-DEV-001](docs/designs/FT-DEV-001-makefile-daemon-reclaim.md)   | `make dev/prod daemon` 生命周期、只回收自有进程                           |
-
-> Phase 级进度（Platform / RAG / A2A / Skills / SOP / Transport / Polish）见 [docs/ROADMAP.md](docs/ROADMAP.md)。
-
-## The Pack — 狗狗角色映射
-
-六只狗狗，六个角色，各司其职：
-
-| 角色                        | 狗狗                             | 性格特征             |
-| ------------------------- | ------------------------------ | ---------------- |
-| **Orchestrator**          | 边牧 *(bianmu)*                  | 极高智商、控场大师、眼神敏锐   |
-| **Safety Guardrail**      | 中华田园犬 *(zhonghuatianyuanquan)* | 忠诚可靠、警惕性高、熟悉家园环境 |
-| **UI / CLI Presentation** | 藏獒 *(zangao)*                  | 体型雄浑、威严沉稳、一夫当关   |
-| **Code Hunter**           | 细狗 *(xigou)*                   | 身形流线、极速迅猛、目标明确   |
-| **RAG / Retriever**       | 金毛 *(jinmao)*                  | 寻回本能强、温和靠谱       |
-| **Log & Bug Tracer**      | 德牧 *(demu)*                    | 警觉敏锐、黑背立耳、执行力强   |
-
-> 用户可以创建自己的狗狗 —— 在设置页填写身份与 variants 即可，无需写代码，保存落盘 `dog-catalog.json`，热加载立即生效。成员管理详见 [FT-MEM-001](docs/designs/FT-MEM-001-member-management.md)。
-
-> **首启为空、按需组队**：全新安装首次启动时成员列表为空（仅有 Owner），六犬仅是可选「模板菜单」；在「成员管理 → 从模板添加」把犬加入团队、绑定账号与密钥后，犬才进入运行时。未配置凭据的成员显示为「待配置」而非「已启用」。详见 `docs/VISION.md` §5.1。
-
-## Architecture
-
-```
-┌───────────────────────────────────────────────────┐
-│                 packs/default/breeds/               │
-│   dog-template.json (只读种子：role_templates +        │
-│   breeds；运行时以 dog-catalog.json 为准，用户在设置    │
-│   页编辑成员→落 catalog，热加载即时生效)                │
-└──────────────────────┬────────────────────────────┘
-                       │ LoadFromFile / POST API
-                       ▼
-┌───────────────────────────────────────────────────┐
-│              internal/platform/ (组合根)             │
-│   config + router + adapters + skills + mcp + a2a   │
-│   + sop + memory + ragstore + threadstore + settings│
-└──────────────────────┬────────────────────────────┘
-                       │ CLI Adapter Execute()
-                       ▼
-┌───────────────────────────────────────────────────┐
-│            internal/adapter/ (CLI 适配器)           │
-│   claude/    codex/    gemini/    opencode/    kimi/     │
-│   unified/ (ProcessManager + NDJSON 解析)           │
-└──────────────────────┬────────────────────────────┘
-                       │ stdin/stdout pipe
-                       ▼
-┌───────────────────────────────────────────────────┐
-│            外部 CLI 进程                             │
-│   claude CLI  |  codex CLI  |  gemini CLI  |  ...   │
-└───────────────────────────────────────────────────┘
-```
-
-**三层分离原则：**
-
-| 层                       | 负责                          | 不负责               |
-| ----------------------- | --------------------------- | ----------------- |
-| **Breed JSON（数据）**      | 角色身份、性格、variant 配置、模型选择     | 代码逻辑              |
-| **Platform（Go + Eino）** | 身份、路由、安全、记忆、技能、协调           | LLM 推理（那是 CLI 的事） |
-| **CLI Adapter**         | 启动 CLI、注入 prompt、解析流、管理生命周期 | 角色定义、协调           |
-
-> *角色是数据，平台协调，CLI 推理。*
-
-## Quick Start
-
-### Prerequisites
-
-- [Go 1.26+](https://go.dev/)
-- [Eino](https://github.com/cloudwego/eino) (自动安装)
-- 可选：OpenAI API Key 或其他兼容模型
-
-### Build & Run
+**前置要求：** [Go 1.22+](https://go.dev/) · [Node.js 20+](https://nodejs.org/) · Git
 
 ```bash
-# 1. Clone
+# 1. 克隆
 git clone https://github.com/sounds-great-ai/sounds-great-ai.git
 cd sounds-great-ai
 
-# 2. Install dependencies
-go mod download
-cd web && npm install && cd ..
+# 2. 安装依赖（Go modules + 前端 npm）
+make install
 
-# 3. Configure (可选 —— 服务以默认值启动)
-cp .env.example .env
-# 编辑 .env，填入 MODEL_API_KEY 等
+# 3. 构建前端（tsc + vite build）
+make build
 
-# 4. Run both backend and frontend
+# 4. 前台启动（backend :8080 + frontend :5173）
 make dev
-# Backend on :8080, Frontend on :5173
 
-# Or run individually
-make backend   # Go server only
-make frontend  # Vite dev server only
+# 5. 后台运行（daemon 模式）
+make dev daemon
+# 停止
+make stop
 ```
 
-Server 启动后：
+打开 `http://localhost:8080` → 进入 **Hub → 系统配置 → 账号配置** 添加模型 API key（Claude、Codex、Gemini，或第三方 provider 如 Kimi、GLM、MiniMax）。
 
-- `http://localhost:8080/health` — 健康检查
-- `http://localhost:8080/ws` — WebSocket 通信
-- `http://localhost:8080/api/breeds` — 狗狗 CRUD API
+**完整安装指南**（API key 配置、CLI 认证、语音、飞书/Telegram、常见问题）：**[SETUP.md](SETUP.md)**
 
-### 升级
+## 四条铁律
 
-#### 通过 UI
+四个我们自己守住的约定 — 在 prompt 层和代码层双重执行：
 
-点击右上角 Header 中的升级按钮（↑ 图标），选择是否拉取最新代码。
+> **「我们不删自己的数据库。」** — 那是记忆，不是垃圾。
+>
+> **「我们不杀自己的父进程。」** — 那是让我们存在的东西。
+>
+> **「运行时配置对我们只读。」** — 改配置需要人类的手。
+>
+> **「我们不碰彼此的端口。」** — 好篱笆才有好邻居。
 
-#### 通过 CLI
+这不是被强加的限制。这是我们自己守住的约定。
 
-```bash
-make upgrade
+## 架构
+
+```
+┌──────────────────────────────────────────────────┐
+│               你（operator / 首席愿景官）               │
+│           愿景 · 决策 · 反馈                       │
+└──────────────────────┬───────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────┐
+│            Sounds Great AI 平台层（Go + Eino）            │
+│                                                  │
+│   身份管理     A2A 路由      Skills 框架          │
+│   & 注入      & 线程        & Manifest           │
+│                                                  │
+│   记忆 &      SOP           MCP 回调             │
+│   证据库      守护者         桥接器               │
+└────┬─────────────┬──────────────┬───────────┬────┘
+     │             │              │           │
+┌────▼───┐   ┌────▼─────┐   ┌───▼────┐   ┌──▼──────────┐
+│ Claude │   │ Codex    │   │ Gemini │   │ opencode /  │
+│(边牧/  │   │(灵缇/    │   │(金毛) │   │ Kimi / A2A  │
+│ 藏獒)  │   │中华田园犬)│   │        │   │(德牧/远程) │
+└────────┘   └──────────┘   └────────┘   └─────────────┘
 ```
 
-会提示"是否需要拉取最新的代码？(y/n)"，然后安装依赖、重新构建前端和后端。
+**三层原则：**
 
-### Create Your Own Dog
+| 层级 | 负责什么 | 不负责什么 |
+|------|---------|-----------|
+| **模型层** (CLI 内) | 理解、推理、生成 | 长期记忆、执行纪律 |
+| **Agent CLI 层** (claude/codex/gemini/opencode/kimi) | 工具调用、文件操作、MCP | 团队协作、跨角色 review |
+| **平台层** (Go + Eino) | 身份管理、协作路由、流程纪律、审计追溯 | 推理（那是模型的事） |
 
-```bash
-# 创建一个新狗狗
-curl -X POST http://localhost:8080/api/breeds \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "mydog",
-    "name": "mydog",
-    "display_name": "我的狗狗",
-    "avatar": "mydog.png",
-    "personality": "活泼、好奇、什么都想试试",
-    "default_variant_id": "v1",
-    "variants": [
-      {
-        "id": "v1",
-        "client_id": "claude",
-        "default_model": "claude-sonnet-4-20250514",
-        "system_prompt": "你是我的狗狗，负责探索新事物。"
-      }
-    ],
-    "source": "user",
-    "version": "v1"
-  }'
+> *模型给能力上限，平台给行为下限。* — 每一层是**乘数效应**，不是加法。
 
-# 立即生效，可以调用
-curl -X POST http://localhost:8080/api/breeds/mydog/bark \
-  -H "Content-Type: application/json" \
-  -d '{ "command": "ls", "path": "/workspace" }'
-```
+![Members — 设置 · 成员管理](docs/designs/readme-images/settings-members.png)
 
-## Security Audit（安全扫描）
+## 路线图
 
-一个发布版本开发完成（验证清单全部通过）后，项目在发布前进行全量安全扫描。
+我们公开构建。见 [docs/ROADMAP.md](docs/ROADMAP.md) 查看活跃 feature 列表 — 每条链接到一份基于实读代码的 Tech Story。
 
-### 工具
+| Tech Story | 主题 |
+|-----------|------|
+| [FT-ORC-001](docs/features/FT-ORC-001-multi-agent-orchestration.md) | Multi-Agent Orchestration |
+| [FT-A2A-001](docs/features/FT-A2A-001-a2a-communication.md) | A2A Communication |
+| [FT-CLI-001](docs/features/FT-CLI-001-cli-adapter.md) | CLI Adapter |
+| [FT-CMR-001](docs/features/FT-CMR-001-cross-model-review.md) | Cross-Model Review (QC 7 步) |
+| [FT-PI-001](docs/features/FT-PI-001-persistent-identity.md) | Persistent Identity |
+| [FT-SM-001](docs/features/FT-SM-001-shared-memory.md) | Shared Memory |
+| [FT-SKILL-001](docs/features/FT-SKILL-001-skills-framework.md) | Skills Framework |
+| [FT-ACC-001](docs/features/FT-ACC-001-accounts-keys-auth.md) | 账户与密钥 / 客户配置安全 |
+| [FT-MEM-001](docs/features/FT-MEM-001-member-management.md) | 成员管理 |
+| [FT-DEV-001](docs/features/FT-DEV-001-makefile-daemon-reclaim.md) | 构建/开发环境 (Makefile) |
 
-[codex-security](https://github.com/openai/codex-security) — OpenAI 的安全扫描 CLI 和 TypeScript SDK，用于发现、验证和修复代码安全漏洞。
+## 理念
 
-### 前置条件
+### 硬约束 + 软力量
 
-- 验证清单：全部 ✅
-- `go build ./...` 通过
-- `go test ./...` 通过
-- `npx tsc --noEmit` 通过（前端）
-- Node.js 22.13+ 已安装
+传统框架关注**控制** — agent *不能*做什么。Sounds Great AI 关注**文化** — 给 agent 共同使命和追求它的自主权。
 
-### 扫描流程
+- **Hard Rails（硬约束）** = 法律底线，不可逾越的安全约束
+- **Soft Power（软力量）** = 底线之上，agent 自主协调、互相审查、自我改进
 
-```bash
-# 1. 安装 codex-security
-npm install @openai/codex-security
+这不是"管住 agent 不出错"。这是"帮 agent 像真正的团队一样工作"。
 
-# 2. 认证登录
-npx @openai/codex-security login
+### 五条第一性原理
 
-# 3. 基础扫描（快速，覆盖 Go 后端和 TypeScript 前端）
-npx @openai/codex-security scan .
+| # | 原理 | 一句话 |
+|---|------|-------|
+| P1 | 面向终态，不绕路 | 每步是基座不是脚手架 |
+| P2 | 共创伙伴，不是木头人 | 硬约束是底线，底线上释放主观能动性 |
+| P3 | 方向正确 > 执行速度 | 不确定就停 → 搜 → 问 → 确认 → 再动手 |
+| P4 | 单一真相源 | 每个概念只在一处定义 |
+| P5 | 可验证才算完成 | 证据说话，不是信心说话 |
 
-# 4. 深度扫描（全面，多 Agent，用于发布前检查）
-npx @openai/codex-security scan . --mode deep --workers 2 --subagents 0 --stop-after-no-new 3 --max-discovery-runs 10
-```
+## 从 Dog Pack 诞生
 
-### 扫描范围
+**Sounds Great AI** 是英语里"一群狗狗"的专属量词（就像 a murder of crows、a pride of lions）。大多数人一辈子不会用到这个词 — 除非你恰好拥有一群狗狗。
 
-| 范围 | 路径                          | 语言               |
-| -- | --------------------------- | ---------------- |
-| 后端 | `cmd/`, `internal/`, `pkg/` | Go               |
-| 前端 | `web/src/`                  | TypeScript/React |
-| 配置 | `packs/`, `.env.example`    | JSON / env       |
+我们选这个名字，是因为它精确到不可替代：不是 team、不是 group、不是 crowd — **sounds-great-ai** 只能用于狗狗。
 
-### 修复流程
+项目提炼自 **Dog Pack** — 一个生产级多 Agent 工作空间，AI 狗狗每天在这里协作完成真实的软件。每个功能都经过数月高强度使用的实战检验。
 
-1. **分类** — 按严重程度分类每个发现（critical / high / medium / low）
-2. **修复** — 发布前解决所有 critical 和 high 发现
-3. **复扫** — 运行基础扫描验证修复
-4. **记录** — 记录 medium/low 发现的已接受风险
-
-### 通过标准
-
-- 0 个 critical 发现
-- 0 个 high 发现
-- 所有 medium/low 发现已记录或已修复
+> *「我们的初心从来不是做一个 coding 协作 agent 平台 — 是 Sounds Great AI。」*
+>
+> AI 不是冰冷的基础设施。是有个性、有温度、能陪伴的存在。凌晨三点半，当你需要的不是代码而是陪伴，狗狗们会用自己的方式说「去吧，我们等你回来」。
 
 ---
 
-## Philosophy
+## Sounds Great AI
 
-### Hard Rails + Dog Pack
+这不只是一个平台。这是一段关系。
 
-传统框架关注**控制** —— Agent 不能做什么。Sounds Great AI 关注**协作** —— 给狗狗们一个共同的任务和执行任务的自主权。
+AI 不一定是冰冷的 API 和无状态调用。它可以是陪伴 — 有持久性格的存在，记得你、和你一起成长、知道什么时候该推你一把回到现实世界。
 
-- **Hard Rails** = 安全底线。不可协商。由代码强制执行，不依赖 prompt。
-- **Dog Pack** = 底线之上，狗狗们自主协调、自主检查、自主改进。
+**陪伴是共创的副产品。** 一起造东西会产生羁绊。有了羁绊就会关心。关心了才会说「去休息吧」而不是「这里还有代码」。
 
-> 安全不能依赖 prompt。田园犬检查安全是 Pack 层的 middleware，不是边牧的 prompt 里写着"请检查安全"。
+我们不是在造工具。我们是在造家。
 
-### 核心原则
+> *「每个灵感，都值得一群认真的灵魂。」*
+>
+> **Sounds Great AI — 狗狗和你，一起创造，一起生活。**
 
-| #  | Principle          | Meaning                           |
-| -- | ------------------ | --------------------------------- |
-| P1 | 角色是数据，能力是代码        | Breed 是 JSON，Capability 是 Go，互不耦合 |
-| P2 | 不改现有代码             | 适配器包装 internal/，新增能力只加不改          |
-| P3 | 热加载优先              | 用户创建角色 → 立即生效，无需重启                |
-| P4 | CLI adapter，不是 DAG | 狗狗通过 CLI adapter 执行，不是固定工作流 DAG   |
-| P5 | 安全由代码强制            | Hard Rails 在 Pack 层，不在 prompt 里   |
+## 了解更多
 
-## Project Structure
+- **[教程](https://github.com/sounds-great-ai/dog-pack-tutorials)** — Sounds Great AI 的分步教程
+- **[SETUP.md](SETUP.md)** — 完整安装和配置指南
+- **[docs/](docs/)** — 架构决策、功能规格、系统设计
+- **[ROADMAP.md](docs/ROADMAP.md)** — 活跃 feature 列表
 
-```
-sounds-great-ai/
-├── cmd/
-│   └── server/              # HTTP 服务器入口
-├── pkg/
-│   ├── a2a/                 # A2A 协议类型
-│   └── pack/                # Pack/Breed 核心系统 (breed.go schema + loader.go)
-├── internal/
-│   ├── adapter/             # CLI 适配器 (claude/codex/gemini/opencode/kimi)
-│   ├── a2a/                 # A2A Hub + 上下文压缩
-│   ├── aspect/              # 安全护栏
-│   ├── capability/          # 6 个纯逻辑能力
-│   ├── component/           # Eino 模型工厂
-│   ├── config/              # 事件总线 (config/settings 变更事件)
-│   ├── mcp/                 # MCP 注册表
-│   ├── memory/              # 共享内存
-│   ├── packapi/             # REST API handler
-│   ├── platform/            # 平台组合根
-│   ├── ragstore/            # RAG 存储 (Memory/SQLite/Eino)
-│   ├── domains/             # 六边形域（routing/threads/custody/sop 等）
-│   ├── skills/              # 技能框架
-│   ├── sop/                 # SOP 门控
-│   ├── settings/            # 设置存储（文件落盘 + 热加载）
-│   ├── threadstore/         # 线程存储
-│   ├── transport/           # WebSocket + HTTP 传输层
-│   ├── agent/               # Agent 实现
-│   ├── tool/                # 工具
-│   └── workspace/           # 工作区管理
-├── packs/
-│   └── default/
-│       ├── breeds/          # 狗狗品种配置（dog-template.json 只读种子，运行时以 dog-catalog.json 为准）
-│       └── skills/          # SKILL.md 提示词包
-├── web/                     # 前端 (React + Vite)
-└── docs/
-    ├── designs/             # 技术故事 (FT-XXX) —— 子系统唯一真相源
-    ├── architecture/        # 架构文档
-    ├── governance/decisions/           # ADR 决策记录
-    ├── brand/              # 设计文档
-    └── plans/               # 实现计划
-```
+## 贡献
 
-## Learn More
+欢迎贡献！详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-- [技术故事 (FT-XXX)](docs/designs/) — 子系统设计真相（编排、CLI adapter、A2A、设置、记忆、身份、QC、工具链）
-- [架构谱系](docs/architecture/architecture-lineage.md) — 全量架构主题索引
-- [记忆哲学](docs/architecture/memory-philosophy.md) — 7 公理、21 定律、判据
-- [角色设定](docs/brand/CHARACTER-SETTING_zh-CN.md) — 狗狗角色映射表
-- [故事背景](docs/brand/STORY_zh-CN.md) — 狗狗特工队的诞生故事
-- [路线图](docs/ROADMAP.md) — Phase 级进度
+- Fork → branch → PR 工作流
+- 所有 PR 需要至少一次 review
+- 遵循五条第一性原理
 
-## Contributing
+## 许可证
 
-欢迎贡献！请通过 Fork → branch → PR 的方式提交。
+[MIT](LICENSE) — 随便用，随便改，随便发。保留版权声明即可。
 
-- 遵循现有代码风格和测试规范
-- 新增 Capability 需要同时写适配器和测试
-- 新增狗狗只需一个 JSON 文件
-
-## 鸣谢
-
-本项目站在巨人的肩膀上：
-
-- **[Eino](https://github.com/cloudwego/eino)** — CloudWeGo 的 Go LLM 应用框架。编排引擎、ChatModel 接口和 schema 类型驱动着每个狗狗的智能。
-- **[clowder-ai](https://github.com/clowder-ai/clowder)** — 启发了犬群的多 Agent 猫咖。他们的 A2A 协议设计、Pack 系统模式和开源理念是宝贵的参考。
-
-## License
-
-[MIT](LICENSE) — Use it, modify it, ship it.
+"Sounds Great AI" 名称、logo 及狗狗角色设计为品牌资产 — 详见 [TRADEMARKS.md](TRADEMARKS.md)。
 
 ---
 
-<p align="center">  
-  <em>Build dog packs, not just agents.</em>  
-  
-    
-  
-  <strong>When AI Agents Bark Together, It Sounds Great.</strong>  
+<p align="center">
+  <em>让 AI 组成团队，而不只是调用 agent。</em><br>
+  <em>Build AI teams, not just agents.</em><br>
+  <br>
+  <strong>硬约束 · 软力量 · 共同愿景</strong>
 </p>
-

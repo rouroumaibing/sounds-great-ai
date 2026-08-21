@@ -27,7 +27,7 @@ const distillAgentTimeout = 120 * time.Second
 // P1) and its Approval-Hub workflow (P1-b "养熟" governance) over HTTP. The
 // capsule content itself is never reasoned about inside the platform: a
 // candidate is submitted as a *proposal*, and only an explicit operator
-// approval promotes it to the active capsule (docs/decisions/irreversible-decisions.md §4.1 — reasoning belongs
+// approval promotes it to the active capsule (不可逆决策 §4.1 — reasoning belongs
 // to a CLI agent or the operator, not to internal/).
 //
 // "autonomous distill" (point 6) is implemented WITHOUT internal reasoning: a
@@ -333,7 +333,7 @@ func cEvalRejections(c *settings.RelationshipCapsule) int {
 // budget (KD-7), and writes it as a *pending proposal* — the operator must
 // still approve it (POST .../proposal/approve) before it becomes active. This
 // is exactly the "model self-improves, operator approves" loop the user
-// accepted. Per F231 (the dog distills its OWN primer), the
+// accepted. The dog distills its OWN primer, so the
 // distiller is derived from the CURRENT session via ?session_id (no hardcoded
 // default dog); ?client_id=<breed> is an explicit operator override. The dog's
 // own identity (L0) is injected so it distills in character.
@@ -485,11 +485,11 @@ func (h *ProfilesHandler) DistillAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 // AutoDistillSession performs a best-effort autonomous distill on session seal
-// (KD-10 F276 maturity, homologous ProfileDistillationTrigger):
+// (KD-10 maturity, ProfileDistillationTrigger):
 // it aggregates the evidence store for the CURRENT session's dog relationship
 // key and, if matching evidence exists and no proposal is already pending,
 // writes a pending capsule proposal (never auto-applied). It performs NO
-// reasoning — faithful to the platform-only aggregation contract (docs/decisions/irreversible-decisions.md §4.1).
+// reasoning — faithful to the platform-only aggregation contract (不可逆决策 §4.1).
 // Every failure path is swallowed; the caller must treat it as fire-and-forget.
 func (h *ProfilesHandler) AutoDistillSession(ctx context.Context, sessionID, breedID string) {
 	if h == nil || h.evidence == nil || h.profiles == nil || h.platform == nil {

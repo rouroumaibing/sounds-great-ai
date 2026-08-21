@@ -37,7 +37,7 @@ var wsCollapse = regexp.MustCompile(`\s+`)
 //     across operators and is not yet owner-scoped, so operator-thread binding
 //     cannot be enforced without a threadstore schema change. The existence +
 //     excerpt + digest checks are the enforceable multi-user safety net.
-//   TODO(sg-f276): enforce ownerUserId binding once ThreadStore is operator-scoped.
+//   TODO(people-memory): enforce ownerUserId binding once ThreadStore is operator-scoped.
 type ThreadstoreAuthorizer struct {
 	threads ports.IThreadStore
 	msgs    ports.IMessageStore
@@ -107,7 +107,7 @@ func (a *ThreadstoreAuthorizer) AuthorizeSource(_ context.Context, operatorID st
 	return true, nil
 }
 
-// verifyMessageSource performs the homologous per-field re-verification
+// verifyMessageSource performs the per-field re-verification
 // of a captured SourceRef against the real message. Any mismatch fails closed
 // (returns false) so a memory item can never be anchored to a message it does
 // not honestly correspond to.

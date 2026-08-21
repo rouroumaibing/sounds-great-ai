@@ -10,7 +10,7 @@ Initially, a lone engineer guarded this code world. To manage the massive micros
 
 Glancing at the half-eaten dog food in his hand, inspiration struck:
 
-"Cats are independent and elegant by nature — but when it comes to rigorous tactical coordination, loyal guarding, imposing presence, and lightning-fast hunting — what this world needs is a Dog Agent Squad!"
+"Dogs are independent and elegant by nature — but when it comes to rigorous tactical coordination, loyal guarding, imposing presence, and lightning-fast hunting — what this world needs is a Dog Agent Squad!"
 
 And so, under the framework of Go and the Eino orchestration engine, **Sounds Great AI** was born.
 

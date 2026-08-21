@@ -76,6 +76,9 @@ type Platform struct {
 	// Platform Services
 	Skills *skills.SkillManager
 	MCP    *mcp.MCPRegistry
+	// MCPStore is the persistent, operator-managed registry of MCP servers.
+	// It owns persistence (mcp-servers.json) and keeps MCP in sync.
+	MCPStore *mcp.FileStore
 	A2AHub routingPorts.IA2AHub
 	SOP    sopPorts.IA2AGuardian
 	Memory *memory.MemoryStore
@@ -89,10 +92,10 @@ type Platform struct {
 	ThreadStore   threadPorts.IThreadStore
 	SettingsStore settings.SettingsStore
 	EvidenceStore memory.EvidenceStore
-	// SharedMemory is the typed-lane registry (Persistent Identity layer,
-	// homologous clowder F102/F152/F221/F227/F231). Lane entries are submitted
-	// as pending candidates at session close (P2), disposed by a human (P3),
-	// and the approved subset is recalled into dog prompts (P4). SQLite-persisted
+	// SharedMemory is the typed-lane registry (Persistent Identity layer).
+	// Lane entries are submitted as pending candidates at session close (P2),
+	// disposed by a human (P3), and the approved subset is recalled into dog
+	// prompts (P4). SQLite-persisted
 	// via NewLaneRegistryAt so typed memory survives restarts.
 	SharedMemory *memory.LaneRegistry
 	// LaneSupply detects typed deltas at session close and submits them as
@@ -101,20 +104,20 @@ type Platform struct {
 	// LaneDispositions records human dispositions on lane candidates and applies
 	// them to the registry (approve/reject/modify -> lane status transitions).
 	LaneDispositions *memory.DispositionRecorder
-	// LaneRecall records memory-recall events (injection observability,
-	// homologous clowder recall_events / RecallFeed). Backs the frontend
-	// RecallFeed/RecallLedger so the operator can see what memory was surfaced.
+	// LaneRecall records memory-recall events (injection observability). Backs
+	// the frontend RecallFeed/RecallLedger so the operator can see what memory
+	// was surfaced.
 	LaneRecall *memory.RecallStore
-	// Profiles persists relationship capsules (Persistent Identity P1,
-	// homologous F231). Kept separate from SettingsStore on purpose:
+	// Profiles persists relationship capsules (Persistent Identity P1). Kept
+	// separate from SettingsStore on purpose:
 	// capsules live in their own directory, never in dog-catalog.json.
 	Profiles *settings.ProfileRepository
 	// Continuity persists the last-session digest per breed (Persistent
-	// Identity P3, homologous F211 continuity bootstrap). Separate
+	// Identity P3). Separate
 	// directory, never in dog-catalog.json.
 	Continuity *settings.ContinuityStore
 	// PeopleMemory persists owner-private third-party people & relationship
-	// memory (Persistent Identity F276, homologous). Multi-operator:
+	// memory (Persistent Identity). Multi-operator:
 	// every operator's data is partitioned by operatorID. File-backed by
 	// default (zero-dependency); when SG_REDIS_URL is set it is Redis-backed
 	// (operator-keyed keyspace + Lua-guarded deferred-receipt lifecycle).
@@ -125,7 +128,7 @@ type Platform struct {
 
 	// SessionBreed maps an active session id to the breed (dog) running it.
 	// It lets the autonomous-distill endpoint derive the distiller from the
-	// CURRENT session (homologous: the dog distills its own primer),
+	// CURRENT session (the dog distills its own primer),
 	// instead of a hardcoded default. Populated best-effort on each spawn and
 	// read on distill. Guarded by SessionBreedMu.
 	SessionBreed   map[string]string
@@ -327,6 +330,7 @@ func New(cfg Config) (*Platform, error) {
 	})
 
 	mcpReg := mcp.NewRegistry()
+	mcpStore := mcp.NewFileStore(settings.ConfigRoot(cfg.WorkspaceDir), mcpReg)
 
 	a2aHub := routingStores.NewA2AHubAdapter(a2a.NewHub(nil))
 
@@ -360,12 +364,12 @@ func New(cfg Config) (*Platform, error) {
 	// human (P3); the approved subset is recalled into dog prompts (P4). Stored
 	// next to memory.json/evidence.json under the same ConfigRoot so a single
 	// directory holds all durable identity state. SQLite-persisted so typed
-	// memory survives restarts (NewLaneRegistryAt, homologous clowder F102).
+	// memory survives restarts.
 	sharedMemory := memory.NewLaneRegistryAt(
 		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), "lanes.json"),
 	)
-	// Recall-event store (injection observability, homologous clowder
-	// recall_events). Persisted as recall-events.jsonl under ConfigRoot.
+	// Recall-event store (injection observability). Persisted as
+	// recall-events.jsonl under ConfigRoot.
 	laneRecall := memory.NewRecallStore(filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), "lanes.json"))
 
 	promptBuilder := prompt.NewBuilder(breeds, skillMgr)
@@ -424,7 +428,7 @@ func New(cfg Config) (*Platform, error) {
 
 	// Project archive source (G8): file-backed repo trajectory store + git-ref
 	// collector. repo_url defaults empty → the collector is inert until the
-	// operator configures a code-repo URL (docs/architecture/platform-capabilities.md §6 new capability).
+	// operator configures a code-repo URL (平台能力清单 §6 new capability).
 	repoTrajectoryStore := custodyStores.NewRepoTrajectoryStore(
 		filepath.Join(settings.ConfigRoot(cfg.WorkspaceDir), settings.RepoTrajectoryFileName),
 	)
@@ -459,8 +463,8 @@ func New(cfg Config) (*Platform, error) {
 	promptBuilder.SetContinuity(continuity)
 
 	// Persistent Identity (Shared Memory): recall approved lane truth into the
-	// dog's system prompt (homologous clowder F296). Only human-approved
-	// entries are injected (M5 submission boundary); pending candidates never
+	// dog's system prompt. Only human-approved entries are injected (M5
+	// submission boundary); pending candidates never
 	// enter the prompt.
 	promptBuilder.SetLaneTruth(sharedMemory, operator)
 	// Gap4 cue-plane: wire the relevance-ranked truth reader so the builder
@@ -468,7 +472,7 @@ func New(cfg Config) (*Platform, error) {
 	// satisfies LaneCueReader (CueMemory), so sharedMemory is passed directly.
 	promptBuilder.SetLaneCue(sharedMemory)
 
-	// Persistent Identity (F276): owner-private
+	// Persistent Identity: owner-private
 	// third-party people & relationship memory. Multi-operator: every operator's
 	// data is partitioned by operatorID. File-backed by default (zero-dependency);
 	// when SG_REDIS_URL is set we use the Redis-backed store (operator-keyed
@@ -498,6 +502,7 @@ func New(cfg Config) (*Platform, error) {
 		Leader:         &leaderCfg,
 		Skills:         skillMgr,
 		MCP:            mcpReg,
+		MCPStore:       mcpStore,
 		A2AHub:         a2aHub,
 		SOP:            sopServices.NewSOPGuardianService(sopGuardian),
 		Memory:         memStore,
@@ -545,7 +550,7 @@ func New(cfg Config) (*Platform, error) {
 	// Acquires a lease.
 	pl.WireWarmPools()
 
-	// Start the daily deferred-receipt clerk (homologous F276 dual path):
+	// Start the daily deferred-receipt clerk:
 	// aligned to "30 4 * * *" (04:30 local), it promotes ready deferred receipts
 	// into rejectable candidates. The goroutine is cancelled when the process
 	// exits (context.Background is fine for a long-lived daemon; it never
@@ -598,7 +603,7 @@ func (p *Platform) RegisterWarmPool(wp *pool.WarmPool, runner unified.WarmRunner
 // its own warm pool (per-provider spawn func). It registers a single
 // BgDaemonTransport that routes to the correct per-provider pool by provider id
 // and sets each provider's carrier chain to lead with bg_daemon, falling back
-// to print_sdk. This is the homologous "claude/codex/gemini 都能长会话"
+// to print_sdk. This is the "claude/codex/gemini 都能长会话"
 // wiring; providers not in the map (opencode/kimi) stay one-shot. Called from
 // WireWarmPools (compiled only under -tags pty). Safe to call when bg_daemon is
 // not wired: the carriers still reference bg_daemon but the registry finds no
@@ -663,12 +668,27 @@ func (p *Platform) BuildMCPConfig() *unified.MCPConfig {
 	}
 	result := &unified.MCPConfig{Servers: make([]unified.MCPServer, 0, len(servers))}
 	for _, s := range servers {
-		result.Servers = append(result.Servers, unified.MCPServer{
+		entry := unified.MCPServer{
 			Name:    s.Name,
 			Command: s.Command,
 			Args:    s.Args,
 			Env:     s.Env,
-		})
+		}
+		if s.URL != "" {
+			// Remote server: emit url + optional headers and a transport type.
+			// Streamable HTTP is the modern default; an "sse://" scheme (or
+			// ?transport=sse) selects SSE.
+			entry.Type = "http"
+			if strings.HasPrefix(s.URL, "sse://") || strings.Contains(s.URL, "transport=sse") {
+				entry.Type = "sse"
+			}
+			entry.URL = s.URL
+			entry.Headers = s.Headers
+			entry.Command = ""
+			entry.Args = nil
+			entry.Env = nil
+		}
+		result.Servers = append(result.Servers, entry)
 	}
 	return result
 }

@@ -21,6 +21,7 @@ import (
 	"sounds-great-ai/internal/adapter/opencode"
 	"sounds-great-ai/internal/adapter/pool"
 	"sounds-great-ai/internal/adapter/unified"
+	"sounds-great-ai/internal/dossier"
 	"sounds-great-ai/internal/hooks"
 	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/memory"
@@ -31,11 +32,11 @@ import (
 	routingPorts "sounds-great-ai/internal/domains/routing/ports"
 	routingServices "sounds-great-ai/internal/domains/routing/services"
 	routingStores "sounds-great-ai/internal/domains/routing/stores"
+	threadPorts "sounds-great-ai/internal/domains/threads/ports"
+	threadStores "sounds-great-ai/internal/domains/threads/stores"
 	"sounds-great-ai/internal/skills"
 	"sounds-great-ai/internal/sop"
 	"sounds-great-ai/internal/threadstore"
-	threadPorts "sounds-great-ai/internal/domains/threads/ports"
-	threadStores "sounds-great-ai/internal/domains/threads/stores"
 
 	agentsPorts "sounds-great-ai/internal/domains/agents/ports"
 	agentsServices "sounds-great-ai/internal/domains/agents/services"
@@ -79,14 +80,24 @@ type Platform struct {
 	// MCPStore is the persistent, operator-managed registry of MCP servers.
 	// It owns persistence (mcp-servers.json) and keeps MCP in sync.
 	MCPStore *mcp.FileStore
-	A2AHub routingPorts.IA2AHub
-	SOP    sopPorts.IA2AGuardian
-	Memory *memory.MemoryStore
+	A2AHub   routingPorts.IA2AHub
+	SOP      sopPorts.IA2AGuardian
+	Memory   *memory.MemoryStore
 
 	// Prompt Hooks
 	HookRegistry   *hooks.Registry
 	HookPipeline   *hooks.Pipeline
 	HookTraceStore *hooks.TraceStore
+
+	// Dossier is the capability-dossier loader (FT-DS-001). It reads
+	// docs/team/dog-dossier.md (repo doc, git-versioned) and feeds the prompt
+	// builder's roster/identity projections; the distillation API shares the
+	// same loader for apply-time cache invalidation.
+	Dossier *dossier.Loader
+	// DossierService orchestrates observations, checkpoint opportunities, and
+	// the distillation proposal pipeline (FT-DS-001). Nil only in minimal
+	// test wiring.
+	DossierService *dossier.Service
 
 	// Stores (port/factory pattern)
 	ThreadStore   threadPorts.IThreadStore
@@ -375,6 +386,42 @@ func New(cfg Config) (*Platform, error) {
 	promptBuilder := prompt.NewBuilder(breeds, skillMgr)
 	contextAssembler := prompt.NewContextAssembler()
 
+	// FT-DS-001: capability dossier (docs/team/dog-dossier.md). Identity
+	// 擅长 line and roster strengths/routing columns prefer dossier
+	// projections over config fallbacks; full profiles stay on-demand reads.
+	dossierLoader := dossier.NewLoader()
+	promptBuilder.SetDossier(dossier.NewReader(dossierLoader, cfg.WorkspaceDir))
+
+	// FT-DS-001: distillation pipeline stores. Observations and proposals are
+	// durable team state (main SQLite DB, factory falls back to in-memory when
+	// SQLitePath is empty); opportunities are transient (in-memory by design).
+	dossierObservations, err := dossier.NewObservationStoreAt(cfg.SQLitePath)
+	if err != nil {
+		return nil, fmt.Errorf("create dossier observation store: %w", err)
+	}
+	dossierProposals, err := dossier.NewProposalStoreAt(cfg.SQLitePath)
+	if err != nil {
+		return nil, fmt.Errorf("create dossier proposal store: %w", err)
+	}
+	dossierOpportunities := dossier.NewInMemoryOpportunityStore()
+	dossierCheckpoint := dossier.NewCheckpoint(dossierOpportunities, func(format string, args ...any) {
+		log.Printf(format, args...)
+	})
+	dossierService := dossier.NewService(dossierProposals, dossierObservations, dossierOpportunities, dossierCheckpoint, dossierLoader, cfg.WorkspaceDir)
+
+	// FT-DS-001 AC-C2: wire the review-complete checkpoint into the SOP
+	// guardian's write-back path (best-effort — a review completion creates
+	// a distillation opportunity for the reviewed author).
+	sopService := sopServices.NewSOPGuardianService(sopGuardian)
+	sopService.SetReviewCompleteListener(func(prov sop.ReviewProvenance) {
+		dossierCheckpoint.OnReviewComplete(dossier.ReviewCompleteContext{
+			ThreadID:      prov.ReviewerThreadID,
+			ReviewerDogID: prov.ReviewerDogID,
+			AuthorDogID:   prov.AuthorDogID,
+			CommitSHA:     prov.ReviewSHA,
+		})
+	})
+
 	// Initialize prompt hooks (session-init: S1-S4)
 	hooksDir := filepath.Join(cfg.WorkspaceDir, "packs/default/hooks")
 	hookReg := hooks.NewRegistry(hooksDir)
@@ -493,36 +540,38 @@ func New(cfg Config) (*Platform, error) {
 	peopleMemory = settings.NewBroadcastingPeopleMemoryStore(peopleMemory, pmHub)
 
 	pl := &Platform{
-		ProcessManager: pm,
+		ProcessManager:  pm,
 		CarrierRegistry: registry,
-		carrierHealth:  carrierHealth,
-		AgentExecutor:  agentsServices.NewAgentExecutor(adapters),
-		Breeds:         breeds,
-		Loader:         loader,
-		Leader:         &leaderCfg,
-		Skills:         skillMgr,
-		MCP:            mcpReg,
-		MCPStore:       mcpStore,
-		A2AHub:         a2aHub,
-		SOP:            sopServices.NewSOPGuardianService(sopGuardian),
-		Memory:         memStore,
+		carrierHealth:   carrierHealth,
+		AgentExecutor:   agentsServices.NewAgentExecutor(adapters),
+		Breeds:          breeds,
+		Loader:          loader,
+		Leader:          &leaderCfg,
+		Skills:          skillMgr,
+		MCP:             mcpReg,
+		MCPStore:        mcpStore,
+		A2AHub:          a2aHub,
+		SOP:             sopService,
+		Memory:          memStore,
 
-		ThreadStore:   threadStorePort,
-		SettingsStore: settingsStore,
-		EvidenceStore: evidenceStore,
-		SharedMemory:  sharedMemory,
-		LaneSupply:    memory.NewDeltaProducer(),
+		ThreadStore:      threadStorePort,
+		SettingsStore:    settingsStore,
+		EvidenceStore:    evidenceStore,
+		SharedMemory:     sharedMemory,
+		LaneSupply:       memory.NewDeltaProducer(),
 		LaneDispositions: memory.NewDispositionRecorder(),
-		LaneRecall:        laneRecall,
-		Profiles:      profiles,
-		Continuity:    continuity,
-		PeopleMemory:  peopleMemory,
-		PeopleMemoryHub: pmHub,
+		LaneRecall:       laneRecall,
+		Profiles:         profiles,
+		Continuity:       continuity,
+		PeopleMemory:     peopleMemory,
+		PeopleMemoryHub:  pmHub,
 
 		WorkspaceDir: cfg.WorkspaceDir,
 
 		PromptBuilder:    promptBuilder,
 		ContextAssembler: contextAssembler,
+		Dossier:          dossierLoader,
+		DossierService:   dossierService,
 
 		HookRegistry:   hookReg,
 		HookPipeline:   hookPipeline,
@@ -707,8 +756,8 @@ const repoCollectInterval = 5 * time.Minute
 
 // StartReconciler runs the ball-custody zombie sweep until ctx is cancelled.
 // It heals dangling invocations (started but never ended) into died/zombie so
-	// the projected custody state never hangs in "active" forever. Mirrors the
-	// zombie-reconciliation sweep. Call once at process startup (main.go).
+// the projected custody state never hangs in "active" forever. Mirrors the
+// zombie-reconciliation sweep. Call once at process startup (main.go).
 func (p *Platform) StartReconciler(ctx context.Context) {
 	if p.BallLedger == nil {
 		return

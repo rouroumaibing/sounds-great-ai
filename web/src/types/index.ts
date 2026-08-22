@@ -1,6 +1,6 @@
 // Navigation types
 export type PrimaryNavType = 'threads' | 'tasks' | 'memory' | 'settings' | 'about' | 'custody' | 'profiles' | 'people';
-export type SettingsTabType = 'members' | 'accounts' | 'personas' | 'im' | 'skills' | 'mcp' | 'plugins' | 'market' | 'marketplace' | 'ball' | 'concierge' | 'voice' | 'config' | 'rules' | 'notifications' | 'system' | 'ops' | 'eval' | 'about';
+export type SettingsTabType = 'members' | 'accounts' | 'personas' | 'im' | 'skills' | 'mcp' | 'plugins' | 'market' | 'marketplace' | 'ball' | 'concierge' | 'voice' | 'config' | 'rules' | 'notifications' | 'system' | 'ops' | 'eval' | 'dossier' | 'about';
 export type DrawerTabType = 'plan' | 'mcp' | 'memory' | 'files' | 'session-chain' | 'sop';
 export type ThreadFilterType = 'all' | 'escalated' | 'active';
 export type MemberFilterType = 'all' | 'enabled' | 'disabled' | 'oauth' | 'config';

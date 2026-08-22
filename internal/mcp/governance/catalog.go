@@ -114,6 +114,36 @@ func Catalog() []ToolDefinition {
 			ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false,
 		},
 
+		// --- dossier: capability profiles (FT-DS-001). Dogs read profiles
+		// before complex handoffs, check their own distillation
+		// opportunities, and propose evidence-backed summary updates. ---
+		{
+			Name: "sg_get_dossier", Family: "dossier",
+			Description: "[dossier] Read the capability dossier: per-dog structured profiles (one-liner, roster summary, routing signals, provenance) joined with the catalog and grouped by model, plus coverage meta. Use before complex handoffs to route by capability, not role.",
+			Method: "GET", Path: "/api/dossier", Required: nil,
+			ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false,
+		},
+		{
+			Name: "sg_get_dossier_base_hash", Family: "dossier",
+			Description: "[dossier] Get the current dog-dossier.md content hash — required as baseHash when creating a distillation proposal.",
+			Method: "GET", Path: "/api/dossier/base-hash", Required: nil,
+			ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false,
+		},
+		{
+			Name: "sg_list_distillation_opportunities", Family: "dossier",
+			Description: "[dossier] List pending distillation opportunities (capability-relevant events awaiting judgment). The operator sees all; pass actor=<your dogId> to scope to your own. Dismiss if not worth distilling; convert after creating a proposal.",
+			Method: "GET", Path: "/api/dossier/distillation-opportunities", QueryParams: []string{"actor"},
+			Required: nil, ReadOnly: true, Destructive: false, Idempotent: true, OpenWorld: false,
+		},
+		{
+			Name: "sg_propose_dossier_distillation", Family: "dossier",
+			Description: "[dossier] Propose an evidence-backed update to a dog's dossier summary layer (targetDogId, targetFields, beforeSnapshot, afterDraft, rationale, evidenceRefs, baseHash from sg_get_dossier_base_hash). Empty evidenceRefs fails closed. Operator approves; only the target dog may apply.",
+			Method: "POST", Path: "/api/dossier/distillations",
+			BodyParams: []string{"sourceEvent", "sourceId", "targetDogId", "targetFields", "beforeSnapshot", "afterDraft", "rationale", "evidenceRefs", "baseHash", "actor"},
+			Required: []string{"sourceEvent", "sourceId", "targetDogId", "targetFields", "beforeSnapshot", "afterDraft", "rationale", "evidenceRefs", "baseHash"},
+			ReadOnly: false, Destructive: false, Idempotent: true, OpenWorld: false,
+		},
+
 		// --- workflow: SOP bulletin board (feature stage, baton holder,
 		// resume capsule, check attestations). Information sharing, not flow
 		// control — dogs decide their own actions. ---

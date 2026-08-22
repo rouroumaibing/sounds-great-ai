@@ -1,8 +1,4 @@
 .env
-.superpowers/
-docs/superpowers
-docs/plans
-.workbuddy
 .sounds-great-ai
 
 tmp/
@@ -23,3 +19,9 @@ bin/
 web/.env.development
 web/.env.local
 web/.env.production
+
+.workbuddy
+.zcode
+.superpowers/
+docs/superpowers
+docs/plans

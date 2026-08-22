@@ -64,14 +64,30 @@ type LaneCueReader interface {
 	RecordCueEvents(hits []memory.CueHit, operator string)
 }
 
+// DossierReader resolves capability-dossier projections for a dog identity
+// (FT-DS-001). Implemented by *dossier.Reader; declared as an interface here
+// to keep prompt decoupled from the dossier package. When set, the builder's
+// identity block and teammate roster prefer dossier projections over the
+// config fallbacks (dossier.l0RosterSummary ?? team_strengths ?? role_description).
+type DossierReader interface {
+	// OneLiner returns the identity one-liner for the dog, if the dossier
+	// has one for this identity.
+	OneLiner(dogID string) (string, bool)
+	// RosterSummary returns the roster strengths cell for the dog.
+	RosterSummary(dogID string) (string, bool)
+	// RoutingNote returns the route-critical boundary note for the dog.
+	RoutingNote(dogID string) (string, bool)
+}
+
 // Builder constructs system prompts for CLI adapter invocations.
 // It assembles breed identity, teammate roster, safety rules, and skill prompts
 // into a single system prompt string injected into the CLI agent.
 type Builder struct {
-	breeds     map[string]*pack.BreedConfig
-	skills     *skills.SkillManager
-	profiles   ProfileReader
-	continuity ContinuityReader
+	breeds       map[string]*pack.BreedConfig
+	skills       *skills.SkillManager
+	profiles     ProfileReader
+	continuity   ContinuityReader
+	dossier      DossierReader
 	laneTruth    LaneTruthReader
 	laneCue      LaneCueReader
 	laneOperator string
@@ -92,6 +108,15 @@ func NewBuilder(breeds map[string]*pack.BreedConfig, skillMgr *skills.SkillManag
 // operator even after a fresh spawn or an auto-compact wiped history.
 func (b *Builder) SetProfiles(p ProfileReader) {
 	b.profiles = p
+}
+
+// SetDossier attaches the capability-dossier reader (FT-DS-001). When set,
+// the identity block's 擅长 line prefers the dossier one-liner, and the
+// teammate roster prefers dossier summaries/routing notes over config
+// fallbacks. The full six-field profile stays out of the prompt — dogs read
+// docs/team/dog-dossier.md on demand (progressive disclosure).
+func (b *Builder) SetDossier(d DossierReader) {
+	b.dossier = d
 }
 
 // SetContinuity attaches a continuity-digest reader (Persistent Identity P3).
@@ -231,8 +256,16 @@ func (b *Builder) buildIdentity(breed *pack.BreedConfig, hint string) string {
 	if breed.RoleDescription != "" {
 		sb.WriteString(fmt.Sprintf("**职责：** %s\n\n", breed.RoleDescription))
 	}
-	if breed.TeamStrengths != "" {
-		sb.WriteString(fmt.Sprintf("**擅长：** %s\n\n", breed.TeamStrengths))
+	// FT-DS-001: dossier one-liner is the evidence-backed self portrait;
+	// team_strengths is the hand-written config fallback.
+	strengths := breed.TeamStrengths
+	if b.dossier != nil {
+		if oneLiner, ok := b.dossier.OneLiner(dogIDOf(breed)); ok {
+			strengths = oneLiner
+		}
+	}
+	if strengths != "" {
+		sb.WriteString(fmt.Sprintf("**擅长：** %s\n\n", strengths))
 	}
 
 	// Restrictions
@@ -323,7 +356,7 @@ func (b *Builder) buildRoster(selfID string) string {
 
 	var sb strings.Builder
 	sb.WriteString("## 队友名册\n\n")
-	sb.WriteString("| 狗狗 | @mention | 擅长 | 职责 |\n")
+	sb.WriteString("| 狗狗 | @mention | 擅长 | 路由边界 |\n")
 	sb.WriteString("|------|----------|------|------|\n")
 
 	for id, breed := range b.breeds {
@@ -336,25 +369,65 @@ func (b *Builder) buildRoster(selfID string) string {
 			mention = breed.MentionPatterns[0]
 		}
 
-		strengths := breed.TeamStrengths
+		// FT-DS-001 fallback chain: dossier summary → config team_strengths
+		// → first variant strengths. Dossier summaries are evidence-backed;
+		// config fields are the community/hand-written baseline.
+		strengths := ""
+		if b.dossier != nil {
+			strengths, _ = b.dossier.RosterSummary(dogIDOf(breed))
+		}
+		if strengths == "" {
+			strengths = breed.TeamStrengths
+		}
 		if strengths == "" && len(breed.Variants) > 0 {
 			v := breed.Variants[0]
 			if len(v.Strengths) > 0 {
 				strengths = strings.Join(v.Strengths, ", ")
 			}
 		}
+		if strengths == "" {
+			strengths = breed.RoleDescription
+		}
+		if strengths == "" {
+			strengths = "—"
+		}
 
-		role := breed.RoleDescription
-		if role == "" {
-			role = "—"
+		// Route boundary: dossier routing note → config caution (+ hard
+		// restrictions always stay visible — they are enforcement, not advice).
+		boundary := ""
+		if b.dossier != nil {
+			boundary, _ = b.dossier.RoutingNote(dogIDOf(breed))
+		}
+		if boundary == "" {
+			boundary = breed.Caution
+		}
+		if len(breed.Restrictions) > 0 {
+			r := "硬限制：" + strings.Join(breed.Restrictions, "、")
+			if boundary != "" {
+				boundary = boundary + "；" + r
+			} else {
+				boundary = r
+			}
+		}
+		if boundary == "" {
+			boundary = "—"
 		}
 
 		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s |\n",
-			breed.DisplayName, mention, strengths, role))
+			breed.DisplayName, mention, strengths, boundary))
 	}
 
 	sb.WriteString("\n")
 	return sb.String()
+}
+
+// dogIDOf resolves the dossier identity key for a breed: the breed-level
+// dog_id when set (e.g. "bianmu"), else the breed id itself.
+func dogIDOf(breed *pack.BreedConfig) string {
+	if breed.DogID != "" {
+		return breed.DogID
+	}
+	return breed.ID
 }
 
 // buildSkills constructs the injected skills section.

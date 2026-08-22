@@ -19,6 +19,7 @@ interface RawSection {
 const RAW_SECTIONS: RawSection[] = [
   { id: 'accounts', label: '账户与密钥', desc: '模型账户、凭据和执行身份的归属关系。', icon: 'fa-solid fa-key', color: 'indigo' },
   { id: 'members', label: '成员管理', desc: '狗狗名册、默认协作对象与编排顺序。', icon: 'fa-solid fa-users-gear', color: 'indigo' },
+  { id: 'dossier', label: '狗狗画像', desc: '能力画像档案、观察暂存与蒸馏提案审批。', icon: 'fa-solid fa-id-card', color: 'indigo' },
   { id: 'skills', label: '技能管理', desc: '技能启用、carrier 挂载与漂移治理。', icon: 'fa-solid fa-wand-magic-sparkles', color: 'indigo' },
   { id: 'system', label: '系统配置', desc: '环境选项、默认行为和运行时总开关。', icon: 'fa-solid fa-gear', color: 'indigo' },
   { id: 'ops', label: '运维监控', desc: '服务健康、运行态观测与评估。', icon: 'fa-solid fa-chart-line', color: 'indigo' },

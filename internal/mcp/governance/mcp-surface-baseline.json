@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "featureId": "SG-MCP-SURFACE",
-  "generatedAt": "2026-08-21T10:30:58Z",
+  "generatedAt": "2026-08-22T08:08:00Z",
   "tools": [
     {
       "name": "sg_add_evidence",
@@ -28,6 +28,22 @@
       "open_world": false
     },
     {
+      "name": "sg_get_dossier",
+      "family": "dossier",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_get_dossier_base_hash",
+      "family": "dossier",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
       "name": "sg_get_thread",
       "family": "collab",
       "read_only": true,
@@ -46,6 +62,14 @@
     {
       "name": "sg_list_breeds",
       "family": "breeds",
+      "read_only": true,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
+      "name": "sg_list_distillation_opportunities",
+      "family": "dossier",
       "read_only": true,
       "destructive": false,
       "idempotent": true,
@@ -92,6 +116,14 @@
       "open_world": false
     },
     {
+      "name": "sg_propose_dossier_distillation",
+      "family": "dossier",
+      "read_only": false,
+      "destructive": false,
+      "idempotent": true,
+      "open_world": false
+    },
+    {
       "name": "sg_search_evidence",
       "family": "memory",
       "read_only": true,
@@ -108,5 +140,5 @@
       "open_world": false
     }
   ],
-  "digest": "sha256:0c2f13ed959013a4c1d3f6979103afb19e839f417e6c0287217a65e062756f55"
+  "digest": "sha256:47f80a636960689814e47b994dd75a4ae23029dce88e5508f526b2a2ba45375f"
 }

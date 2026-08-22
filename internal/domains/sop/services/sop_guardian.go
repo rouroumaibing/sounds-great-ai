@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"sounds-great-ai/internal/a2a"
-	sop "sounds-great-ai/internal/sop"
 	sopPorts "sounds-great-ai/internal/domains/sop/ports"
+	sop "sounds-great-ai/internal/sop"
 )
 
 // defaultSOPDefinitionPath is the bundled SOP definition. It is overridden via
@@ -34,6 +34,11 @@ type SOPGuardianService struct {
 	authorAssign map[string]reviewAssignment
 	cycles       map[string]*sop.ReviewCycle
 	assignGen    uint64
+
+	// reviewCompleteHook, when set, fires best-effort (never blocking the
+	// handoff verdict) after a review provenance is recorded. FT-DS-001 uses
+	// it to create distillation opportunities for the reviewed author.
+	reviewCompleteHook func(sop.ReviewProvenance)
 }
 
 // reviewAssignment is the review lease. AuthorDogID is the predecessor (the
@@ -56,6 +61,12 @@ func NewSOPGuardianService(inner *sop.SOPGuardian) *SOPGuardianService {
 		authorAssign: make(map[string]reviewAssignment),
 		cycles:       make(map[string]*sop.ReviewCycle),
 	}
+}
+
+// SetReviewCompleteListener attaches a best-effort post-review hook
+// (FT-DS-001 distillation checkpoint). Nil-safe.
+func (s *SOPGuardianService) SetReviewCompleteListener(hook func(sop.ReviewProvenance)) {
+	s.reviewCompleteHook = hook
 }
 
 // SetDefinitionPath overrides the SOP definition YAML used for declarative
@@ -219,15 +230,24 @@ func (s *SOPGuardianService) EnforceReviewHandoff(in sopPorts.ReviewHandoffInput
 					cyc.AssignReview(asn.AuthorDogID, asn.ReviewerDogID, asn.ThreadID)
 					s.cycles[key] = cyc
 				}
-				err := cyc.RecordReview(sop.ReviewProvenance{
+				prov := sop.ReviewProvenance{
 					ReviewerDogID:    asn.ReviewerDogID,
 					AuthorDogID:      asn.AuthorDogID,
 					ReviewerThreadID: in.SessionID,
 					ReviewSHA:        in.SessionID,
-				})
+				}
+				err := cyc.RecordReview(prov)
 				s.assignMu.Unlock()
 				if err != nil {
 					return sopPorts.ReviewHandoffVerdict{Blocked: true, Messages: []string{err.Error()}}
+				}
+				// FT-DS-001: best-effort distillation checkpoint — a review
+				// just completed for the author; never block the verdict on it.
+				if s.reviewCompleteHook != nil {
+					func() {
+						defer func() { _ = recover() }()
+						s.reviewCompleteHook(prov)
+					}()
 				}
 			} else {
 				s.assignMu.Unlock()

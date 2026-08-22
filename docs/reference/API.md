@@ -498,3 +498,40 @@ Real-time communication for chat execution, streaming output, and agent coordina
   "duration_ms": 5234
 }
 ```
+
+## Dossier API (FT-DS-001)
+
+Base: `/api/dossier` — capability profiles, observation staging, distillation proposals.
+
+### GET /api/dossier
+Capability profiles joined with the dog catalog, grouped by model. Returns `modelGroups[]` (model → dogs with `dossier` profile or null) and `meta` (totalDogs / totalModels / dossierCoverage / dossierAvailable).
+
+### GET /api/dossier/base-hash
+Current `docs/team/dog-dossier.md` SHA-256. Required as `baseHash` when creating a distillation proposal.
+
+### POST /api/dossier/observations
+Body: `{ "dogId": "...", "content": "...", "actor": "operator" }` → 201 `{ observation }`. Observations stage in SQLite forever; their only promotion path is being cited as proposal evidence — they never overwrite the summary layer.
+
+### GET /api/dossier/observations?dogId=&limit=
+Per-dog list, or all grouped by dog when `dogId` omitted.
+
+### GET /api/dossier/distillation-opportunities
+Pending opportunities. Operator sees all; dog actors (X-SG-Actor or ?actor=dogId) see only their own. Opportunities are transient (in-memory, lost on restart by design).
+
+### POST /api/dossier/distillation-opportunities/{id}/dismiss | /convert
+Body (convert): `{ "proposalId": "..." }`.
+
+### POST /api/dossier/distillations
+Create a proposal. Body: `sourceEvent` (review-complete|feat-phase-close|manual), `sourceId` (idempotency key), `targetDogId`, `targetFields[]`, `beforeSnapshot`, `afterDraft`, `rationale`, `evidenceRefs[]` (**non-empty, fail-closed**: type ∈ observation|review|trajectory|operator-comment + id), `baseHash`, `actor`. 201 created / 200 idempotent hit. 400 when evidenceRefs empty or structurally invalid.
+
+### GET /api/dossier/distillations?dogId=&limit=
+Pending proposals, or all statuses for a dog with `dogId`.
+
+### GET /api/dossier/distillations/{id}
+Proposal detail.
+
+### POST /api/dossier/distillations/{id}/approve | /reject
+Operator transitions pending → approved / rejected. 403 when the approver equals the creator (separation of duties). Reject body: `{ "reason": "..." }`.
+
+### POST /api/dossier/distillations/{id}/execute-apply
+Target dog only (actor must equal targetDogId, else 403). Validates status=approved + baseHash (409 on stale) + section-anchored snapshot replace, writes the dossier file, `git add+commit` (no push; rollback on commit failure), marks applied. Returns `{ proposal, commitSha }`.

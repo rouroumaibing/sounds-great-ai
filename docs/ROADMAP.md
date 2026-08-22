@@ -17,3 +17,4 @@
 | [FT-ACC-001](features/FT-ACC-001-accounts-keys-auth.md) | 账户与密钥 | 设置页「账户与密钥」与「客户配置安全」设计 |
 | [FT-MEM-001](features/FT-MEM-001-member-management.md) | 成员管理 | 设置页「成员管理」设计 |
 | [FT-DEV-001](features/FT-DEV-001-makefile-daemon-reclaim.md) | 构建/开发环境 | Makefile 守护生命周期设计（dev/prod/daemon 等 target） |
+| [FT-DS-001](features/FT-DS-001-dog-dossier.md) | Dog Dossier | 狗狗能力画像：特性全景（人设 × 能力档案 × 关系画像 × 行为评估四层拼图）+ 能力档案子系统交付（证据沉淀 × 蒸馏提案审批 × 名册认知路由，对齐 clowder F208） |

@@ -189,6 +189,15 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 		mux.Handle("/api/continuity", continuityHandler.Routes())
 		mux.Handle("/api/continuity/", continuityHandler.Routes())
 	}
+	// FT-DS-001: capability dossier (profiles join, observation staging,
+	// distillation opportunities + proposal pipeline).
+	if pl != nil && pl.DossierService != nil {
+		dossierHandler := transport.NewDossierHandler(pl.DossierService, pl.Dossier, func() map[string]*pack.BreedConfig {
+			return pl.Breeds
+		})
+		mux.Handle("/api/dossier", auth.Wrap(dossierHandler.Routes()))
+		mux.Handle("/api/dossier/", auth.Wrap(dossierHandler.Routes()))
+	}
 	if pl != nil && pl.PeopleMemory != nil {
 		pmOperator := "operator"
 		if pl.Leader != nil && pl.Leader.Name != "" {

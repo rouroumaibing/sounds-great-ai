@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { useAppStore } from '../../store/useAppStore';
+import { useChatStore } from '../../store/useChatStore';
 import { useThreads } from '../../hooks/useThreads';
 import { ThreadItem } from './ThreadItem';
 import { VirtualList } from '../common/VirtualList';
@@ -15,6 +16,7 @@ export function ThreadList() {
   const setThreadSearchInput = useAppStore((s) => s.setThreadSearchInput);
   const threadFilter = useAppStore((s) => s.threadFilter);
   const setThreadFilter = useAppStore((s) => s.setThreadFilter);
+  const escalations = useChatStore((s) => s.escalations);
 
   const { threads, loading, error, createThread } = useThreads();
 
@@ -24,8 +26,8 @@ export function ThreadList() {
       t.title.toLowerCase().includes(threadSearchInput.toLowerCase()) ||
       t.id.includes(threadSearchInput);
     if (!matchesSearch) return false;
-    if (threadFilter === 'escalated') return t.hasEscalation;
-    if (threadFilter === 'active') return !t.hasEscalation;
+    if (threadFilter === 'escalated') return !!escalations[t.id];
+    if (threadFilter === 'active') return !escalations[t.id];
     return true;
   });
 

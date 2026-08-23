@@ -8,8 +8,13 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+# 前端构建产物全部忽略。嵌入用 go:embed 在 web/embed_dist.go（带 embeddist
+# 构建标签），默认构建走空 FS 桩（web/embed_stub.go），手动删除 dist 不会
+# 破坏 go build / go test。
 dist
 dist-ssr
+dist.new
+dist.old
 *.local
 
 # Editor directories and files

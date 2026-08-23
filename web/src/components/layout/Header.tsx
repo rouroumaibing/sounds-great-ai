@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { useChatStore } from '../../store/useChatStore';
 import { useThreads } from '../../hooks/useThreads';
 import { useI18n } from '../../store/useI18n';
+import { NotificationCenter } from '../common/NotificationCenter';
 
 export function Header() {
   const activeNav = useAppStore((s) => s.activeNav);
@@ -70,7 +71,7 @@ export function Header() {
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition text-xs"
           >
             <i className="fa-solid fa-globe"></i>
-            <span>{locale === 'zh-CN' ? t('common.langSwitch') : 'English'}</span>
+            <span>{locale === 'zh-CN' ? '中文' : 'English'}</span>
             <i className={clsx('fa-solid fa-chevron-down text-[10px] transition-transform', langOpen && 'rotate-180')}></i>
           </button>
           {langOpen && (
@@ -81,7 +82,7 @@ export function Header() {
                   onClick={() => { setLocale('zh-CN'); setLangOpen(false); }}
                   className={clsx('w-full px-3 py-2 text-left text-xs transition flex items-center gap-2', locale === 'zh-CN' ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60')}
                 >
-                  <i className="fa-solid fa-language text-[10px]"></i>{t('common.langSwitch')}
+                  <i className="fa-solid fa-language text-[10px]"></i>中文
                 </button>
                 <button
                   onClick={() => { setLocale('en'); setLangOpen(false); }}
@@ -95,6 +96,7 @@ export function Header() {
         </div>
 
         <div className="flex items-center space-x-1 border-l border-slate-800 pl-2.5">
+          <NotificationCenter />
           <button onClick={toggleLeftPanel} className={clsx('p-2 rounded-lg border text-xs transition', leftPanelVisible ? 'border-indigo-500/50 text-indigo-400 bg-indigo-500/10' : 'border-slate-800 text-slate-500 hover:text-slate-300')} title={t('header.toggleLeft')}>
             <i className="fa-solid fa-table-columns"></i>
           </button>

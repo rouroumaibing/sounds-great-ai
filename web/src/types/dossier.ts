@@ -60,6 +60,22 @@ export interface DossierObservation {
 
 export type DistillationProposalStatus = 'pending' | 'approved' | 'rejected' | 'applied';
 
+// Transient workflow signal: "a capability-relevant event just closed;
+// consider distilling it into the dossier". Deliberately not persisted —
+// opportunities are prompts, not ledgers.
+export interface DistillationOpportunity {
+  opportunityId: string;
+  sourceEvent: string;
+  sourceId: string;
+  targetDogId: string;
+  threadId: string;
+  reviewerDogId: string;
+  authorDogId: string;
+  status: 'pending' | 'converted' | 'dismissed';
+  createdAt: string;
+  convertedToProposalId?: string;
+}
+
 export interface EvidenceRef {
   type: string;
   id: string;

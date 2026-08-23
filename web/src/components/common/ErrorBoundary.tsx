@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
+import { isStaleChunkError, tryAutoReload } from '../../services/update';
 
 interface Props {
   children: ReactNode;
@@ -23,6 +24,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     console.error('ErrorBoundary caught:', error, errorInfo);
+    // A lazy-route chunk that vanished after a redeploy only recovers with a
+    // fresh page load: React caches the rejected import, so the in-place
+    // "Try again" button cannot re-fetch it.
+    if (isStaleChunkError(error)) tryAutoReload();
   }
 
   render(): ReactNode {

@@ -99,7 +99,7 @@ flowchart TB
 
 ### 3.2 F231 关系胶囊 / 养熟（`internal/transport/profiles_handler.go` + `settings.ProfileRepository`）
 
-**capsule / proposal 状态机**：`ProfileRepository` 存 active capsule（`RelationshipCapsule`：key/body/ownerDog/sourceRef/eval 计数）+ 一个 pending `proposal`。`PUT /api/profiles/{key}` 直接写（当前前端未调用）；正常路径是**提案→审批**。
+**capsule / proposal 状态机**：`ProfileRepository` 存 active capsule（`RelationshipCapsule`：key/body/ownerDog/sourceRef/eval 计数）+ 一个 pending `proposal`。正常路径是**提案→审批**；`PUT /api/profiles/{key}` 直接写作为 operator 显式选择的捷径存在（2026-08-22 起前端经 `CapsuleEditor` 的「直接写入」按钮接入，见 §4.2）。
 
 **Distill（平台只聚合，不推理）**（`Distill`，:287）：`evidence.ListEvidence()` 按 key 过滤，返回证据列表 + `evidence_count` + 提示 operator 走 `propose`/`PUT`。**不调用 LLM**。
 
@@ -120,7 +120,7 @@ flowchart TB
 ### 4.1 F276 UI（`web/src/components/people-memory/PeopleMemoryContent.tsx` + `web/src/services/peopleMemoryService.ts`）
 
 - **三 Tab + operator 切换**：人物 / 待批候选 / 延迟回执；顶部 operator 切换器，`getActiveOperator()/setActiveOperator()` 持久化 localStorage，`operatorHeaders()` 以 `X-Operator-Id` 发送。
-- **实时同步（SSE）**：`PeopleMemoryContent.tsx:159` `new EventSource('/api/people-memory/events?operator='+appliedOperator)`；`onopen→liveState='open'`、`onmessage→reloadRef.current()`（重刷当前 tab/详情）、`onerror→'error'`（自动重连）；切换 operator 重开订阅。**这是 SG 在 F276 单会话聊天卡之上新增的实时同步（SSE）增强**。
+- **实时同步（SSE over fetch）**：`PeopleMemoryContent.tsx` 经 `services/sse.ts` 的 `streamSSE('/api/people-memory/events?operator='+…)` 订阅——**fetch 流式消费而非 EventSource**（2026-08-23 修复：EventSource 既不能带 `Authorization` 头也不走 `API_BASE`，AUTH_TOKEN/远程 API 下 401/连错主机）；`onOpen→liveState='open'`、`onMessage→reloadRef.current()`（重刷当前 tab/详情）、`onError→'error'`（指数重连由 streamSSE 循环负责）、切换 operator 重开订阅（AbortController）；SSE 帧解析（跨 chunk 重组、注释帧跳过）由 `sse.test.ts` 锁定。
 - **核心交互**：
   - 新建捕获：多草稿表单（N 张 claim 卡 + ≤1 关系卡 + ≤1 互动卡，`submitCapture` :242）。
   - 候选详情：`CandidateDetailView` + `DraftCard`，**每张草稿独立批准/驳回**（:994）；支持全部批准/驳回、稍后(not-now)、撤回、撤销审批（:1028）。决定后 `DraftCard` 就地折叠为 ✅/🚫。
@@ -131,11 +131,14 @@ flowchart TB
 
 ### 4.2 F231 UI（`web/src/components/profiles/*` + `web/src/services/profilesService.ts`）
 
-- **结构**：左侧关系键列表（选中即加载）；右侧 `RelationshipCapsuleCard`（active 画像 body + 主人 breed 圆点 + 赞/踩计数）；有 proposal → `ApprovalCard`（批准并写入 primer / 驳回）；无 proposal → `DistillControls`。
+- **结构**：左侧关系键列表（选中即加载）；右侧 `RelationshipCapsuleCard`（active 画像 body + 主人 breed 圆点 + 赞/踩计数 + 删除键按钮）；有 proposal → `ApprovalCard`（批准并写入 primer / 驳回）；无 proposal → `CapsuleEditor` + `DistillControls`。
+- **CapsuleEditor（2026-08-22 新增，`RelationshipCapsuleCard.tsx` 内嵌组件）**：operator 原地起草胶囊更新，两条提交路径——「提交提案（走审批）」→ `POST /api/profiles/{key}/propose` 落 pending proposal（`ApprovalCard` 随即接管）；「直接写入（跳过审批）」→ `PUT /api/profiles/{key}`（该端点此前为前端死接口）。`ownerDog` 默认 `operator`；提案是正常路径，直接写入需 operator 显式选择。
+- **删除（2026-08-22 接入）**：`RelationshipCapsuleCard` 头部删除按钮（3 秒二次确认）→ `DELETE /api/profiles/{key}`（后端连带清 pending proposal；该端点此前同为前端死接口）。
 - **DistillControls 三种触发**（`DistillControls.tsx:27`）：①「让当前会话的狗狗蒸馏」（`activeThreadId`，来自 zustand `useAppStore`）；②「指定狗狗蒸馏」（`client_id` 覆盖，来自 `breedMeta.ts` 的 `BREED_OPTIONS`）；③「仅聚合证据」（不 spawn 狗狗）。
 - **ApprovalCard 状态机**：pending/busy/approved/rejected/error（:13）；终态就地折叠为「✓ 已批准并写入 primer」「已驳回该提议」（:48）。
 - **实时**：**无 SSE**，每次决策后 `handleChanged()`（ProfilesContent.tsx:55）重调 `loadDetail`+`loadList` 手动刷新。**无 token/蒸馏预算显示**。
 - **状态**：`ProfilesContent` 纯局部 `useState`；`DistillControls` 额外用 zustand `useAppStore`。**无 operator 头**（蒸馏者靠 session_id/client_id 服务端派生）。
+- **i18n**：`people.*`/`profiles.*` 共 74 键已补入 `en.ts`/`zh-CN.ts`（760 键严格对齐，`useI18n.test.ts` 守护）——此前英界面整体显示中文内联兜底（2026-08-22 修复）。
 
 ---
 
@@ -192,9 +195,9 @@ flowchart TB
 |------|------|------|
 | GET `/api/profiles` | List | 关系键 + 状态 + eval 计数 + 待审标记 |
 | GET `/api/profiles/{key}` | Get | 胶囊详情 |
-| PUT `/api/profiles/{key}` | Upsert | 直接写（前端未用） |
-| DELETE `/api/profiles/{key}` | Delete | 删除 |
-| POST `/api/profiles/{key}/propose` | Propose | 提交胶囊提案 |
+| PUT `/api/profiles/{key}` | Upsert | 直接写（`CapsuleEditor`「直接写入」按钮，2026-08-22 接入） |
+| DELETE `/api/profiles/{key}` | Delete | 删除（`RelationshipCapsuleCard` 删除按钮，2026-08-22 接入） |
+| POST `/api/profiles/{key}/propose` | Propose | 提交胶囊提案（`CapsuleEditor`「提交提案」按钮，2026-08-22 接入） |
 | GET `/api/profiles/{key}/proposal` | GetProposal | 取待审（404→null） |
 | POST `/api/profiles/{key}/proposal/approve` | Approve | 批准写入 active |
 | POST `/api/profiles/{key}/proposal/reject` | Reject | 驳回 |

@@ -177,7 +177,7 @@ const (
 
 // SystemNoticePayload 是 SYSTEM_NOTICE 事件的 payload
 type SystemNoticePayload struct {
-	Severity  string `json:"severity"`  // "critical", "warning", "info", "recovery"
+	Severity  string `json:"severity"` // "critical", "warning", "info", "recovery"
 	Title     string `json:"title"`
 	Message   string `json:"message"`
 	Timestamp string `json:"timestamp"` // ISO 8601
@@ -212,4 +212,45 @@ type SopGatePayload struct {
 	Author   string `json:"author,omitempty"`
 	Reviewer string `json:"reviewer,omitempty"`
 	Blocked  bool   `json:"blocked,omitempty"`
+}
+
+// CVO escalation 事件类型 (G4: A2A 深度硬轨熔断后上交 CVO)
+const (
+	// EventCvoEscalation is pushed server → client when the A2A depth hard
+	// rail trips and the ball is parked with the operator/CVO. The frontend
+	// renders an actionable escalation card; the operator answers with a
+	// CVO_ESCALATION_RESPONSE.
+	EventCvoEscalation EventType = "CVO_ESCALATION"
+	// EventCvoEscalationResponse is sent client → server carrying the
+	// operator's decision on a pending escalation.
+	EventCvoEscalationResponse EventType = "CVO_ESCALATION_RESPONSE"
+)
+
+// CvoEscalationOption is one preset decision offered to the operator. Prompt
+// is the instruction the server re-dispatches when the option is chosen;
+// labels are localized client-side by option ID, so no display text rides
+// the wire.
+type CvoEscalationOption struct {
+	ID     string `json:"id"`
+	Prompt string `json:"prompt"`
+}
+
+// CvoEscalationPayload 是 CVO_ESCALATION 事件的 payload。
+type CvoEscalationPayload struct {
+	EscalationID string                `json:"escalation_id"`
+	Reason       string                `json:"reason"`
+	MaxDepth     int                   `json:"max_depth,omitempty"`
+	FromBreed    string                `json:"from_breed,omitempty"`
+	ToBreed      string                `json:"to_breed,omitempty"`
+	Options      []CvoEscalationOption `json:"options"`
+}
+
+// CvoEscalationResponsePayload 是 CVO_ESCALATION_RESPONSE 事件的 payload
+// (client → server)。Decision is an option ID from the escalation payload,
+// or "intervene" when the operator prefers to type a custom directive (no
+// re-dispatch happens for intervene).
+type CvoEscalationResponsePayload struct {
+	SessionID    string `json:"session_id"`
+	EscalationID string `json:"escalation_id"`
+	Decision     string `json:"decision"`
 }

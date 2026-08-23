@@ -1,5 +1,12 @@
 SHELL := /bin/bash
 
+# Git version stamped into the binary (/api/upgrade/info reports it; the
+# frontend polls that to offer a refresh after a redeploy).
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+# Recursive so $$(cat ...) reads web/dist/.build-id at recipe time, after the
+# frontend build ran in the same invocation.
+GO_LDFLAGS = -X main.version=$(VERSION) -X main.embeddedBuildID=$$(cat web/dist/.build-id 2>/dev/null || echo 0)
+
 .PHONY: dev prod daemon backend frontend build stop restart clean install upgrade help deep qc install-git-hooks tools
 
 .DEFAULT_GOAL := help
@@ -35,7 +42,7 @@ dev:
 		echo "Checking ports :8080 (backend) and :5173 (frontend)..."; \
 		scripts/daemon-helper.sh ensure_port 8080 1 || exit 1; \
 		scripts/daemon-helper.sh ensure_port 5173 0 || exit 1; \
-		go build -o bin/sounds-great-ai-dev ./cmd/server/; \
+		go build -ldflags "$(GO_LDFLAGS)" -o bin/sounds-great-ai-dev ./cmd/server/; \
 		if [ $$? -ne 0 ]; then echo "Error: backend build failed"; exit 1; fi; \
 		./bin/sounds-great-ai-dev > .logs/backend.log 2>&1 & \
 		BACK_PID=$$!; \
@@ -65,8 +72,8 @@ prod:
 	if [ ! -d web/node_modules ]; then \
 		echo "Error: web/node_modules not found. Run 'make install' first."; exit 1; \
 	fi; \
-	$(MAKE) build; \
-	go build -o bin/sounds-great-ai ./cmd/server/; \
+		$(MAKE) build; \
+		go build -ldflags "$(GO_LDFLAGS)" -tags embeddist -o bin/sounds-great-ai ./cmd/server/; \
 	if [ "$(DAEMON_MODE)" = "true" ]; then \
 		mkdir -p .logs .pids; \
 		for name in backend frontend; do \
@@ -90,6 +97,8 @@ prod:
 		./bin/sounds-great-ai; \
 	fi
 
+# go:embed: the default (untagged) build uses an empty-FS stub (see
+# web/embed_stub.go), so a missing or manually deleted web/dist compiles fine.
 backend:
 	go run ./cmd/server/
 
@@ -107,11 +116,25 @@ upgrade:
 	fi; \
 	echo "Installing dependencies..."; $(MAKE) install; \
 	echo "Building frontend..."; $(MAKE) build; \
-	echo "Building Go binary..."; go build -o bin/sounds-great-ai cmd/server/main.go; \
-	echo "Upgrade complete. Run 'make prod daemon' to restart."
+	echo "Building Go binary..."; go build -ldflags "$(GO_LDFLAGS)" -tags embeddist -o bin/sounds-great-ai cmd/server/main.go; \
+	if [ -f .pids/backend.pid ] && kill -0 $$(cat .pids/backend.pid) 2>/dev/null; then \
+		echo "Backend daemon is running — restarting to apply the upgrade..."; \
+		$(MAKE) stop; $(MAKE) prod daemon; \
+	else \
+		echo "Upgrade complete. Run 'make prod daemon' to start."; \
+	fi
 
 build:
-	cd web && npx tsc --noEmit && rm -rf dist && npm run build
+	@# Plain `tsc --noEmit` is a no-op on the solution-style root tsconfig
+	@# (files: []) — typecheck both referenced projects explicitly.
+	cd web && npx tsc --noEmit -p tsconfig.app.json && npx tsc --noEmit -p tsconfig.node.json && rm -rf dist.new && npx vite build --outDir dist.new --emptyOutDir
+	@# Atomic swap: the live dist tree is replaced in one rename (a running
+	@# server never sees a half-built dist), and the previous build moves to
+	@# dist.old where SPAHandler keeps serving its hashed chunks to tabs
+	@# opened before this deploy.
+	@rm -rf web/dist.old
+	@if [ -d web/dist ]; then mv web/dist web/dist.old; fi
+	mv web/dist.new web/dist
 
 stop:
 	@found=false; \
@@ -152,7 +175,7 @@ restart: stop
 	@$(MAKE) dev daemon
 
 clean:
-	rm -rf web/dist bin/
+	rm -rf web/dist web/dist.new web/dist.old bin/
 	rm -f main server server-dev sounds-great-ai sounds-great-ai-dev qc
 
 qc:
@@ -196,7 +219,7 @@ help:
 	@echo "  make stop          Stop background processes (PID files + port-based orphan reclaim)"
 	@echo "  make restart       Stop then start both in background (make stop && make dev daemon)"
 	@echo "  Binaries: dev -> bin/sounds-great-ai-dev, prod -> bin/sounds-great-ai"
-	@echo "  make build         Build frontend for production (tsc + vite build)"
+	@echo "  make build         Build frontend for production (tsc + vite build, atomic swap; previous build kept in web/dist.old)"
 	@echo "  make clean         Remove build artifacts (web/dist, bin/)"
 	@echo "  make clean deep    Deep clean: + logs, pids, SQLite, Go cache, node_modules, .sounds-great-ai (runtime settings/credentials)"
 	@echo "  make backend       Start Go backend only"

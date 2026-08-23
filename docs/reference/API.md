@@ -64,6 +64,11 @@ Error response body is a JSON object:
 
 Some handlers attach structured fields (e.g. `bound_member_ids`) alongside `error`.
 
+## Response Conventions
+
+- **Collection fields are never `null`.** An empty collection serializes as `[]`, not `null`. Go nil slices marshal to `null` by default, so handlers that build list fields must initialize them (`[]string{}`); consumers treat these fields as arrays without null-guarding (regression test: `internal/transport/skills_handler_test.go`).
+- **Static assets under `/assets/*` that no longer exist return a real `404`** with a non-HTML body. The SPA fallback to `index.html` applies to navigation requests only (`Sec-Fetch-Dest: document` or `Accept` containing `text/html`). Cache headers: `assets/*` are `immutable` (content-hashed), entry points (`index.html`, `sw.js`, `registerSW.js`, manifests) are `no-cache`. See `FT-UPG-001` for the full serving contract.
+
 ## Pack API (breeds)
 
 Handlers: `internal/packapi/handler.go`. Base path: `/api/breeds`.
@@ -252,6 +257,12 @@ Handlers: `internal/transport/people_memory_handler.go`. Base path: `/api/people
 - `POST /api/people-memory/deferred/{receiptID}/claim` (and `/withdraw`, `/forget`) — deferred receipt lifecycle
 - `POST /api/people-memory/person/{personID}/forget` — forget a person (redaction)
 
+### GET /api/people-memory/events (SSE)
+Server-sent events stream that pushes `PeopleMemoryEvent` to subscribers, filtered server-side by `operator` (query param; falls back to the default operator when empty). Keeps multiple browser tabs viewing the same operator in sync.
+
+- Content-Type: `text/event-stream`; 25s heartbeat comments (`: ping`); events arrive as `data: <json>\n\n`.
+- Requires streaming-capable middleware: any middleware wrapping `ResponseWriter` must delegate `http.Flusher` (see SOP guardrail).
+
 > Exact request/response shapes live in `people_memory_handler.go`. This surface is part of the Persistent Identity feature (`docs/designs/FT-PI-001-persistent-identity.md`).
 
 ## Profiles API
@@ -377,21 +388,30 @@ Handlers: `internal/transport/eval_handler.go` (mounted only when an eval handle
 
 ## Skills API
 
-Handler: `SkillsHandler` in `cmd/server/routes.go`. Base path: `/api/skills`.
+Handler: `SkillsHandler` in `internal/transport/skills_handler.go`. Base path: `/api/skills`.
 
 ### GET /api/skills
-List available skills from `packs/default/skills`.
+List available skills from all sources (packs / user / plugin).
 **Response:** `200 OK`
 ```json
 [
   {
-    "name": "quality-gate.md",
-    "source": "packs/default/skills"
+    "id": "image-generation",
+    "name": "image-generation",
+    "description": "AI 图片生成：…",
+    "category": "",
+    "triggers": ["生成图", "image generation"],
+    "source": "packs",
+    "enabled": false,
+    "scope": "",
+    "mountPoints": [],
+    "mountHealth": "disabled",
+    "security": "approved"
   }
 ]
 ```
 
-> Unlike older docs, the response items carry `name` (including the `.md` extension) and `source` — there is no `description` or `triggers` field.
+> `triggers` and `mountPoints` are always arrays (empty, never `null`) — including for skills with no persisted intent (e.g. a freshly wiped workspace). `mountHealth`: `disabled|missing|mounted|logical`; `security`: `approved|pending|quarantined|revoked`. Other endpoints under `/api/skills` (detail/patch/drift/security) live in `skills_handler.go`.
 
 ## MCP API
 
@@ -414,7 +434,7 @@ List registered MCP servers.
 
 ## Upgrade API
 
-Handlers: `UpgradeInfoHandler` / `UpgradeHandler` in `cmd/server/routes.go`.
+Handlers: `UpgradeInfoHandler` / `UpgradeHandler` in `cmd/server/handlers.go`.
 
 ### GET /api/upgrade/info
 Detect installation mode and current version.
@@ -422,10 +442,12 @@ Detect installation mode and current version.
 ```json
 {
   "mode": "source",
-  "version": "v0.1.0",
-  "repo": "sounds-great-ai"
+  "version": "fdb524e-dirty",
+  "repo": "https://github.com/rouroumaibing/sounds-great-ai"
 }
 ```
+
+> `mode` is `source` when a `.git` directory exists, else `release`. `version` comes from the `-ldflags` build stamp (`git describe --tags --always --dirty`); plain `go run`/`go build` without ldflags falls back to a `VERSION` file, then `"dev"`. The frontend polls this endpoint to detect server upgrades (see `FT-UPG-001` §5.3).
 
 ### POST /api/upgrade
 Execute an upgrade.
@@ -434,10 +456,12 @@ Execute an upgrade.
 ```json
 {
   "success": true,
-  "message": "Upgraded to v0.2.0",
+  "message": "Upgrade complete (source mode). Restart the server to apply.",
   "logs": ["pulling...", "building...", "done"]
 }
 ```
+
+> Source mode runs `git pull` (when `pull:true`), then `make install`, `make build`, and `go build -tags embeddist -ldflags … -o bin/sounds-great-ai cmd/server/main.go`; the server does not restart itself. Release mode downloads the platform binary from the latest GitHub release — which embeds the matching frontend (`FT-UPG-001` §3.5).
 
 ## WebSocket
 

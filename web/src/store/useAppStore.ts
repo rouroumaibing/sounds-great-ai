@@ -43,13 +43,13 @@ interface AppStore {
   // Notification state (UI notification center)
   notifications: Notification[];
 
-  // File tree (static mock for now — no file API)
+  // File tree (GET /api/files/tree)
   fileTree: FileNode[];
 
   // Toast state (global UI)
   toasts: Toast[];
 
-  // Mention state (P0: manual only, popover not shown)
+  // Mention state (manual @ + MentionPopover in CommandBar)
   mentionOpen: boolean;
   mentionQuery: string;
 
@@ -85,6 +85,7 @@ interface AppStore {
 
   // Actions — Notifications
   fetchNotifications: () => Promise<void>;
+  pushLiveNotice: (notice: Omit<Notification, 'id' | 'read'>) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearNotifications: () => void;
@@ -177,6 +178,10 @@ export const useAppStore = create<AppStore>()(
           userPromptInput: `${state.userPromptInput} @${file.path} `,
           contextMenu: { ...state.contextMenu, show: false },
         }));
+        // Send immediately: the chat store owns the WS send path. Imported
+        // dynamically to avoid the static store cycle
+        // (useChatStore → useAppStore).
+        void import('./useChatStore').then((m) => m.useChatStore.getState().sendPrompt());
       },
 
       setShowAddMemberModal: (show) => set({ showAddMemberModal: show }),
@@ -188,6 +193,17 @@ export const useAppStore = create<AppStore>()(
           set({ notifications: Array.isArray(data) ? data : [] });
         } catch { /* graceful: keep empty */ }
       },
+      pushLiveNotice: (notice) =>
+        set((state) => ({
+          notifications: [
+            {
+              ...notice,
+              id: `live-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              read: false,
+            },
+            ...state.notifications,
+          ],
+        })),
       markNotificationRead: (id) => {
         apiPatch(`/api/notifications/${id}/read`, {}).catch(() => {});
         set((state) => ({

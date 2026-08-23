@@ -1,9 +1,8 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { WsManager } from '../services/ws';
-import { API_BASE } from '../services/http';
+import { API_BASE, apiGet } from '../services/http';
 import { useAppStore } from './useAppStore';
-import { useNoticeStore } from './useNoticeStore';
 import type { StreamEvent, BreedResponseLiveEvent, BreedResponseCompleteEvent, SopGateEvent } from '../types';
 import { useI18n } from './useI18n';
 import type {
@@ -22,6 +21,7 @@ import type {
   LivenessPayload,
   CarrierHealthPayload,
   SopGatePayload,
+  CvoEscalationPayload,
 } from '../types/api';
 
 // Re-export useShallow for components that select objects/arrays from this store
@@ -47,13 +47,17 @@ interface ChatStore {
   lastSeq: Record<string, number>;
   // T25 / R6: structured per-carrier upstream health from CARRIER_HEALTH events.
   carrierHealth: Record<string, CarrierHealthState>;
+  // G4: threads with an unresolved CVO escalation. Keyed by thread id; true
+  // while an escalation card awaits the operator's decision.
+  escalations: Record<string, boolean>;
 
   initWebSocket: () => void;
   sendPrompt: () => void;
   sendHitlResponse: (requestId: string, approved: boolean, reason: string) => void;
   loadThreadEvents: (threadId: string, events: StreamEvent[]) => void;
   prependHistory: (threadId: string, events: StreamEvent[]) => void;
-  resolveEscalation: () => void;
+  resolveEscalation: (threadId: string, decision: string, escalationId?: string) => void;
+  restoreEscalations: () => Promise<void>;
   handleWsEvent: (event: WsEvent) => void;
 }
 
@@ -86,6 +90,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isGenerating: {},
   lastSeq: {},
   carrierHealth: {},
+  escalations: {},
 
   initWebSocket: () => {
     const existing = get().wsManager;
@@ -170,18 +175,58 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     });
   },
 
-  resolveEscalation: () => {
-    const { activeThreadId } = useAppStore.getState();
-    if (!activeThreadId) return;
+  resolveEscalation: (threadId, decision, escalationId) => {
+    const manager = get().wsManager;
+    if (manager && escalationId) {
+      manager.sendEscalationResponse(escalationId, decision, threadId);
+    }
     set((state) => {
-      const threadEvents = state.events[activeThreadId] ?? [];
+      const threadEvents = state.events[threadId] ?? [];
+      const remaining = threadEvents.filter(
+        (e) => !(e.type === 'cvo_escalation' && (!escalationId || e.escalationId === escalationId || !e.escalationId))
+      );
+      const stillEscalated = remaining.some((e) => e.type === 'cvo_escalation');
       return {
-        events: {
-          ...state.events,
-          [activeThreadId]: threadEvents.filter((e) => e.type !== 'cvo_escalation'),
-        },
+        events: { ...state.events, [threadId]: remaining },
+        escalations: { ...state.escalations, [threadId]: stillEscalated },
       };
     });
+  },
+
+  // restoreEscalations re-hydrates unresolved CVO escalation cards after a
+  // page reload (the registry survives reloads server-side, not restarts).
+  restoreEscalations: async () => {
+    try {
+      const data = await apiGet<
+        Array<{ escalation_id: string; session_id: string; created_at: string; payload: CvoEscalationPayload | null }>
+      >('/api/escalations');
+      if (!Array.isArray(data) || data.length === 0) return;
+      set((state) => {
+        const events = { ...state.events };
+        const escalations = { ...state.escalations };
+        for (const esc of data) {
+          const tid = esc.session_id;
+          if (!tid) continue;
+          const existing = events[tid] ?? [];
+          if (existing.some((e) => e.type === 'cvo_escalation' && e.escalationId === esc.escalation_id)) continue;
+          events[tid] = [
+            ...existing,
+            {
+              type: 'cvo_escalation',
+              threadId: tid,
+              escalationId: esc.escalation_id,
+              reason: esc.payload?.reason,
+              maxDepth: esc.payload?.max_depth,
+              options: (esc.payload?.options ?? []).map((o) => ({ id: o.id, prompt: o.prompt })),
+            },
+          ];
+          escalations[tid] = true;
+        }
+        return { events, escalations };
+      });
+    } catch {
+      // Older backend without the endpoint: escalate nothing, stay quiet.
+    }
   },
 
   handleWsEvent: (event) => {
@@ -489,7 +534,38 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
       case 'SYSTEM_NOTICE': {
         const p = payload as SystemNoticePayload;
-        useNoticeStore.getState().addNotice(p);
+        if (!p) break;
+        // Surface live in the toast stack (critical/error notices are loud)
+        // and persist into the notification center so the bell has data.
+        const toastType =
+          p.severity === 'critical' ? 'error'
+          : p.severity === 'warning' ? 'warning'
+          : p.severity === 'recovery' ? 'success'
+          : 'info';
+        useAppStore.getState().showToast({ message: `${p.title}：${p.message}`, type: toastType });
+        useAppStore.getState().pushLiveNotice({
+          severity: toastType === 'success' ? 'info' : toastType,
+          title: p.title,
+          message: p.message,
+          source: 'system',
+          timestamp: p.timestamp,
+        });
+        break;
+      }
+
+      case 'CVO_ESCALATION': {
+        const p = payload as CvoEscalationPayload;
+        set((state) => ({
+          escalations: { ...state.escalations, [threadId]: true },
+          events: appendEvent(state.events, threadId, {
+            type: 'cvo_escalation',
+            threadId,
+            escalationId: p?.escalation_id,
+            reason: p?.reason,
+            maxDepth: p?.max_depth,
+            options: (p?.options ?? []).map((o) => ({ id: o.id, prompt: o.prompt })),
+          }),
+        }));
         break;
       }
 

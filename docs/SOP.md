@@ -58,6 +58,17 @@ SG 没有独立的 alpha 镜像环境。验收遵循「先隔离、再合入、�
 
 **注意**：已合入改动的验收用 CI / `make qc`，不得用本地 runtime 当验收靶子。
 
+### 验收盲区清单（pitfall 真相源：`packs/default/sop/development.yaml`）
+
+以下盲区来自真实事故复盘（2026-08-23，详见 `docs/features/FT-UPG-001-version-upgrade.md`），命中对应改动类型时必须补验收：
+
+| 盲区 | 何时命中 | 最低验收动作 | yaml pitfall id |
+|---|---|---|---|
+| **清零状态** | 涉及持久化数据/配置存储的改动 | `make clean deep` 后首屏 + 逐面板冒烟（空配置是独立测试场景，不是"有数据"状态的子集） | `quality-gate-fresh-workspace-smoke` |
+| **产物断言** | 构建产物含关键内容（SW、注入清单等） | 断言产物内容而非 exit code；前端类型检查用 `tsc --noEmit -p <project>`（solution 型根 tsconfig 让裸 `tsc --noEmit` 空转通过） | `quality-gate-artifact-assertion` |
+| **存活客户端** | 升级/部署/缓存策略类改动 | 验收"升级前已打开的页面 tab"在升级期间及之后可用或能自愈，而非仅"构建成功+服务重启" | `quality-gate-live-client-upgrade` |
+| **中间件包装接口** | 新增/修改包装 `ResponseWriter` 的中间件 | 必须委托 `http.Hijacker`（WS）与 `http.Flusher`（SSE）——telemetry `statusRecorder` 曾只补 Hijack 漏 Flusher，导致所有 SSE 端点 500 | （并入产物/验收审查项） |
+
 ## Risk-Routed Development：铁路改立交
 
 **强制力跟着风险走，不跟着动作类型走。** "写了代码""开了 PR""进入 merge"都不能单独触发整条流水线。默认是最小安全动作；只有命中客观风险面才进入对应加严车道。
@@ -116,6 +127,8 @@ SG 没有独立的 alpha 镜像环境。验收遵循「先隔离、再合入、�
 # 关注：MCP tool 注册表、skill manifest、route 表、callback 接线
 rg -n "<tool_name>" --type go --type ts
 ```
+
+**自指字符串不走翻译**：语言名、品牌名、代码示例等"以自身身份出现的字符串"直接写死原生名（如语言切换器固定 `中文` / `English`），不经过 `t()`——翻译包里的译文会随 locale 变化，导致切换后 UI 显示错乱（pitfall id：`impl-i18n-self-referential-strings`）。同理，Go 侧序列化集合字段必须初始化为空切片（`[]string{}`），nil slice 会编成 `null` 击穿前端契约（契约见 `docs/reference/API.md` Response Conventions）。
 
 ## 例外路径
 

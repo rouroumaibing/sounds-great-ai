@@ -71,15 +71,28 @@ func (am *ApprovalManager) RequestApproval(ctx context.Context, req *ApprovalReq
 	}
 }
 
-// ResolveApproval 用户响应审批时调用
-func (am *ApprovalManager) ResolveApproval(requestID string, approved bool) {
+// IsPending reports whether a request is currently awaiting a decision.
+func (am *ApprovalManager) IsPending(requestID string) bool {
+	am.mu.Lock()
+	defer am.mu.Unlock()
+	_, ok := am.pending[requestID]
+	return ok
+}
+
+// ResolveApproval 用户响应审批时调用。返回是否命中待审请求——false 表示
+// 该 request_id 不存在（已超时、已处理或服务重启后丢失）。
+func (am *ApprovalManager) ResolveApproval(requestID string, approved bool) bool {
 	am.mu.Lock()
 	ch, ok := am.pending[requestID]
+	if ok {
+		delete(am.pending, requestID)
+	}
 	am.mu.Unlock()
 
 	if ok {
 		ch <- approved
 	}
+	return ok
 }
 
 // RequestApprovalWithTimeout 带默认60秒超时的审批请求

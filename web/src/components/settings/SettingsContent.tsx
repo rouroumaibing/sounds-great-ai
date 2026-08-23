@@ -8,6 +8,10 @@ const SkillsPanel = lazy(() => import('./SkillsPanel').then(m => ({ default: m.S
 const SystemPanel = lazy(() => import('./SystemPanel').then(m => ({ default: m.SystemPanel })));
 const OpsPanel = lazy(() => import('./OpsPanel').then(m => ({ default: m.OpsPanel })));
 const DogDossierPanel = lazy(() => import('./DogDossierPanel'));
+const ConciergePanel = lazy(() => import('./ConciergePanel').then(m => ({ default: m.ConciergePanel })));
+const VoicePanel = lazy(() => import('./VoicePanel').then(m => ({ default: m.VoicePanel })));
+const ConnectorsPanel = lazy(() => import('./ConnectorsPanel').then(m => ({ default: m.ConnectorsPanel })));
+const PluginsPanel = lazy(() => import('./PluginsPanel').then(m => ({ default: m.PluginsPanel })));
 
 function LoadingSpinner() {
   return (
@@ -22,6 +26,10 @@ const SECTION_COMPONENTS: Record<string, React.LazyExoticComponent<React.Compone
   accounts: AccountKeys,
   dossier: DogDossierPanel,
   skills: SkillsPanel,
+  concierge: ConciergePanel,
+  voice: VoicePanel,
+  im: ConnectorsPanel,
+  plugins: PluginsPanel,
   system: SystemPanel,
   ops: OpsPanel,
 };

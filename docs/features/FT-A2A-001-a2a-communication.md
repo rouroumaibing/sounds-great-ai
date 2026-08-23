@@ -100,6 +100,7 @@ A2A Communication 在 SG 中由**两层**构成，两者都走后端编排、前
 - [x] **AC-11 (异常与边界-进程崩溃)**: Given CLI 子进程被 kill, When ACP Pool 僵尸回收触发, Then 账本写 `invocation.died`→投影 `dead/zombie`，主链路不阻塞。
 - [x] **AC-12 (权限与安全)**: Given 未登录访问 `GET /api/custody/briefing` / `POST .../webhook`, When 无有效 auth, Then 返回 401/403（`auth.WrapFunc`）；credentials.json 权限 0600，密钥不通过 REST 明文返回。
 - [x] **AC-13 (红线-禁 server)**: Given 任何代码改动, When 引入 `internal/a2a/server/` 或 `internal/a2a/client/` 子目录、或新建监听外部入站的 A2A HTTP server, Then 命中 AGENTS.md 红旗（§4.1+§4.7），必须阻止提交。
+- [x] **AC-14 (正常路径-CVO 升级闭环, 2026-08-22)**: Given 交接链深度超限 `CheckA2ADepth() == EscalateToCVO`, When 熔断发生, Then 账本写 `BallHandedCVO` + 前端收到 `CVO_ESCALATION`（含 `escalation_id`/`reason`/预置选项）；操作员点选选项 → `CVO_ESCALATION_RESPONSE` 回传 → 后端按该选项的**服务端预置 prompt** 经 `routeAndDispatch` 重新派发（等价于一条新的用户消息），`intervene` 则只解除不重派；升级卡与 `escalations[threadId]` 标记同步清除（见 §4.8）。
 
 ---
 
@@ -148,7 +149,10 @@ A2A Communication 在 SG 中由**两层**构成，两者都走后端编排、前
 | `BARK_RESULT` | 编排 | 某犬完成（终态带 Content） | `breed_response_complete` + `isGenerating=false` |
 | `BARK_ERROR` | 适配 | 某犬出错（含 A2A 外部调用失败） | `error` |
 | `CARRIER_HEALTH` | 适配 | carrier 健康度（含 A2A endpoint 健康） | `carrierHealth` map |
+| `SOP_GATE` | 编排 | 跨犬审查门禁（拦截/建议路由） | `sop_gate` → `SopGate` |
+| `CVO_ESCALATION` | 编排 | A2A 深度硬轨熔断，球权上交 CVO（§4.8） | `cvo_escalation` 决策卡 + `escalations[threadId]` |
 | `WAKE_HOLD` | 编排 | 唤醒持球线程(前端→后端) | (发送侧) |
+| `CVO_ESCALATION_RESPONSE` | 编排 | CVO 升级决策回传(前端→后端，§4.8) | (发送侧) |
 
 ### 4.3 球权账本事件（custody 域，`internal/domains/custody/ports/ledger.go`）
 
@@ -174,8 +178,8 @@ append-only 事件流，纯函数投影为可观测状态（**读驱动**：`han
 
 | 层 | 文件 | 职责 |
 |----|------|------|
-| 传输 | `internal/transport/ws_handler.go` | WS 事件循环、路由入口、`WAKE_HOLD`/`resumeHeld`、`BroadcastCarrierHealth` |
-| 执行/A2A | `internal/transport/execution.go` | `executeWithPlatform/Serial/Parallel`、`detectMentionInResponse`、`handleA2AHandoff`(730)、G1 `tryDispatch`(737)、§4.5 读 `Snapshot` 守卫(827-835)、custody 写账本 |
+| 传输 | `internal/transport/ws_handler.go` | WS 事件循环、路由入口、`WAKE_HOLD`/`resumeHeld`、`BroadcastCarrierHealth`、CVO 升级注册表 + 决策重派（`routeAndDispatch`:271 / `emitCvoEscalation`:382 / `handleEscalationResponse`:427，见 §4.8） |
+| 执行/A2A | `internal/transport/execution.go` | `executeWithPlatform/Serial/Parallel`、`detectMentionInResponse`、`handleA2AHandoff`(730)、G1 `tryDispatch`(737)、§4.5 读 `Snapshot` 守卫(827-835)、custody 写账本、深度熔断点 `emitCvoEscalation`(891，§4.8) |
 | @解析 | `internal/transport/mention.go` | `mentionRegex`(10)、`parseMention`(13)、`isLeaderMention`(27) |
 | 路由 | `internal/domains/routing/services/mention_router.go` | `@mention` 解析、配置默认犬、serial 意图判定 |
 | 熔断 | `internal/domains/routing/services/worklist_registry.go` | G2 深度 + ping-pong 熔断 `Push`(94) |
@@ -215,6 +219,34 @@ append-only 事件流，纯函数投影为可观测状态（**读驱动**：`han
 - **协议**：`Execute`(`adapter.go:112`) 组装 `a2aprotocol.JSONRPCRequest{Method:"tasks/send"}`，POST 到 endpoint，可选 `Bearer` token，120s 上下文超时；解码 `JSONRPCResponse` 后 `streamTask` 把外部 Task 的 `artifacts`/`history` 文本映射为 `unified.StreamEvent{Type:"text"|"error"|"done"}` 回灌。
 - **球权守卫**：外部 A2A 派发**仍**经 `handleA2AHandoff` 的 G1 `tryDispatch` + §4.5 `Snapshot` 读校验（§4.7 约束：外部 agent 不绕过球权账本）。
 
+### 4.8 CVO 升级闭环（G4 深度硬轨 → 操作员决策 → 重派，2026-08-22 接通）
+
+> 背景：`execution.go` 的 G4 分支此前只发 `SYSTEM_NOTICE` + 停球，前端 `CvoEscalation.tsx` 的三个决策按钮是空函数、徽标永不点亮（死功能）。本节固化 2026-08-22 打通的全栈闭环。
+
+**协议**（`pkg/protocol/event.go:217-256`）：
+
+- `CVO_ESCALATION`（后端→前端）：payload `CvoEscalationPayload{escalation_id, reason, max_depth, from_breed, to_breed, options[]}`；每个选项 `CvoEscalationOption{id, prompt}` —— **label 不上线**，前端按 option id 本地化（`workspace.escalation.optionA/B`），只有语义 id 和服务端预置 prompt 过线。
+- `CVO_ESCALATION_RESPONSE`（前端→后端）：payload `CvoEscalationResponsePayload{session_id, escalation_id, decision}`，decision = 选项 id 或 `intervene`。
+
+**后端三段**：
+
+| 段 | 位置 | 行为 |
+|----|------|------|
+| 发射 | `execution.go:891` `emitCvoEscalation`（实现在 `ws_handler.go:382`） | 深度熔断点在 `recordBall(BallHandedCVO)` + `SendSystemNotice` 后，生成 uuid、登记 `h.escalations` 注册表（`ws_handler.go:40/47`，mu 保护、应答即删）、推事件到该 session 的 streamer。预置两选项：`option_1` 接手拆解 / `option_2` 收尾总结（prompt 为服务端固定中文指令，不信任客户端回传的 prompt） |
+| 接收 | `ws_handler.go:170-202` 读循环分支 | 解析响应 → `handleEscalationResponse`(427)：`takeEscalation`(415) 原子取出（未知/已处理 → SYSTEM_NOTICE 提示，不重放） |
+| 重派 | `handleEscalationResponse` → `routeAndDispatch`(271) | 命中选项且带 prompt → `bindStreamer` 重绑当前连接 → 按**普通用户消息同一路径**（MentionRouter 路由 + BARK_START + 信号量限流 + worklist 预算）重新派发；`intervene` → 仅发确认通知，等待操作员在 CommandBar 手动指挥。`routeAndDispatch` 是从 USER_INPUT 块抽出的共享派发路径，两条入口（用户消息 / 升级决策）行为一致 |
+
+**前端**：
+
+| 组件 | 行为 |
+|------|------|
+| `useChatStore.handleWsEvent` | `CVO_ESCALATION` case：追加 `cvo_escalation` StreamEvent（携带 threadId/escalationId/reason/maxDepth/options）并置 `escalations[threadId]=true` |
+| `useChatStore.resolveEscalation(threadId, decision, escalationId)` | `WsManager.sendEscalationResponse` 回传 → 移除对应升级卡（按 escalationId 精确匹配）→ 无剩余卡时清 `escalations[threadId]` |
+| `CvoEscalation.tsx` | 三按钮（接手/收尾/人工介入）接 `resolveEscalation`；标题行渲染 `max_a2a_depth` 与 reason |
+| 徽标消费方 | `PrimaryNav`（threads 钮 rose 脉冲徽标 = 任一线程有未决升级）、`ThreadItem`（CVO 徽标 + 警示图标）、`ThreadList`（escalated/active 筛选，改读 `escalations` store 而非后端 thread 字段） |
+
+**边界与已知限制**：升级注册表为进程内存（重启即失，与机会瞬态设计同哲学）；**重载恢复**——`GET /api/escalations`（`routes.go`，auth.Wrap）返回未决升级投影（按创建时间排序），前端 `App` 挂载时 `restoreEscalations()` 重放升级卡并点亮标记（按 escalation_id 去重，旧后端 404 静默），2026-08-23 起刷新页面后卡片可恢复，仅服务重启丢失；响应中的 prompt 永远取服务端注册表里的预置值，客户端传来的只有 decision id —— 防止把执行指令的信任交给前端。
+
 ---
 
 ## 5. Story 级 Definition of Done (DoD Checklist)
@@ -241,6 +273,7 @@ append-only 事件流，纯函数投影为可观测状态（**读驱动**：`han
 | A-5 | `internal/a2a/compressor.go` 死代码 | ✅ **已删除（代码）** | `Platform.Compressor` 字段已移除（`platform.go` 三处） |
 | A-6 | `pkg/a2a` 曾零引用死代码 | ✅ **已激活（代码）** | `adapter.go:30` import 复用；全仓仅 2 处引用 |
 | A-7 | 无内部 A2A server / 不入站控制面 | ✅ **红线禁止（设计约束）** | AGENTS.md:53/55；不可逆决策 §4.7 |
+| A-8 | CVO 升级链路前端死功能（按钮空函数、无事件源、徽标永不亮） | ✅ **已修复（全栈，2026-08-22）** | 协议 `pkg/protocol/event.go:217-252` + `execution.go:891` 发射 + `ws_handler.go:427` 决策重派 + 前端 `CvoEscalation.tsx`/`escalations` store 接通；AC-14 与 `useChatStore.test.ts`（含多级升级部分解决用例）锁定行为。详见 §4.8 |
 
 **无 P0/P1 阻塞项**：A2A 主链路（含外部客户端）无阻断性缺口。仅 A-1（流式订阅/自动发现）为特性增强，可在 §4.7 框架内排期，不构成红线冲突。
 

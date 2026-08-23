@@ -56,6 +56,12 @@ stages:
         predicate:
           type: manual_only
           reason: Current runtime has no stable post-compact recall-failure telemetry.
+      - id: impl-i18n-self-referential-strings
+        text: 自指字符串（语言名/品牌名/代码示例）走了 t() 翻译——语言切换后 UI 显示错乱（如两个 English 按钮）
+        severity: warn
+        predicate:
+          type: manual_only
+          reason: Self-referential string detection is semantic; language names must be hardcoded endonyms.
 
   - id: quality_gate
     label: 自检（按风险）
@@ -74,6 +80,24 @@ stages:
         predicate:
           type: command_pattern
           must_match: go test|go build|go vet
+      - id: quality-gate-fresh-workspace-smoke
+        text: 涉及持久化数据的改动只验收了"有数据"状态，没跑 clean deep 后的清零状态（空配置/空存储下的首屏与逐面板冒烟）
+        severity: warn
+        predicate:
+          type: manual_only
+          reason: Fresh-workspace state is environmental; the SkillsPanel null-crash class only reproduces there.
+      - id: quality-gate-artifact-assertion
+        text: 构建产物含关键内容时只看 exit code，没断言产物本身（如 sw.js 须含 push 处理器；前端类型检查须用 tsc -p ——solution 型根 tsconfig 会让裸 tsc --noEmit 空转通过）
+        severity: warn
+        predicate:
+          type: manual_only
+          reason: Artifact content assertions are project-specific; silent tool no-ops (empty tsc, ignored config keys) exit 0.
+      - id: quality-gate-live-client-upgrade
+        text: 升级/部署类改动只验收"构建成功+服务重启"，没验收已打开页面的 tab 在升级期间及升级后可用或能自愈
+        severity: warn
+        predicate:
+          type: manual_only
+          reason: Live-browser-tab behavior across a redeploy needs a real client; server-side checks cannot see it.
 
   - id: fresh_context
     label: Fresh-Context Pre-Review（可选）

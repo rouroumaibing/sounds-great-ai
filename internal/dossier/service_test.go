@@ -17,15 +17,15 @@ func setupGitRepo(t *testing.T) string {
 	run := func(args ...string) {
 		cmd := exec.Command("git", args...)
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test",
-			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test",
-		)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
 	run("init", "-q")
+	// Repo-local identity so commits work even where Service.git runs
+	// without GIT_AUTHOR_* env (e.g. CI runners with no global git config).
+	run("config", "user.name", "test")
+	run("config", "user.email", "test@test")
 	if err := os.MkdirAll(filepath.Join(dir, "docs", "team"), 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -4,6 +4,9 @@
 >
 > 本 roadmap 反映 SG 实际梳理的代码级设计故事（Tech Story）。每条对应 `docs/features/FT-XXX-*.md`，
 > 均基于 `internal/` + `web/src/` + `cmd/` 真实代码实读，锚点可回源。
+>
+> 面板类功能（plugins / marketplace / concierge / voice / connectors）的分阶段实现排期见
+> [plans/panels-roadmap.md](plans/panels-roadmap.md)。
 
 | ID | 主题 | 说明 |
 |----|------|------|
@@ -14,6 +17,7 @@
 | [FT-PI-001](features/FT-PI-001-persistent-identity.md) | Persistent Identity | 持久身份：F231 关系胶囊 + F276 人物关系记忆 + Continuity |
 | [FT-SM-001](features/FT-SM-001-shared-memory.md) | Shared Memory | 共享记忆：`internal/memory/lane_*.go` 的候选生产→审批→召回注入链路 |
 | [FT-SKILL-001](features/FT-SKILL-001-skills-framework.md) | Skills Framework | Skills 框架：按需加载 prompt 系统的前后端逻辑 |
+| [FT-PLUGIN-001](features/FT-PLUGIN-001-plugins-marketplace.md) | Plugins & Marketplace | 插件系统与市场（panels P1–P4）：zip 安装（zip-slip 防护）、skills 审查门禁、breed 注册、ed25519 验签安装；含 concierge/voice/connectors 配置面板 |
 | [FT-ACC-001](features/FT-ACC-001-accounts-keys-auth.md) | 账户与密钥 | 设置页「账户与密钥」与「客户配置安全」设计 |
 | [FT-MEM-001](features/FT-MEM-001-member-management.md) | 成员管理 | 设置页「成员管理」设计 |
 | [FT-DEV-001](features/FT-DEV-001-makefile-daemon-reclaim.md) | 构建/开发环境 | Makefile 守护生命周期设计（dev/prod/daemon 等 target） |

@@ -39,9 +39,10 @@ make prod         → 前台启动生产构建后端（前端已 build，由后�
 make prod daemon  → 后台启动生产构建后端（不启动前端进程）
 make stop         → 回收受管进程(.pids) + 端口兜底回收自家孤儿(is_ours)
 make restart      → stop + dev daemon（一键干净重启）
-make clean        → 删 web/dist、bin/、残留二进制(sounds-great-ai*)
+make build        → 真实类型检查(tsc -p) + vite 构建到 dist.new + 原子交换(旧构建→dist.old)
+make clean        → 删 web/dist、web/dist.new、web/dist.old、bin/、残留二进制(sounds-great-ai*)
 make deep         → stop + clean + 删 .logs/.pids + 删 SQLite + go cache + node_modules + 删 .sounds-great-ai(运行时配置/凭据)
-make upgrade      → 拉代码(prompt) + install + build 前端 + go build 后端（不 restart）
+make upgrade      → 拉代码(prompt) + install + build + go build；daemon 在跑则自动 stop + prod daemon 重启
 ```
 
 ---
@@ -96,10 +97,11 @@ daemon:
 
 | target | 设计意图 |
 |--------|---------|
-| `clean` | 删产物（`web/dist`、`bin/`、根目录残留二进制）。**不删 `.pids`/`.logs`、不回收进程**——它是纯"清文件"语义，进程回收交给 `stop` |
+| `clean` | 删产物（`web/dist`、`web/dist.new`、`web/dist.old`、`bin/`、根目录残留二进制）。**不删 `.pids`/`.logs`、不回收进程**——它是纯"清文件"语义，进程回收交给 `stop` |
 | `deep` | `deep: stop clean` + 删 `.logs/.pids`/SQLite/go cache/node_modules + 删 `.sounds-great-ai`。**把"先停后清"钉死在依赖顺序里**，防止"删了文件却留下孤儿进程"；删除 `.sounds-great-ai` 使 `deep` 成为"从零重置"语义，但会**不可逆清除运行时凭据** |
-| `upgrade` | 拉代码 + install + build 前端 + `go build` 后端，但**刻意不 restart**——升级只更新磁盘二进制，是否重启由 operator 决定（保留人工确认点） |
+| `upgrade` | 拉代码 + install + build 前端 + `go build -tags embeddist -ldflags ...` 后端；**若 backend daemon 在跑则自动 `stop` + `prod daemon` 重启**。升级期间线上完整性由 `build` 的原子交换保证（详见 FT-UPG-001） |
 | `restart` | `restart: stop` 后 `$(MAKE) dev daemon`，提供"一键干净重启"的便捷入口 |
+| `build` | 类型检查（`tsc -p` 双配置——根 tsconfig 是 solution 型，裸 `tsc --noEmit` 是空操作）+ vite 构建到 `dist.new`，再一次性 rename 交换：旧 `dist` → `dist.old`（一代宽限）、`dist.new` → `dist`。vite 插件同步写 `.build-id`（unix 秒），供后端三源排名与 ldflags 注入使用 |
 
 ---
 
@@ -141,6 +143,8 @@ daemon:
 
 **命名一致性的必要性**：应用内自升级（`handlers.go`）会写出二进制，若它与 `make` 启动的目标名不一致，就会出现"自升级更新了 A 文件、实际跑的却是 B 文件"的错位。三处统一命名从根上消除这类错位。
 
+**构建参数一致性**（2026-08-23 起，详见 FT-UPG-001）：`prod` / `upgrade` / 应用内 source 升级的 `go build` 统一带 `-ldflags "$(GO_LDFLAGS)"`（版本号 + 前端 build-id 注入），其中 prod/upgrade/应用内升级额外带 `-tags embeddist`（把 `web/dist` 嵌入二进制）；`dev daemon` 只带 ldflags 不带标签（dev 前端走 vite:5173，且不带标签可保证 dist 被手动删除时 `go build` 仍可编译——空桩见 `web/embed_stub.go`）。
+
 ---
 
 ## 6. 设计权衡与待完善项
@@ -150,8 +154,9 @@ daemon:
 1. **前端 vite 孤儿不在 `is_ours` 白名单内**：vite 命令是 `node .../vite`，不被认作"自家"。若 `5173` 被遗留 vite 占住，`ensure_port 5173 0`（reclaim=0 且非自家）会拒绝，且 `make stop` 端口兜底也清不掉它。当前设计为"前端残留交由人工处理"，避免把回收范围扩大到 node 进程族（风险更大）。
 2. **`restart` 写死成 `dev daemon`**：`restart: stop` 后固定 `$(MAKE) dev daemon`，重启 prod 需手动 `make stop && make prod daemon`。保留 dev 为默认是出于"本地开发最常用"的假设。
 3. **prod daemon 守卫仍检查 `frontend.pid`**：prod 不写 `frontend.pid`，但守卫循环统一查两个 pidfile。若之前 dev daemon 留下 `frontend.pid`，再 `make prod daemon` 会被"frontend already running"拦下——prod 守卫理论上只需查 backend。
-4. **`upgrade` 与 `prod` 的 build 步骤重叠**：`upgrade` 内 `$(MAKE) build` + `go build` 与 `prod` 重复，属冗余不致命。
+4. **`upgrade` 与 `prod` 的 build 步骤重叠**：`upgrade` 内 `$(MAKE) build` + `go build` 与 `prod` 重复；且 `upgrade` 自动重启走 `$(MAKE) prod daemon` 会再完整构建一遍。属冗余不致命，升级为低频操作，正确性优先。
 5. **`deep` 会不可逆清除运行时凭据**：`deep` 现删除仓库根 `.sounds-great-ai` 目录（含 `credentials.json` 0600 密钥、`accounts.json`、`dog-catalog.json`）。该目录已在 `.gitignore` 内、属 gitignored 的运行时数据，**不进版本库**。删除后下次启动按 `packs/default/breeds/dog-template.json` 重新生成种子。这是"从零重置"语义的有意延伸，但意味着 `deep` 不再只是"清构建产物"——operator 若只想清构建产物、保留账号/密钥/成员配置，应改用 `make clean`（浅清理，不含 `stop` 与目录删除）。此行为已同步到 `make help` 文案。
+6. **`build` 在 `web/dist.old` 保留一代旧构建**（约 3MB）：这是给升级前已打开页面的一代宽限窗口（旧哈希 chunk 仍可服务），`clean` 与下一次 `build` 会将其清除。取舍详见 FT-UPG-001 §7。
 
 ---
 
@@ -172,6 +177,10 @@ daemon:
   - When 执行 `make clean deep`，Then 除既有构建产物/日志/pid/SQLite/go cache/`node_modules` 外，还删除仓库根 `.sounds-great-ai`（accounts/credentials/dog-catalog 落盘）。
   - When 仅执行 `make clean`（浅清理），Then **不**删除 `.sounds-great-ai`、不回收进程——保留运行时账号/密钥/成员配置。
   - `.sounds-great-ai` 已在 `.gitignore`，删除不触动版本库；下次启动按 `dog-template.json` 重新种子化。
+- [x] **AC-05 (升级原子性与自动重启，2026-08-23)**:
+  - When daemon 运行中执行 `make upgrade`，Then 构建期间线上 `web/dist` 始终完整（原子交换），结束后自动 `stop` + `prod daemon`，新版本号经 `/api/upgrade/info` 可见。
+  - When `make clean`，Then `web/dist`、`web/dist.new`、`web/dist.old` 全部清除，不残留 grace 副本。
+  - When 手动删除整个 `web/dist` 后裸跑 `go build ./cmd/server/`，Then 编译仍成功（`embeddist` 标签空桩语义）。
 
 ---
 
@@ -199,6 +208,7 @@ daemon:
 - **2026-08-12（初版）**：以设计视角梳理 `Makefile` 目标体系与守护生命周期——`daemon` 开关、双入口骨架、启动三道关、`stop` 双层回收、`clean/deep/upgrade/restart` 意图、跨平台 `daemon-helper.sh`、`sounds-great-ai` 命名约定与安全边界。落盘为 Tech Story（纯设计文档，不含事件背景）。
 - **2026-08-13（拆分恢复为独立文档）**：此前被并入 `FT-MEM-001-member-management.md` 的附录 A；经用户确认 Makefile/守护进程生命周期应独立于「成员管理」成文，故从合并文档中剔除并恢复为本独立 Tech Story（内容未改）。
 - **2026-08-13（`deep` 扩展删除 `.sounds-great-ai`）**：应需求将 `make clean deep` 的清理范围扩展到项目根 `.sounds-great-ai` 运行时目录。`Makefile` 的 `deep` target 新增 `rm -rf .sounds-great-ai`（位于 `node_modules` 清理之后、`go clean` 之前），`make help` 文案同步标注。随之更新本文：§2 命令契约、§3.5 `deep` 行、§6 增补"不可逆清除运行时凭据"取舍项、§8 资安护栏改写（区分 `clean`/`stop` 无敏感数据 vs `deep` 删凭据）。
+- **2026-08-23（升级链路改造，详见 FT-UPG-001）**：`build` 改为真实类型检查（`tsc -p` 双配置）+ vite 构建到 `dist.new` 后原子交换（旧构建保留至 `dist.old` 一代宽限）；`prod`/`upgrade` 的 `go build` 统一 `-ldflags`（版本 + build-id 注入）+ `-tags embeddist`（前端嵌入二进制），`dev daemon` 只带 ldflags；**`upgrade` 语义变更：daemon 在跑时自动 `stop` + `prod daemon` 重启**（此前为"刻意不 restart"）；`clean` 清理范围扩为 `web/dist`、`web/dist.new`、`web/dist.old` 三目录。随之更新本文：§2 命令契约、§3.5 target 表、§5 构建参数一致性、§6 取舍项 4/6、新增 AC-05。
 
 ---
 

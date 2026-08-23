@@ -3,17 +3,59 @@
 /**
  * Service Worker for Sounds Great AI PWA.
  *
- * Handles:
- * - Push notifications with dedup registry
- * - Notification click → focus/open app
- *
- * The actual caching (static assets, API NetworkOnly) is handled by
- * vite-plugin-pwa's Workbox-generated service worker. This file provides
- * the custom push notification and notificationclick handlers.
+ * vite-plugin-pwa compiles this file with the `injectManifest` strategy: the
+ * workbox precache manifest is injected into self.__WB_MANIFEST at build time
+ * (see vite.config.ts), while the caching routes below and the push
+ * notification handlers are all defined here.
  */
+
+import {
+  precacheAndRoute,
+  createHandlerBoundToURL,
+  cleanupOutdatedCaches,
+} from 'workbox-precaching'
+import { registerRoute, NavigationRoute } from 'workbox-routing'
+import { NetworkOnly, CacheFirst } from 'workbox-strategies'
+import { ExpirationPlugin } from 'workbox-expiration'
 
 // Cast self to ServiceWorkerGlobalScope for proper typing in SW context.
 const sw = self as unknown as ServiceWorkerGlobalScope
+
+// vite-plugin-pwa's injectManifest step scans the BUILT output for the
+// literal token `self.__WB_MANIFEST` and replaces it with the precache
+// manifest — reference it directly, never through an alias.
+type PrecacheManifest = (string | { url: string; revision: string | null })[]
+
+// --- Precache & routing ---
+// The full build (every hashed chunk) is precached, which is what lets an
+// offline or mid-deploy tab keep loading; on the next deploy the new manifest
+// replaces it and autoUpdate + skipWaiting activate it immediately.
+precacheAndRoute((self as unknown as { __WB_MANIFEST: PrecacheManifest }).__WB_MANIFEST)
+cleanupOutdatedCaches()
+
+// SPA navigation fallback: serve the app shell for document requests, except
+// the WebSocket endpoint.
+registerRoute(
+  new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\/ws/] }),
+)
+
+// API calls: NetworkOnly — never cache.
+registerRoute(/\/api\//i, new NetworkOnly(), 'GET')
+
+// Static assets: CacheFirst (60 entries, 30 days).
+registerRoute(
+  /\.(?:png|jpg|jpeg|svg|ico|woff|woff2)$/i,
+  new CacheFirst({
+    cacheName: 'static-assets',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 60,
+        maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+      }),
+    ],
+  }),
+  'GET',
+)
 
 // --- Notification dedup registry ---
 // Prevents duplicate notifications for the same event within a time window.
@@ -28,8 +70,8 @@ interface NotificationPayload {
 }
 
 /**
- * Check if a notification with the given tag was recently shown.
- * Uses Cache API for dedup within the dedup window.
+ * Checks if a notification with the given tag was recently shown.
+ * Uses the Cache API for dedup within the dedup window.
  */
 async function isDuplicate(tag: string): Promise<boolean> {
   if (!tag) return false
@@ -50,7 +92,7 @@ async function isDuplicate(tag: string): Promise<boolean> {
 }
 
 /**
- * Record that a notification was shown, for future dedup checks.
+ * Records that a notification with the given tag was shown.
  */
 async function recordNotification(tag: string): Promise<void> {
   if (!tag) return
@@ -65,7 +107,7 @@ async function recordNotification(tag: string): Promise<void> {
 }
 
 /**
- * Parse push event data into a NotificationPayload.
+ * Parses push event data into a NotificationPayload.
  */
 function parsePushData(data: string | null): NotificationPayload {
   if (!data) {

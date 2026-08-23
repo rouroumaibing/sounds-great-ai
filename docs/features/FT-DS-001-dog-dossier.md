@@ -113,7 +113,7 @@ stateDiagram-v2
 | HTTP 面 | `internal/transport/dossier_handler.go:42` | 11 端点（§4）；actor 解析：body actor > X-SG-Actor > operator |
 | SOP 挂接 | `internal/domains/sop/services/sop_guardian.go:69` `SetReviewCompleteListener` → `platform.go:416` | RecordReview 成功后 best-effort 触发（recover 包裹，永不阻塞 handoff 判定） |
 | MCP 面 | `internal/mcp/governance/catalog.go`（dossier 族 4 工具） | sg_get_dossier / sg_get_dossier_base_hash / sg_list_distillation_opportunities / sg_propose_dossier_distillation |
-| 前端 | `web/src/components/settings/DogDossierPanel.tsx` | settings「狗狗画像」分节：覆盖概览 + 模型分组卡片（provenance badge + 路由信号）+ 观察提交 + 提案审批 |
+| 前端 | `web/src/components/settings/DogDossierPanel.tsx` | settings「狗狗画像」分节：覆盖概览 + 模型分组卡片（provenance badge + 路由信号）+ 观察提交 + 机会处置（忽略/关联提案转化，2026-08-22 接入）+ 提案审批 |
 
 ## 4. 注入链（画像如何影响行为）
 
@@ -133,8 +133,8 @@ stateDiagram-v2
 | GET `/api/dossier` | 画像 × catalog join，按 model 分组 + coverage | 只读 |
 | GET `/api/dossier/base-hash` | 当前档案 SHA-256（提案创建用） | 只读 |
 | POST/GET `/api/dossier/observations` | 观察写入/列表（?dogId= 过滤） | 写暂存层，永不覆盖总结层 |
-| GET `/api/dossier/distillation-opportunities` | 机会列表 | operator 全量；犬 actor 只看指向自己的 |
-| POST `…/opportunities/{id}/dismiss` \| `/convert` | 忽略 / 标记已转提案 | 仅目标犬或 operator |
+| GET `/api/dossier/distillation-opportunities` | 机会列表 | operator 全量；犬 actor 只看指向自己的；FE：`dossierService.listOpportunities`（2026-08-22 接入） |
+| POST `…/opportunities/{id}/dismiss` \| `/convert` | 忽略 / 标记已转提案 | 仅目标犬或 operator；FE：`DogDossierPanel` 机会分节——忽略一键、转化需填关联提案 ID（提案由狗狗经 `POST /api/dossier/distillations` 或 MCP `sg_propose_dossier_distillation` 创建，operator 只做关联标记） |
 | POST `/api/dossier/distillations` | 创建提案（sourceId 幂等，命中 200/新建 201） | evidenceRefs 空=400 fail-closed |
 | GET `/api/dossier/distillations`（?dogId=） | pending 列表 / 指定犬全量 | — |
 | GET `…/distillations/{id}` | 提案详情 | — |
@@ -156,6 +156,7 @@ stateDiagram-v2
 - [x] **AC-A（档案与注入）**: dog-dossier.md 14 个 dogId 条目全部解析通过；builder 双切源——identity 擅长行与名册双列在 dossier 有值时优先、缺值时回退 config（单测覆盖）
 - [x] **AC-B（观察暂存）**: POST 观察 → SQLite 永久存储 → 只能作为证据被提案引用；空 dogId/content 400
 - [x] **AC-C（触发器）**: sop_guardian RecordReview 成功 → 机会创建（幂等：同 thread+sha+reviewer 只一条）；机会瞬态（进程重启可丢，by design）
+- [x] **AC-C2（机会前端闭环，2026-08-22）**: `DogDossierPanel` 机会分节列出 pending 机会（sourceEvent/targetDogId/threadId/时间），支持忽略与关联提案 ID 标记转化——机会管线三个端点全部有前端消费者（此前 `GET …/opportunities` 及 dismiss/convert 为前端断档）；契约由 `dossierService.test.ts` 锁定
 - [x] **AC-D（提案状态机）**: pending→approved/rejected→applied CAS 迁移；自批/自否 403；非目标犬 apply 403；sourceId 幂等
 - [x] **AC-E（应用器安全）**: baseHash 不符 409 拒绝且文件不动；beforeSnapshot 只在目标犬段内替换（跨段同文案测试）；段头缺失 fail-closed；commit 失败回滚文件+index
 - [x] **AC-F（MCP）**: dossier 族 4 工具进 catalog，baseline/attestation 已再生（17 tools）

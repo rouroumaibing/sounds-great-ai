@@ -6,8 +6,11 @@ import {
   listProposals,
   approveProposal,
   rejectProposal,
+  listOpportunities,
+  dismissOpportunity,
+  convertOpportunity,
 } from '../../services/dossierService';
-import type { DossierOverview, DistillationProposal, DossierObservation } from '../../types/dossier';
+import type { DossierOverview, DistillationProposal, DossierObservation, DistillationOpportunity } from '../../types/dossier';
 
 function StatusBadge({ status }: { status: DistillationProposal['status'] }) {
   const map: Record<string, string> = {
@@ -37,25 +40,29 @@ export default function DogDossierPanel() {
   const [overview, setOverview] = useState<DossierOverview | null>(null);
   const [observations, setObservations] = useState<Record<string, DossierObservation[]>>({});
   const [proposals, setProposals] = useState<DistillationProposal[]>([]);
+  const [opportunities, setOpportunities] = useState<DistillationOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [obsDogId, setObsDogId] = useState('');
   const [obsContent, setObsContent] = useState('');
   const [busy, setBusy] = useState('');
+  const [convertDraft, setConvertDraft] = useState<{ id: string; proposalId: string } | null>(null);
 
   const dogIds = overview?.modelGroups.flatMap(g => g.dogs.map(d => d.dogId)) ?? [];
 
   const refresh = useCallback(async () => {
     try {
       setError('');
-      const [ov, obs, props] = await Promise.all([
+      const [ov, obs, props, opps] = await Promise.all([
         getDossierOverview(),
         listObservations() as Promise<Record<string, DossierObservation[]>>,
         listProposals(),
+        listOpportunities(),
       ]);
       setOverview(ov);
       setObservations(obs);
       setProposals(props);
+      setOpportunities(opps);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -84,6 +91,32 @@ export default function DogDossierPanel() {
     try {
       if (action === 'approve') await approveProposal(id);
       else await rejectProposal(id, 'operator 否决');
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const dismissOpp = async (id: string) => {
+    setBusy(`dismiss:${id}`);
+    try {
+      await dismissOpportunity(id);
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const commitConvert = async () => {
+    if (!convertDraft?.proposalId.trim()) return;
+    setBusy(`convert:${convertDraft.id}`);
+    try {
+      await convertOpportunity(convertDraft.id, convertDraft.proposalId.trim());
+      setConvertDraft(null);
       await refresh();
     } catch (e) {
       setError(String(e));
@@ -209,6 +242,64 @@ export default function DogDossierPanel() {
                 </li>
               )),
             )}
+          </ul>
+        )}
+      </section>
+
+      {/* 蒸馏机会 */}
+      <section className="rounded-xl border border-slate-700/60 bg-slate-900/60 p-4">
+        <h3 className="text-sm font-semibold">蒸馏机会</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          能力相关事件闭环后产生的瞬时信号（不落库）。可忽略，或在狗狗创建提案后在此关联标记为已转化。
+        </p>
+        {opportunities.filter(o => o.status === 'pending').length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">暂无待处理机会。</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {opportunities.filter(o => o.status === 'pending').map(o => (
+              <li key={o.opportunityId} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">{o.sourceEvent}</span>
+                    <span className="text-slate-300">目标犬 <b>{o.targetDogId}</b></span>
+                    <span className="text-slate-500">· 线程 {o.threadId}</span>
+                    <span className="text-slate-600">· {new Date(o.createdAt).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => void dismissOpp(o.opportunityId)}
+                      disabled={busy === `dismiss:${o.opportunityId}`}
+                      className="rounded-lg bg-slate-700/80 px-2.5 py-1 text-xs text-white hover:bg-slate-700 disabled:opacity-40"
+                    >
+                      忽略
+                    </button>
+                    <button
+                      onClick={() => setConvertDraft(convertDraft?.id === o.opportunityId ? null : { id: o.opportunityId, proposalId: '' })}
+                      className="rounded-lg bg-indigo-600/80 px-2.5 py-1 text-xs text-white hover:bg-indigo-600"
+                    >
+                      {convertDraft?.id === o.opportunityId ? '取消' : '标记已转化'}
+                    </button>
+                  </div>
+                </div>
+                {convertDraft?.id === o.opportunityId && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      value={convertDraft.proposalId}
+                      onChange={e => setConvertDraft({ id: o.opportunityId, proposalId: e.target.value })}
+                      placeholder="关联的提案 ID（由狗狗通过蒸馏提案创建）"
+                      className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs font-mono"
+                    />
+                    <button
+                      onClick={() => void commitConvert()}
+                      disabled={!convertDraft.proposalId.trim() || busy === `convert:${o.opportunityId}`}
+                      className="rounded-lg bg-emerald-600/80 px-2.5 py-1 text-xs text-white disabled:opacity-40"
+                    >
+                      {busy === `convert:${o.opportunityId}` ? '提交中…' : '确认转化'}
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
           </ul>
         )}
       </section>

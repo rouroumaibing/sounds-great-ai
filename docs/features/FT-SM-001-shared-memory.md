@@ -105,7 +105,7 @@ SG 的 Shared Memory 不是单一模块，而是一条**确定性流水线**，�
 
 ## 6. 前端（代码锚点）
 
-- **`MemoryTab.tsx`**：待审批/truth/召回记录/账本四区；**操作员作用域下拉**（`:26-30`，`breedService.getBreeds()` 供给 +「默认(系统)」项 `:131-140`），随 `link/setSensitivity/markOutcome` 透传；召回账本显示三轴+成熟度（`:337,285`）。
+- **`MemoryTab.tsx`**：待审批/truth/召回记录/账本四区 + **全文搜索结果面板**（2026-08-23 接入：`searchLanes` 命中渲染为天蓝面板——类型徽章 + 内容截断 + 状态色点，Enter 触发/可关闭；此前调用后丢弃结果只报"0 结果"）；**操作员作用域下拉**（`:26-30`，`breedService.getBreeds()` 供给 +「默认(系统)」项 `:131-140`），随 `link/setSensitivity/markOutcome` 透传；召回账本显示三轴+成熟度（`:337,285`）。
 - **`MemoryGapPanel.tsx`**：① **SVG 径向关系图**（`REL_COLOR` + `DIM` 隐藏 private/restricted 边，`:27,41,227-256`）；② 10 关系下拉 + 边敏感度 `<select>`（`:57-58`）；③ 敏感度放宽确认流（`widen` 状态 + `onConfirmWiden`，`:65`）；④ 生命周期轨迹自动加载（`:72,92`）；⑤ 全部写操作经 `operator` 透传（`:106,124,138`）。**cue 账本列表已移除**（用户决定）。
 - **`memoryService.ts`**：`linkEntries/setSensitivity/markRecallOutcomeDetailed` 接 `operator` 并走 `?operator=`（`:94,112,139`）；`getLifecycle` 保留；`getCueEvents` 已删。
 - **`types/api.ts`**：`RecallWindowStatApi`(三轴+maturity `:387-400`)、`LaneEdgeApi`(边级字段 `:443-450`)、`LANE_RELATIONS`(10 `:472`)、`SensitivityLevel`(4 `:469`)。

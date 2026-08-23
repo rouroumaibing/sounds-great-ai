@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../store/useI18n';
+import { streamSSE } from '../../services/sse';
 import {
   listPeople,
   getPerson,
@@ -154,17 +155,23 @@ export function PeopleMemoryContent() {
   // applied operator and refresh the current view whenever another tab changes
   // anything (approve/reject/fold/edit). The subscription re-opens when the
   // operator scope changes; reloadRef keeps the latest reload fn without
-  // re-subscribing on every selection.
+  // re-subscribing on every selection. Consumed over fetch-SSE (not
+  // EventSource) so the Authorization header and API_BASE origin apply —
+  // EventSource could carry neither and broke under AUTH_TOKEN/remote API.
   const reloadRef = useRef<() => void>(() => {});
   useEffect(() => {
+    const controller = new AbortController();
     setLiveState('connecting');
-    const es = new EventSource(
+    void streamSSE(
       `/api/people-memory/events?operator=${encodeURIComponent(appliedOperator)}`,
+      {
+        onOpen: () => setLiveState('open'),
+        onMessage: () => reloadRef.current(),
+        onError: () => setLiveState('error'),
+      },
+      controller.signal,
     );
-    es.onopen = () => setLiveState('open');
-    es.onmessage = () => reloadRef.current();
-    es.onerror = () => setLiveState('error'); // EventSource auto-reconnects
-    return () => es.close();
+    return () => controller.abort();
   }, [appliedOperator]);
 
   const openPerson = useCallback(async (id: string) => {

@@ -1,4 +1,4 @@
-import { API_BASE, apiGet, authHeaders } from './http';
+import { API_BASE, apiGet, apiPost, authHeaders } from './http';
 
 export interface HealthInfo {
   status: string;
@@ -48,6 +48,31 @@ export async function getTraces(): Promise<TracesResponse> {
 
 export async function getEvals(): Promise<EvalSummary[]> {
   return apiGet<EvalSummary[]>('/api/evals');
+}
+
+// QC auto-runner heartbeat (GET /api/qc/status). Only registered when the
+// server runs with a QC runner; expect ApiError(404) otherwise.
+export interface QcStatus {
+  passed: boolean;
+  risk_tier: string;
+  stale: boolean;
+  reviewed_sha: string;
+  steps?: Record<string, unknown>;
+  last_run: string;
+  last_error: string;
+  state_phase: string;
+  state_reviewed_sha: string;
+  aggregate?: Record<string, unknown>;
+}
+
+export async function getQcStatus(): Promise<QcStatus> {
+  return apiGet<QcStatus>('/api/qc/status');
+}
+
+// runQc triggers an on-demand QC pass. heavy=true also runs the heavy
+// build/test step; otherwise the runner's skipHeavy default applies.
+export async function runQc(heavy = false): Promise<Record<string, unknown>> {
+  return apiPost<Record<string, unknown>>(`/api/qc/run${heavy ? '?heavy=1' : ''}`, {});
 }
 
 // parseMetricLines extracts `name value` (and `name{labels} value`) pairs from

@@ -76,10 +76,11 @@ SG 的 Skills Framework 是一个**治理化子系统**：从 `packs/default/ski
 | 技能列表/启停/挂载点 | ✅ 面板发起 `GET`/`PATCH` | ✅ `SkillManager` 持久化意图 + 调谐 |
 | 漂移治理 | ✅ 检查/解决按钮 + 策略切换 + 横幅展示 | ✅ `DetectSkillDrift`/`ResolveSkillDrift` |
 | 同步挂载 | ✅ "同步挂载"按钮 | ✅ `SyncSkillMounts`（per-skill symlink） |
-| 安全/权限 | ✅ 预览弹窗显示安全徽标 + 批准/隔离按钮 | ✅ `reconcileSecurity`/`securityBlocks`/`Approve`/`Quarantine`/`Revoke` |
+| 安全/权限 | ✅ 预览弹窗安全徽标 + 批准/隔离按钮；**安全审查汇总条**（非 approved 项列表 + 放行/隔离/撤销快捷动作，消费 `GET /api/skills/security`，2026-08-22 接入） | ✅ `reconcileSecurity`/`securityBlocks`/`Approve`/`Quarantine`/`Revoke` |
 | 生产注入 | ❌ 不拼 prompt | ✅ `enabledSkillIDs` → `PromptBuilder.Build` |
 | 触发命名 | ❌ | ✅ d11 `SkillTriggerResolver`（显式 `skill:` tag + carrier 过滤） |
 | 配置热加载 | ❌ | ✅ `SkillConfigStore.Watch`（3s 轮询 + 30s 防抖 → `ReloadAll`） |
+| 插件 skills 来源 | ❌（PluginsPanel 只展示/启停） | ✅ `AddSource/RemoveSource` 动态源（2026-08-23，panels P3）；plugin 来源沿用外部源安全纪律；插件启用门禁消费 `Security().StateOf` |
 
 ---
 
@@ -94,9 +95,11 @@ SG 的 Skills Framework 是一个**治理化子系统**：从 `packs/default/ski
 - [x] **AC-05 (正常路径-漂移解决)**: Given 存在漂移且点击「一键解决」, When `POST /api/skills/drift/resolve` `{strategy:'keep-project'|'use-global'}`, Then `ResolveSkillDrift` 先备份 `conflict` 占用到 `<ConfigRoot>/.drift-backup/<carrier>-<skillId>`，再 `SyncSkillMounts` 调谐；策略决定原生目录 scope。
 - [x] **AC-06 (正常路径-同步挂载)**: Given 点击「同步挂载」, When `POST /api/skills/sync`, Then `SyncSkillMounts` 对 `claude/codex/gemini/kimi` 建/清 per-skill 符号链接（不目录级链接），逻辑挂载 carrier 无磁盘操作。
 - [x] **AC-07 (正常路径-预览 + 安全动作)**: Given 点击卡片打开预览弹窗, When `GET /api/skills/{id}` 返回 `SkillDetail`（含 `content`/`path`/`security`）, Then 弹窗显示正文 + 安全状态徽标；点击「批准/隔离」发 `POST /api/skills/security/{id}/{action}`，状态刷新。
+- [x] **AC-07b (正常路径-安全审查汇总, 2026-08-22)**: Given 面板挂载, When `loadSecurity()` 调 `GET /api/skills/security`（`AllSecurityStates`：id/source/trusted/fingerprint/status/reviewedBy）, Then 非 approved 项以玫瑰色汇总条列出（指纹前缀 + 审查人），提供放行/隔离/撤销快捷动作（与预览弹窗共用 `securityAction`）；该端点此前无前端消费者。
 - [x] **AC-08 (权限与安全-状态机)**: Given 扫描到技能, When `reconcileSecurity` 分类, Then 内部可信源（`source=='packs'`）默认 `approved`；外部源（`user`/`plugin`）首次为 `pending`（注入前需人工批准）。
 - [x] **AC-09 (权限与安全-指纹失配)**: Given 外部源技能正文变更, When 重扫指纹 `skillFingerprint(body)` 与已存不符, Then 该技能 `Status` 强制 `quarantined`（防上游替换下毒）。
 - [x] **AC-10 (生产注入链路)**: Given 某 carrier 下技能已启用且未被安全阻断, When `execution.enabledSkillIDs(carrier)` → `PromptBuilder.Build({SkillIDs})`, Then `buildSkillRoster` **始终**注入全部技能清单（不依赖 SkillIDs），`buildSkills` **仅当** `SkillIDs` 非空才注入正文。
+- [x] **AC-11 (插件动态源, 2026-08-23)**: Given 插件安装, When `AddSource(<id>/skills, "plugin") + Scan()`, Then 随包技能以外部源纪律进 pending 审查；`RemoveSource + Scan()` 后技能退出扫描且安全状态保留（重装同指纹沿用）；重启后 enabled 插件源自动重挂。插件启用门禁：随包 skill 任一非 approved → 409。全链由 `plugins_handler_test.go` 锁定（见 `FT-PLUGIN-001`）。
 - [x] **AC-11 (触发命名-resolver)**: Given 用户查询含 `skill:<id>` 显式指令, When `SkillTriggerResolver.Resolve` 命中, Then 返回精确 `SKILL_NAME/SKILL_ID`（不进入子串宽松匹配）；且仅匹配 `mountedToCarrier` 当前 carrier 的技能（避免命名与挂载范围错位）。
 - [x] **AC-12 (配置热加载)**: Given 外部进程编辑 `skills-config.json`, When `Watch`（3s 轮询 mtime + 30s 防抖）触发, Then `ReloadAll` 重载 global+project 两层并重扫源，内存态自动刷新（无需重启 server）。
 - [x] **AC-13 (异常与边界-注入被阻断)**: Given 技能处于 `pending`/`quarantined`/`revoked`, When 生产流 `enabledSkillIDs`/`Resolve`/`AllEnabled` 经 `securityBlocks` 过滤, Then 该技能不进入注入集合（已启用但被安全态阻断）。
@@ -206,7 +209,9 @@ SG 的 Skills Framework 是一个**治理化子系统**：从 `packs/default/ski
 
 ### 4.10 平台接线
 
-`platform.go:318` `skills.NewManagerWithConfig(homeCfg, projCfg, map[string]string{cfg.SkillsDir:"packs"})` → `Config().Load()` + `Scan()` → `Config().Watch(... ReloadAll ...)`（`:323`）。`KnownCarriers = [claude,codex,gemini,opencode,kimi]`（`manager.go:22`）。
+`platform.go` `skills.NewManagerWithConfig(homeCfg, projCfg, map[string]string{cfg.SkillsDir:"packs"})` → `Config().Load()` + `Scan()` → `Config().Watch(... ReloadAll ...)`。`KnownCarriers = [claude,codex,gemini,opencode,kimi]`（`manager.go`）。
+
+**插件动态源（2026-08-23，panels P3）**：`SkillManager` 新增 `AddSource(dir, source)` / `RemoveSource(dir)`（幂等、按目录去重）——插件安装/启用时把 `<ConfigRoot>/plugins/<id>/skills` 以 `source="plugin"` 加入扫描源，停用/卸载时移除；`platform.go` 构造 skillMgr 后按插件注册表（`plugins.Service.EnabledPlugins()`）重挂 enabled 插件源（重启恢复）。外部源安全纪律不变：plugin 来源首次 pending、指纹变更 quarantine。**插件启用门禁**消费本管线——随包 skill 任一非 approved 则插件启用 409（`plugins_handler.go`，见 `FT-PLUGIN-001` AC-03）。
 
 ---
 

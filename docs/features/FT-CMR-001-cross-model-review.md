@@ -159,6 +159,8 @@ SG 的三层设计对应 clowder F253 的 Maine Coon 三层（具名猫）模型
 - `GET /api/qc/status`（`routes.go:485-506`）：返回最近心跳（`passed` / `risk_tier` / `stale` / `reviewed_sha` / `steps` / `last_run` / `last_error`）+ 持久化 `state_phase` / `state_reviewed_sha` + 聚合 `aggregate`（来自 `AggregateQCMetrics`）。
 - `POST /api/qc/run?heavy=1`（`routes.go:510-518`）：按需跑一次，`?heavy=1` 也跑重构建/测试。
 
+**前端接入（2026-08-22）**：设置 → 运维（`OpsPanel`）新增「QC」子页——状态卡（PASS/FAIL + STALE 徽标、风险层级、`state_phase`、最近运行时间、`last_error` 错误条、`reviewed_sha` 前 12 位）+ 双触发按钮（「立即巡检」`POST /api/qc/run`；「重巡检（含构建/测试）」`?heavy=1`）。经 `opsService.getQcStatus/runQc`；qcRunner 未注册（404）时降级显示「QC 自动巡检未启用」提示而非报错。这两个端点此前无前端消费者（只能 curl）。
+
 **两个开关语义**（避免 server 心跳造假阴性）：
 - `ServerMode`（`qc_loop.go:48-52`）：step2/step3/step7 降级 advisory（跨模型评审与签核是「人 / merge 门禁」的事，server 不该自动生成）；
 - `SkipHeavy`（`qc_loop.go:53-56`）：默认跳过 step5 重 `go build`/`go test`（否则每 30 分钟全仓 `go test` 拖垮主机；构建/测试仍归 CI / `pre-merge`）。

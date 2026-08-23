@@ -12,6 +12,8 @@ import (
 	"sounds-great-ai/internal/hooks"
 	"sounds-great-ai/pkg/pack"
 	"sounds-great-ai/pkg/protocol"
+
+	"github.com/google/uuid"
 )
 
 func (h *WSHandler) sendBarkError(sessionID, breedID, errMsg string) {
@@ -262,6 +264,25 @@ func (h *WSHandler) SendSystemNotice(severity, title, message string) {
 		Title:     title,
 		Message:   message,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+	// Mirror the notice into the notification center (UI bell). Connected
+	// clients get the live WS event; the persisted copy survives reloads.
+	if h.notifications != nil {
+		sev := "info"
+		switch severity {
+		case "critical":
+			sev = "error"
+		case "warn", "warning":
+			sev = "warning"
+		}
+		h.notifications.Push(Notification{
+			ID:        uuid.NewString(),
+			Severity:  sev,
+			Title:     title,
+			Message:   message,
+			Source:    "system",
+			Timestamp: notice.Timestamp,
+		})
 	}
 	event := protocol.NewEvent(protocol.EventSystemNotice, "", &notice)
 	h.mu.RLock()

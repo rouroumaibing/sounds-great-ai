@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { apiGet, apiPatch, apiPost } from '../../services/http';
-import type { SkillItem, SkillDetail, SkillDriftIssue } from '../../types';
+import type { SkillItem, SkillDetail, SkillDriftIssue, SkillSecurityState } from '../../types';
 
 const CARRIERS = ['claude', 'codex', 'gemini', 'opencode', 'kimi'] as const;
 
@@ -51,6 +51,7 @@ export function SkillsPanel() {
   const [preview, setPreview] = useState<SkillDetail | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [driftStrategy, setDriftStrategy] = useState<'keep-project' | 'use-global'>('keep-project');
+  const [securityStates, setSecurityStates] = useState<SkillSecurityState[] | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,9 +66,21 @@ export function SkillsPanel() {
     }
   }, []);
 
+  // Full security states (fingerprint / trusted / reviewedBy), fetched once on
+  // mount; the per-item list only carries a coarse status badge.
+  const loadSecurity = useCallback(async () => {
+    try {
+      const data = await apiGet<SkillSecurityState[]>('/api/skills/security');
+      setSecurityStates(Array.isArray(data) ? data : []);
+    } catch {
+      setSecurityStates([]);
+    }
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadSecurity();
+  }, [load, loadSecurity]);
 
   const patchSkill = useCallback(
     async (id: string, body: Record<string, unknown>) => {
@@ -85,7 +98,7 @@ export function SkillsPanel() {
     patchSkill(it.id, { enabled: !it.enabled, mountPoints: it.mountPoints });
 
   const toggleCarrier = (it: SkillItem, carrier: string) => {
-    const set = new Set(it.mountPoints);
+    const set = new Set(it.mountPoints ?? []);
     if (set.has(carrier)) set.delete(carrier);
     else set.add(carrier);
     patchSkill(it.id, { mountPoints: Array.from(set) });
@@ -145,6 +158,7 @@ export function SkillsPanel() {
       try {
         await apiPost<SkillItem>(`/api/skills/security/${id}/${action}`, {});
         await load();
+        await loadSecurity();
         if (preview && preview.id === id) {
           const detail = await apiGet<SkillDetail>(`/api/skills/${id}`);
           setPreview(detail);
@@ -153,8 +167,10 @@ export function SkillsPanel() {
         setError(e instanceof Error ? e.message : String(e));
       }
     },
-    [load, preview],
+    [load, loadSecurity, preview],
   );
+
+  const pendingSecurity = (securityStates ?? []).filter((s) => s.status !== 'approved');
 
   const filtered = items.filter((it) => {
     if (!search.trim()) return true;
@@ -239,6 +255,59 @@ export function SkillsPanel() {
         </div>
       )}
 
+      {/* 安全审查（未批准项） */}
+      {securityStates !== null && pendingSecurity.length > 0 && (
+        <div className="rounded-lg border border-rose-500/40 bg-rose-500/5 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-rose-300">
+              安全审查：{pendingSecurity.length} 项未批准
+            </span>
+            <span className="text-[10px] text-slate-500 font-mono">来自 /api/skills/security</span>
+          </div>
+          <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+            {pendingSecurity.map((s) => (
+              <li key={s.id} className="flex items-center justify-between gap-2 rounded-lg bg-slate-950/60 border border-slate-800 px-2.5 py-1.5">
+                <div className="min-w-0 text-xs">
+                  <span className="font-mono text-slate-200">{s.id}</span>
+                  <span className={clsx('ml-2 px-1.5 py-0.5 rounded text-[9px] font-mono', SECURITY_COLOR[s.status] ?? 'text-slate-500 bg-slate-800/60')}>
+                    {SECURITY_LABEL[s.status] ?? s.status}
+                  </span>
+                  <span className="ml-2 text-[10px] text-slate-500 font-mono truncate">
+                    {s.fingerprint ? `fp ${s.fingerprint.slice(0, 12)}` : ''}{s.reviewedBy ? ` · ${s.reviewedBy}` : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {s.status !== 'approved' && (
+                    <button
+                      onClick={() => securityAction(s.id, 'approve')}
+                      className="px-2 py-0.5 rounded text-[10px] bg-emerald-600/80 hover:bg-emerald-600 text-white transition"
+                    >
+                      放行
+                    </button>
+                  )}
+                  {s.status !== 'quarantined' && (
+                    <button
+                      onClick={() => securityAction(s.id, 'quarantine')}
+                      className="px-2 py-0.5 rounded text-[10px] bg-amber-600/80 hover:bg-amber-600 text-white transition"
+                    >
+                      隔离
+                    </button>
+                  )}
+                  {s.status !== 'revoked' && (
+                    <button
+                      onClick={() => securityAction(s.id, 'revoke')}
+                      className="px-2 py-0.5 rounded text-[10px] bg-rose-600/80 hover:bg-rose-600 text-white transition"
+                    >
+                      撤销
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {error && (
         <div className="text-center text-rose-400 text-xs py-2">{error}</div>
       )}
@@ -286,9 +355,9 @@ export function SkillsPanel() {
               </button>
             </div>
 
-            {it.triggers.length > 0 && (
+            {(it.triggers ?? []).length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {it.triggers.map((tr: string) => (
+                {(it.triggers ?? []).map((tr: string) => (
                   <span key={tr} className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 font-mono">
                     {tr}
                   </span>
@@ -300,7 +369,7 @@ export function SkillsPanel() {
             <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-800/60">
               <span className="text-[10px] text-slate-500 mr-1">挂载:</span>
               {CARRIERS.map((c) => {
-                const on = it.mountPoints.includes(c);
+                const on = (it.mountPoints ?? []).includes(c);
                 return (
                   <button
                     key={c}
@@ -314,7 +383,7 @@ export function SkillsPanel() {
                   </button>
                 );
               })}
-              {it.mountPoints.length === 0 && (
+              {(it.mountPoints ?? []).length === 0 && (
                 <span className="text-[10px] text-slate-600">全量（默认）</span>
               )}
             </div>

@@ -16,6 +16,40 @@ type sourceRoot struct {
 	source string // packs | user | plugin
 }
 
+// AddSource registers an extra scan source at runtime (plugins P3: an
+// enabled plugin's skills dir joins as source "plugin" so its skills enter
+// the pending-security pipeline). Idempotent per dir; caller triggers Scan().
+func (m *SkillManager) AddSource(dir, source string) {
+	if dir == "" {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, sr := range m.sources {
+		if sr.dir == dir {
+			return
+		}
+	}
+	m.sources = append(m.sources, sourceRoot{dir: dir, source: source})
+}
+
+// RemoveSource drops a previously added scan source (plugin disabled or
+// uninstalled). Caller triggers Scan() to drop the skills it provided.
+func (m *SkillManager) RemoveSource(dir string) {
+	if dir == "" {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	kept := m.sources[:0]
+	for _, sr := range m.sources {
+		if sr.dir != dir {
+			kept = append(kept, sr)
+		}
+	}
+	m.sources = kept
+}
+
 // KnownCarriers 是 SG 协调的外部 CLI agent 列表（ValidCLIClientIDs）。
 // 其中 claude/codex/gemini/kimi 拥有原生 skills 目录，可物理挂载（符号链接）；
 // opencode 无统一原生目录，仅逻辑挂载（启用即注入 prompt）。

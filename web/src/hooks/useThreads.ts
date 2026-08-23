@@ -53,5 +53,16 @@ export function useThreads() {
     }
   }, [showToast]);
 
-  return { threads, loading, error, createThread, deleteThread, refetch: fetchThreads };
+  const renameThread = useCallback(async (id: string, title: string) => {
+    try {
+      await threadService.renameThread(id, title);
+      setThreads((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast({ message: t('hooks.usethreads.s4').replace('{msg}', msg), type: 'error' });
+      throw e;
+    }
+  }, [showToast]);
+
+  return { threads, loading, error, createThread, deleteThread, renameThread, refetch: fetchThreads };
 }

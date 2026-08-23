@@ -1,13 +1,46 @@
-import { defineConfig } from 'vite'
+import fs from 'node:fs'
+import path from 'node:path'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// Write a build id (unix seconds) into the output dir. The Go server ranks
+// the on-disk web/dist against the frontend embedded at compile time by this
+// id (main.embeddedBuildID ldflag), so binary-only upgrades and dist-only
+// rebuilds both resolve to the newer frontend.
+function writeBuildId(): Plugin {
+  let root = process.cwd()
+  let outDir = 'dist'
+  return {
+    name: 'write-build-id',
+    configResolved(config) {
+      root = config.root
+      outDir = config.build.outDir
+    },
+    closeBundle() {
+      try {
+        fs.writeFileSync(path.resolve(root, outDir, '.build-id'), `${Math.floor(Date.now() / 1000)}\n`)
+      } catch {
+        // Best-effort: SPAHandler falls back to index.html mtime ranking.
+      }
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    writeBuildId(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Compile our own service worker (src/sw.ts: precache wiring + push
+      // notification handlers). generateSW would ignore src/sw.ts entirely,
+      // which is how the push handlers used to silently never ship. The
+      // runtime-caching / navigation-fallback rules live in src/sw.ts too;
+      // only the precache glob list stays here.
+      strategies: 'injectManifest',
+      srcDir: 'src',
       manifest: {
         name: 'Sounds Great AI',
         short_name: 'SGAI',
@@ -31,30 +64,10 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      // NOTE: with strategies: 'injectManifest' the plugin reads glob options
+      // from this `injectManifest` key (the `workbox` key is generateSW-only).
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff,woff2}'],
-        runtimeCaching: [
-          {
-            // API calls: NetworkOnly (no caching, always fresh)
-            urlPattern: /\/api\/.*/i,
-            handler: 'NetworkOnly',
-            method: 'GET',
-          },
-          {
-            // Static assets: CacheFirst (60 entries, 30 days)
-            urlPattern: /\.(?:png|jpg|jpeg|svg|ico|woff|woff2)$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'static-assets',
-              expiration: {
-                maxEntries: 60,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
-            },
-          },
-        ],
-        // Exclude WebSocket from caching (NetworkOnly by default, but explicit exclude)
-        navigateFallbackDenylist: [/^\/ws/],
       },
       // PWA only active in production build (vite-plugin-pwa is disabled in dev by default)
       injectRegister: 'auto',

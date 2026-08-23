@@ -7,6 +7,7 @@ import { ToolPanel } from './components/drawer/ToolPanel';
 import { CatHueInjector } from './components/CatHueInjector';
 import { ContextMenu } from './components/common/ContextMenu';
 import { ToastContainer } from './components/common/ToastContainer';
+import { UpdateBanner } from './components/common/UpdateBanner';
 import { StreamTimeline } from './components/workspace/StreamTimeline';
 import { ConnectionStatusBar } from './components/workspace/ConnectionStatusBar';
 import { SettingsContent } from './components/settings/SettingsContent';
@@ -25,6 +26,7 @@ function App() {
   const activeSettingsTab = useAppStore((s) => s.activeSettingsTab);
 
   const initWebSocket = useChatStore((s) => s.initWebSocket);
+  const restoreEscalations = useChatStore((s) => s.restoreEscalations);
   const fetchNotifications = useAppStore((s) => s.fetchNotifications);
   const fetchFileTree = useAppStore((s) => s.fetchFileTree);
 
@@ -39,7 +41,8 @@ function App() {
   useEffect(() => {
     fetchNotifications();
     fetchFileTree();
-  }, [fetchNotifications, fetchFileTree]);
+    void restoreEscalations();
+  }, [fetchNotifications, fetchFileTree, restoreEscalations]);
 
   useEffect(() => {
     if (leftPanelVisible) leftPanelRef.current?.expand();
@@ -103,6 +106,7 @@ function App() {
       </div>
       <ContextMenu />
       <ToastContainer />
+      <UpdateBanner />
     </div>
   );
 }

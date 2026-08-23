@@ -18,6 +18,7 @@ export function MemoryTab() {
   const [recallLedger, setRecallLedger] = useState<RecallLedgerApi>({});
   const [pullQuery, setPullQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchHits, setSearchHits] = useState<LaneEntryApi[] | null>(null);
   const [reflectFocus, setReflectFocus] = useState('');
   const [reflection, setReflection] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -97,10 +98,10 @@ export function MemoryTab() {
     setBusy(true);
     try {
       const hits = await memoryService.searchLanes(q);
-      // Surface search hits as a transient pending-style list via truth+pending
-      // is overkill; just refresh and let the operator scroll. We log count.
+      setSearchHits(hits);
       setLanesError(hits.length === 0 ? t('drawer.memory.searchEmpty') : null);
     } catch (e) {
+      setSearchHits(null);
       setLanesError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
@@ -308,6 +309,7 @@ export function MemoryTab() {
           <input
             value={searchQuery}
             onChange={(ev) => setSearchQuery(ev.target.value)}
+            onKeyDown={(ev) => { if (ev.key === 'Enter') void onSearch(); }}
             placeholder={t('drawer.memory.searchPlaceholder')}
             className="flex-1 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-[11px] text-slate-200 placeholder:text-slate-600"
           />
@@ -319,6 +321,34 @@ export function MemoryTab() {
             {t('drawer.memory.search')}
           </button>
         </div>
+
+        {searchHits !== null && (
+          <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-2 space-y-1">
+            <div className="flex items-center justify-between text-[10px] font-mono text-sky-300">
+              <span>{t('drawer.memory.searchHits').replace('{count}', String(searchHits.length))}</span>
+              <button
+                onClick={() => { setSearchHits(null); setSearchQuery(''); }}
+                className="text-slate-400 hover:text-slate-200 transition"
+                title={t('common.close')}
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            {searchHits.map((hit) => (
+              <div key={hit.id} className="flex items-start gap-1.5 text-[11px] leading-snug">
+                <span className="shrink-0 px-1 py-0.5 rounded bg-slate-900 border border-slate-700 text-[9px] font-mono text-slate-400">{hit.type}</span>
+                <span className="flex-1 text-slate-300 break-all line-clamp-2">{hit.content}</span>
+                <span className={`shrink-0 px-1 py-0.5 rounded text-[9px] font-mono border ${
+                  hit.status === 'approved' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                  : hit.status === 'retired' ? 'text-slate-500 border-slate-700 bg-slate-800/40'
+                  : 'text-amber-400 border-amber-500/30 bg-amber-500/10'}`}
+                >
+                  {hit.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {lanesError && <div className="text-center text-rose-400 text-xs py-2">{t('common.error')}: {lanesError}</div>}
         {!lanesError && recallEvents.length === 0 && (

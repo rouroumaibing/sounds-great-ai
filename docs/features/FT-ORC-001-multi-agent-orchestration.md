@@ -145,13 +145,16 @@
 | `BARK_ERROR` | 适配 | 某犬出错（结构化诊断） | `error` |
 | `ERROR` | 编排 | 全局错误（**仅 toast，不进 timeline**） | (仅 toast) |
 | `CARRIER_HEALTH` | 适配 | carrier 健康度（quota/structural/transient） | `carrierHealth` map → `ConnectionStatusBar` |
-| `SYSTEM_NOTICE` | 编排 | 系统提示 | `system_notice` |
+| `SYSTEM_NOTICE` | 编排 | 系统提示 | Toast + 通知中心（`useAppStore.pushLiveNotice`；后端同步镜像入 `/api/notifications`，见 §6.1 N-1） |
+| `SOP_GATE` | 编排 | 跨犬审查门禁状态（拦截/建议路由） | `sop_gate` → `SopGate` 组件 |
+| `CVO_ESCALATION` | 编排 | A2A 深度硬轨熔断，球权上交 CVO（G4，见 FT-A2A-001 §4.8） | `cvo_escalation` → `CvoEscalation` 决策卡 + `escalations[threadId]` 标记 |
 | `HITL_RESPONSE` | 编排 | 人工响应(前端→后端) | (发送侧) |
 | `WAKE_HOLD` | 编排 | 唤醒持球线程(前端→后端) | (发送侧) |
+| `CVO_ESCALATION_RESPONSE` | 编排 | CVO 升级决策回传(前端→后端，选 A/B 自动重派指令、intervene 人工接管) | (发送侧) |
 
 > 前端 `StreamTimeline.tsx` 用 `switch(event.type)` 把上述事件渲染为 `BreedCard / ThinkingBlock / ToolLogBlock / CodeDiffBlock / CliOutputBlock / ApprovalBlock / ErrorBlock` 等。`CliOutputBlock`（合并相邻 `tool_call`+`terminal_output` 为单卡片）已取代 `TerminalOutputBlock`——后者在 `web/src` 中**无任何引用（死代码）**，勿再引用。
 >
-> **`BARK_REJECTED`**：仅前端 `useChatStore.ts:469` 有处理分支（清 `isGenerating` + toast），**后端当前无发出点**，属防御性分支，未在上表列出。
+> **`BARK_REJECTED`**：仅前端 `useChatStore.ts:478` 有处理分支（清 `isGenerating` + toast），**后端当前无发出点**，属防御性分支，未在上表列出。
 
 ### 4.3 球权账本事件（custody 域，`internal/domains/custody/ports/ledger.go`）
 
@@ -234,18 +237,21 @@ append-only 事件流，纯函数投影为可观测状态：
 
 | 组件/文件 | 职责 |
 |-----------|------|
-| `web/src/store/useChatStore.ts` | 编排核心状态：`events[threadId]`、`isGenerating`、`lastSeq`、WS 事件分发 |
-| `web/src/store/useAppStore.ts` | 导航/输入状态(Zustand persist)：`activeNav`、`mentionOpen`、`activeThreadId` |
-| `web/src/services/ws.ts` | `WsManager`(WS 连接/重连/批量) + `sendWakeHold()` 人工唤醒发送 |
+| `web/src/store/useChatStore.ts` | 编排核心状态：`events[threadId]`、`isGenerating`、`lastSeq`、`escalations[threadId]`（CVO 升级标记）、WS 事件分发 |
+| `web/src/store/useAppStore.ts` | 导航/输入状态(Zustand persist)：`activeNav`、`mentionOpen`、`activeThreadId`；通知 CRUD + `pushLiveNotice`（WS 实时通知入列表）；`quoteAndSendFile`（引用即发送） |
+| `web/src/components/common/NotificationCenter.tsx` | 通知中心：Header 铃铛 + 未读数 + 下拉面板（单条已读/全部已读/清空），消费 `/api/notifications` 与 `SYSTEM_NOTICE` 实时推送 |
+| `web/src/services/ws.ts` | `WsManager`(WS 连接/重连/批量) + `sendWakeHold()` 人工唤醒发送 + `sendEscalationResponse()` CVO 升级决策回传 |
 | `web/src/components/workspace/StreamTimeline.tsx` | 同一时间线渲染多犬事件流；`useChatHistory` 接线历史水合 |
 | `web/src/components/workspace/BreedCard.tsx` + `BreedResponseStart/Complete.tsx` | 每只犬一次"叫唤"卡片 |
+| `web/src/components/workspace/CvoEscalation.tsx` | CVO 升级决策卡：三按钮（接手/收尾/人工介入）→ `resolveEscalation` 回传后端（2026-08-22 前为空函数死代码，见 §6.1 N-2） |
 | `web/src/components/workspace/CustodyTrail.tsx` + `hooks/useCustodyTrail.ts` + `services/custody.ts` | 球权轨迹面板(状态/持球者/回合·传球·持球统计/事件轨迹) + 人工唤醒按钮 |
 | `web/src/components/workspace/CommandBar.tsx` + `MentionPopover.tsx` | `@` 触发 mention 弹层，插入 `@{breedId}` |
+| `web/src/components/threads/ThreadItem.tsx` + `hooks/useThreads.ts` | 线程卡片：内联重命名（`PATCH /api/threads/{id}`，Enter 提交/Esc 取消）、删除、CVO 徇标（读 `escalations` store） |
 | `web/src/components/settings/MemberManagement.tsx` + `HubBreedEditor/HubLeaderEditor.tsx` | 狗狗队伍成员/默认犬/Leader 编辑 |
 | `web/src/components/settings/AccountKeys.tsx` | 账户与密钥(409 强删确认) |
-| `web/src/components/drawer/tabs/PlanTab.tsx` | 任务计划面板；无 `taskPlanSteps` 时显示「暂无任务计划」空状态（诚实呈现，不误导） |
+| `web/src/components/drawer/tabs/PlanTab.tsx` | 任务计划面板；无 `taskPlanSteps` 时显示「暂无任务计划」空状态（诚实呈现，不误导）。一级导航「Tasks」死入口已移除（后端不产出 `taskPlanSteps`，见 §6.1 N-3） |
 | `web/src/lib/breed-colors.ts` | 6 犬配色(边牧蓝/西高地粉/金毛橙/德牧深灰/藏獒紫/田园犬绿) |
-| `web/src/types/api.ts` + `types/index.ts` | `WsEvent`/`BreedConfig`/`Variant`/`RosterEntry`/`StreamEvent`/`DogAgent` 等契约类型 |
+| `web/src/types/api.ts` + `types/index.ts` | `WsEvent`/`BreedConfig`/`Variant`/`RosterEntry`/`StreamEvent`/`DogAgent`/`CvoEscalationPayload` 等契约类型 |
 
 ---
 
@@ -277,6 +283,24 @@ append-only 事件流，纯函数投影为可观测状态：
 | G-8 | legacy client_id 迁移风险 | ✅ **已修复（代码+数据）** | `file_store.go:normalizeClientID()` self-healing；活体 catalog + 种子模板 legacy 值已归零；`file_store_test.go` 回归 |
 
 **无 P1 阻塞项**：编排主链路无阻断性缺口。仅 G-5 为性能/设计议题、G-4 后端 `taskPlanSteps` 产出为待排期特性。
+
+### 6.1 增量处置（2026-08-22：死功能修复 + 断档接口接入）
+
+> 2026-08-22 全面测试前盘点发现的前端死功能与前后端断档，本日全部处置。锚点为当日代码。
+
+| # | 缺口 | 处置 | 证据 |
+|---|------|------|------|
+| N-1 | 通知中心"只建管道没有水龙头"：`fetchNotifications` CRUD 齐备、`sw.ts` 支持推送，但零组件消费；且后端 `NotificationsHandler.Push` 仅测试调用（列表永远为空） | ✅ **已修复（前后端）** | 后端 `helpers.go SendSystemNotice` 镜像写入通知存储（severity 映射 critical→error/warn→warning）+ `routes.go` `SetNotificationsHandler` 接线；前端新增 `NotificationCenter.tsx`（Header 铃铛/未读数/下拉面板），`useChatStore` SYSTEM_NOTICE 分支改为 Toast + `pushLiveNotice` 双通道；死胡同的 `useNoticeStore.ts` 已删除 |
+| N-2 | `CvoEscalation.tsx` 决策按钮为空函数（`resolveEscalation = () => {}`），且无事件源产生 `cvo_escalation`，徽标永不点亮 | ✅ **已修复（全栈）** | 见 FT-A2A-001 §4.8：协议新增 `CVO_ESCALATION`/`CVO_ESCALATION_RESPONSE`，`execution.go` 熔断点发射，`ws_handler.go` 维护待处理注册表并按决策重派指令；前端 `escalations[threadId]` 驱动主导航/ThreadItem/筛选徽标 |
+| N-3 | 一级导航「Tasks」死入口：后端 0 处产出 `taskPlanSteps`，视图永远空白 | ✅ **已移除（代码）** | `PrimaryNavType` 删除 `'tasks'` 枚举 + `PrimaryNav`/`SecondaryPanel` 移除入口（类型注释记录决策）；抽屉 `PlanTab` 保留诚实空态 |
+| N-4 | `quoteAndSendFile` 与 `quoteFileToInput` 逐字节相同（"发送到 Task review"按钮名不副实） | ✅ **已修复（代码）** | `useAppStore.quoteAndSendFile` 引用后动态 import `useChatStore.sendPrompt()` 立即发送（避免静态循环依赖）；有测试锁定行为 |
+| N-5 | 线程无法重命名（后端 `PATCH /api/threads/{id}` 存在但前端 0 调用） | ✅ **已接入（前端）** | `threadService.renameThread` + `useThreads.renameThread` + `ThreadItem` 悬停铅笔内联编辑（Enter/Esc/失焦提交，1-200 字符后端校验） |
+| N-6 | `people.*`/`profiles.*`/`nav.custody|people|profiles` 共 74 个 i18n key 双语字典缺失（英界面整体显示中文兜底） | ✅ **已补齐（i18n）** | `en.ts`/`zh-CN.ts` 各 +80 键至 760 键严格对齐；`useI18n.test.ts` 以测试守护键位奇偶校验 |
+| N-7 | 前端 130+ 文件仅 1 个测试文件（ErrorBoundary） | ✅ **已补（测试）** | 新增 10 文件 59 用例：`useChatStore` WS 事件机全链路、`useAppStore`、`useI18n`、`ws.ts` 出站协议帧、services 契约（http/thread/profiles/dossier/ops）；`go test ./...` + `vitest` + `tsc` 全绿 |
+| N-8 | HITL_RESPONSE 后端只记日志丢弃（`TODO: Forward to agent/hitl channel`），前端 ApprovalBlock 的答复永远到不了被阻塞的执行方 | ✅ **已修复（2026-08-23）** | `WSHandler` 构造即持有 `aspect.ApprovalManager` 并 `wireApprovalSender()`（审批请求按 session 路由到该线程 streamer 推 `HITL_APPROVAL`）；读循环 HITL_RESPONSE 分支调 `ResolveApproval`（命中即唤醒阻塞方，未命中发 SYSTEM_NOTICE 提示不报错）；`ResolveApproval` 改为返回命中并原子删除防双答。端到端环路（USER_INPUT 绑流 → RequestApproval → 客户端收卡 → HITL_RESPONSE 批准 → 阻塞方醒来）由 `ws_hitl_test.go` 在真实 WS 传输上锁定。**遗留**：生产执行路径（`internal/tool` 的 run_command/edit_file 挂 CommandGuardAspect）尚未装配——发射端登记见 panels-roadmap 遗留节 |
+| N-9 | CVO 升级卡为实时事件，刷新页面后消失（徽标也灭） | ✅ **已修复（2026-08-23）** | `GET /api/escalations`（auth.Wrap，按创建时间排序）+ 前端 `App` 挂载 `restoreEscalations()` 重放卡片点亮标记（escalation_id 去重、旧后端 404 静默）；仅服务重启丢失（注册表进程内存，by design） |
+| N-10 | MemoryTab 全文搜索调用 `searchLanes` 后丢弃结果（只报"0 结果"错误） | ✅ **已修复（2026-08-23）** | 搜索命中渲染为天蓝结果面板（类型徽章 + 内容两行截断 + 状态色点），Enter 触发、可关闭清空；i18n `drawer.memory.searchHits` 双语 |
+| N-11 | 人物记忆 SSE 用原生 `EventSource`：不带 `Authorization`、不走 `API_BASE`，AUTH_TOKEN/远程 API 下 401/连错主机 | ✅ **已修复（2026-08-23）** | 新增 `services/sse.ts` `streamSSE`（fetch 流式消费 + authHeaders + API_BASE + 指数重连 + AbortController 生命周期），`PeopleMemoryContent` 切换接入；帧解析（跨 chunk 重组/注释帧跳过/多行 data）由 `sse.test.ts` 锁定 |
 
 ---
 

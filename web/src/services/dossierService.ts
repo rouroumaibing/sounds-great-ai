@@ -3,6 +3,7 @@ import type {
   DossierObservation,
   DossierOverview,
   DistillationProposal,
+  DistillationOpportunity,
 } from '../types/dossier';
 
 export async function getDossierOverview(): Promise<DossierOverview> {
@@ -26,6 +27,23 @@ export async function listProposals(params?: { dogId?: string; status?: string }
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const res = await apiGet<{ proposals: DistillationProposal[] }>(`/api/dossier/distillations${suffix}`);
   return res.proposals ?? [];
+}
+
+// ---- Distillation opportunities (transient workflow signals) ----
+
+export async function listOpportunities(): Promise<DistillationOpportunity[]> {
+  const res = await apiGet<{ opportunities: DistillationOpportunity[] }>('/api/dossier/distillation-opportunities');
+  return res.opportunities ?? [];
+}
+
+export async function dismissOpportunity(id: string): Promise<void> {
+  await apiPost(`/api/dossier/distillation-opportunities/${encodeURIComponent(id)}/dismiss`, {});
+}
+
+// convertOpportunity marks an opportunity as converted once the referenced
+// proposal exists (dogs create proposals; the operator links them here).
+export async function convertOpportunity(id: string, proposalId: string): Promise<void> {
+  await apiPost(`/api/dossier/distillation-opportunities/${encodeURIComponent(id)}/convert`, { proposalId });
 }
 
 export async function approveProposal(proposalId: string): Promise<DistillationProposal> {

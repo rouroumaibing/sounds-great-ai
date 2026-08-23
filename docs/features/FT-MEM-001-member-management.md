@@ -60,6 +60,7 @@
 ### 3.2 列表主页 `MemberManagement.tsx`
 
 - **数据来源**：`useBreeds()` 拿 `breeds`（**仅 catalog 运行时犬**，来自 `/api/breeds`；`MergedBreeds` 不再并入 template）；`useSettings()` 拿 `roster`（`/api/settings/roster`，每条含派生 `credential_ready`）。`members = breeds.map(b => breedToSettingsMember(b, roster[b.id]))`（`useMemo`，依赖 breeds+roster）。首启 catalog 为空时 `breeds=[]`，列表呈现引导空态。
+- **插件来源的成员（2026-08-23，panels P3）**：插件启用时其 `breeds/*.json` 经 `SettingsStore.CreateBreed/UpdateBreed` 注册（`source='plugin'`，与 `/api/breeds` 同校验通道），随 catalog 出现在本列表；停用→`enabled=false`（定义保留），卸载→删除。生命周期归 `PluginsPanel`（`FT-PLUGIN-001`），本面板只呈现与编辑。
 - **`breedToSettingsMember` 投影**（核心映射）：
   - `id ← b.id`，`name←b.name`，`breed←b.display_name`，`color←b.color.primary`。
   - 取默认 variant：`variants.find(v => v.id===b.default_variant_id) ?? variants[0]`；从该 variant 取 `default_model / client_id / account_ref / provider / session_chain / cli.* / strategy / context_budget.* / mcp_support`。

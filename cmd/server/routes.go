@@ -17,19 +17,22 @@ import (
 	"sounds-great-ai/internal/config"
 	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
 	custodyServices "sounds-great-ai/internal/domains/custody/services"
+	threadPorts "sounds-great-ai/internal/domains/threads/ports"
+	threadStores "sounds-great-ai/internal/domains/threads/stores"
 	"sounds-great-ai/internal/hooks"
+	"sounds-great-ai/internal/marketplace"
 	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/memory"
 	"sounds-great-ai/internal/ops"
 	"sounds-great-ai/internal/packapi"
 	"sounds-great-ai/internal/platform"
+	"sounds-great-ai/internal/plugins"
 	"sounds-great-ai/internal/ragstore"
 	"sounds-great-ai/internal/settings"
+	"sounds-great-ai/internal/skills"
 	"sounds-great-ai/internal/sop"
 	"sounds-great-ai/internal/telemetry"
 	"sounds-great-ai/internal/threadstore"
-	threadPorts "sounds-great-ai/internal/domains/threads/ports"
-	threadStores "sounds-great-ai/internal/domains/threads/stores"
 	"sounds-great-ai/internal/transport"
 	"sounds-great-ai/pkg/pack"
 
@@ -72,6 +75,13 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 		}
 	})
 	mux.HandleFunc("GET /ws", wsHandler.HandleWS)
+
+	// Pending CVO escalations (G4): lets the frontend re-hydrate escalation
+	// cards after a page reload while the server keeps the ball parked.
+	mux.HandleFunc("GET /api/escalations", auth.WrapFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(wsHandler.PendingEscalations())
+	}))
 
 	settingsDir := settings.ConfigRoot(workspaceDir)
 	var settingsStore settings.SettingsStore
@@ -245,17 +255,34 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	notificationsHandler := transport.NewNotificationsHandler()
 	mux.Handle("/api/notifications", notificationsHandler.Routes())
 	mux.Handle("/api/notifications/", notificationsHandler.Routes())
+	// Mirror SendSystemNotice broadcasts into the notification center so the
+	// UI bell reads real data instead of an always-empty store.
+	wsHandler.SetNotificationsHandler(notificationsHandler)
 
 	filesHandler := transport.NewFilesHandler(workspaceDir)
 	mux.Handle("/api/files/", filesHandler.Routes())
 
-	panelsHandler := transport.NewPanelsHandler()
-	mux.Handle("/api/config/concierge", panelsHandler.Routes())
-	mux.Handle("/api/config/voice", panelsHandler.Routes())
-	mux.Handle("/api/config/connectors", panelsHandler.Routes())
-	mux.Handle("/api/plugins", panelsHandler.Routes())
-	mux.Handle("/api/plugins/", panelsHandler.Routes())
-	mux.Handle("/api/marketplace", panelsHandler.Routes())
+	panelsHandler := transport.NewPanelsHandler(settings.NewPanelConfigStore(settingsDir))
+	mux.Handle("/api/config/concierge", auth.Wrap(panelsHandler.Routes()))
+	mux.Handle("/api/config/voice", auth.Wrap(panelsHandler.Routes()))
+	mux.Handle("/api/config/connectors", auth.Wrap(panelsHandler.Routes()))
+	mux.Handle("/api/config/connectors/", auth.Wrap(panelsHandler.Routes()))
+
+	// Plugins (panels-roadmap P3): lifecycle over <ConfigRoot>/plugins with
+	// the skills-security gate on enable. Falls back to the stub-grade
+	// service when the platform (skills/store) is absent.
+	var pluginSkills *skills.SkillManager
+	var pluginStore settings.SettingsStore
+	if pl != nil {
+		pluginSkills = pl.Skills
+		pluginStore = pl.SettingsStore
+	}
+	pluginsHandler := transport.NewPluginsHandler(
+		plugins.NewService(settingsDir), pluginSkills, pluginStore,
+		marketplace.NewClient(os.Getenv("SG_MARKETPLACE_INDEX")))
+	mux.Handle("/api/plugins", auth.Wrap(pluginsHandler.Routes()))
+	mux.Handle("/api/plugins/", auth.Wrap(pluginsHandler.Routes()))
+	mux.Handle("/api/marketplace", auth.Wrap(pluginsHandler.Routes()))
 
 	if evalHandler != nil {
 		mux.Handle("/api/evals", evalHandler.Routes())
@@ -308,10 +335,11 @@ func BuildMuxWithHandler(wsHandler *transport.WSHandler, p *pack.Pack, pl *platf
 	mux.HandleFunc("GET /api/upgrade/info", auth.WrapFunc(UpgradeInfoHandler))
 	mux.HandleFunc("POST /api/upgrade", auth.WrapFunc(UpgradeHandler))
 
-	distDir := filepath.Join(workspaceDir, "web", "dist")
-	if _, err := os.Stat(distDir); err == nil {
-		mux.Handle("/", SPAHandler(distDir))
-	}
+	// SPAHandler resolves its own roots (disk dist / dist.old / embedded
+	// snapshot) and 404s cleanly when none is available, so it is registered
+	// unconditionally — a server started before any frontend build no longer
+	// needs a restart once dist appears.
+	mux.Handle("/", SPAHandler(workspaceDir))
 
 	return telemetry.TraceMiddleware(cors(mux))
 }
@@ -521,15 +549,15 @@ func QCStatusHandler(runner *sop.AutoRunner) http.HandlerFunc {
 		last, lastRun, lastErr := runner.Last()
 		state := sop.LoadQCState(runner.StatePath())
 		out := map[string]any{
-			"passed":              last.Passed,
-			"risk_tier":           last.RiskTier,
-			"stale":               last.Stale,
-			"reviewed_sha":        last.ReviewedSha,
-			"steps":               last.Steps,
-			"last_run":            lastRun.UTC().Format(time.RFC3339),
-			"last_error":          lastErr,
-			"state_phase":         state.Phase,
-			"state_reviewed_sha":  state.ReviewedSha,
+			"passed":             last.Passed,
+			"risk_tier":          last.RiskTier,
+			"stale":              last.Stale,
+			"reviewed_sha":       last.ReviewedSha,
+			"steps":              last.Steps,
+			"last_run":           lastRun.UTC().Format(time.RFC3339),
+			"last_error":         lastErr,
+			"state_phase":        state.Phase,
+			"state_reviewed_sha": state.ReviewedSha,
 		}
 		if agg, err := sop.AggregateQCMetrics(runner.MetricsPath()); err == nil {
 			out["aggregate"] = agg

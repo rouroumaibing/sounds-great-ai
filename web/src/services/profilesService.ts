@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, ApiError } from '../services/http';
+import { apiGet, apiPost, apiPut, apiDelete, ApiError } from '../services/http';
 import type {
   CapsuleSummary,
   RelationshipCapsule,
@@ -59,4 +59,18 @@ export async function distillAgent(
 
 export async function upsertCapsule(key: string, body: string, ownerDog = 'operator'): Promise<RelationshipCapsule> {
   return apiPut<RelationshipCapsule>(`/api/profiles/${enc(key)}`, { body, owner_dog: ownerDog });
+}
+
+// Propose submits a candidate capsule as a pending proposal (approval flow).
+// The active capsule is untouched until the operator approves.
+export async function proposeCapsule(
+  key: string,
+  body: string,
+  ownerDog = 'operator',
+): Promise<{ status: string; relationship_key: string }> {
+  return apiPost(`/api/profiles/${enc(key)}/propose`, { body, owner_dog: ownerDog });
+}
+
+export async function deleteCapsule(key: string): Promise<void> {
+  await apiDelete(`/api/profiles/${enc(key)}`);
 }

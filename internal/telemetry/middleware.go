@@ -32,6 +32,16 @@ func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return hj.Hijack()
 }
 
+// Flush implements http.Flusher, delegating to the underlying ResponseWriter.
+// Required for SSE endpoints (e.g. /api/people-memory/events) to stream
+// through TraceMiddleware — without it every Flusher type assertion on the
+// wrapped writer fails and the endpoint 500s with "streaming unsupported".
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 func statusStr(code int) string {
 	if code >= 400 {
 		return "error"

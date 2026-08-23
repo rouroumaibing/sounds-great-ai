@@ -99,6 +99,21 @@ export class WsManager {
     }));
   }
 
+  // sendEscalationResponse answers a CVO_ESCALATION with the operator's
+  // decision (an option id, or "intervene" for a custom directive).
+  sendEscalationResponse(escalationId: string, decision: string, sessionId: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('[WS] Cannot send CVO_ESCALATION_RESPONSE — WebSocket not open');
+      return;
+    }
+    this.ws.send(JSON.stringify({
+      type: 'CVO_ESCALATION_RESPONSE',
+      session_id: sessionId,
+      timestamp: 0,
+      payload: { session_id: sessionId, escalation_id: escalationId, decision },
+    }));
+  }
+
   // sendWakeHold releases a parked hold_ball manually (human click). The server
   // re-dispatches the holder via ResumeHeldThread (transport/ws_handler.go).
   sendWakeHold(sessionId: string, kind: string, token?: string): void {

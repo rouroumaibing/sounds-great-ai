@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiDelete } from './http';
+import { apiGet, apiPost, apiPatch, apiDelete } from './http';
 import type { Thread, StreamEvent } from '../types';
 
 export const threadService = {
@@ -9,6 +9,11 @@ export const threadService = {
 
   async createThread(title: string): Promise<Thread> {
     return apiPost<Thread>('/api/threads', { title });
+  },
+
+  // Rename a thread (PATCH /api/threads/{id}, title 1-200 chars).
+  async renameThread(id: string, title: string): Promise<{ id: string; title: string }> {
+    return apiPatch<{ id: string; title: string }>(`/api/threads/${id}`, { title });
   },
 
   async deleteThread(id: string): Promise<void> {

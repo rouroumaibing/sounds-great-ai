@@ -1,5 +1,7 @@
-// Navigation types
-export type PrimaryNavType = 'threads' | 'tasks' | 'memory' | 'settings' | 'about' | 'custody' | 'profiles' | 'people';
+// Navigation types. 'tasks' was removed: the backend never produces
+// taskPlanSteps, so the top-level entry was a dead view. The honest
+// per-thread plan surface remains the drawer's plan tab.
+export type PrimaryNavType = 'threads' | 'memory' | 'settings' | 'about' | 'custody' | 'profiles' | 'people';
 export type SettingsTabType = 'members' | 'accounts' | 'personas' | 'im' | 'skills' | 'mcp' | 'plugins' | 'market' | 'marketplace' | 'ball' | 'concierge' | 'voice' | 'config' | 'rules' | 'notifications' | 'system' | 'ops' | 'eval' | 'dossier' | 'about';
 export type DrawerTabType = 'plan' | 'mcp' | 'memory' | 'files' | 'session-chain' | 'sop';
 export type ThreadFilterType = 'all' | 'escalated' | 'active';
@@ -54,12 +56,17 @@ export interface SopGateEvent {
 
 export interface EscalationOption {
   id: string;
-  label: string;
+  label?: string;
+  prompt?: string;
 }
 
 export interface CvoEscalationEvent {
   type: 'cvo_escalation';
+  threadId?: string;
+  escalationId?: string;
+  reason?: string;
   escalationTitle?: string;
+  maxDepth?: number;
   options?: EscalationOption[];
 }
 

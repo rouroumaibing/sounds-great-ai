@@ -234,6 +234,30 @@ export interface SopGatePayload {
   blocked?: boolean;
 }
 
+// CVO escalation (G4): pushed when the A2A depth hard rail parks the ball
+// with the operator; answered via CVO_ESCALATION_RESPONSE. Option labels are
+// localized client-side by option id — only semantic ids cross the wire.
+export interface CvoEscalationOptionPayload {
+  id: string;
+  prompt: string;
+}
+
+export interface CvoEscalationPayload {
+  escalation_id: string;
+  reason: string;
+  max_depth?: number;
+  from_breed?: string;
+  to_breed?: string;
+  options: CvoEscalationOptionPayload[];
+}
+
+// --- CVO_ESCALATION_RESPONSE (client → server) ---
+export interface CvoEscalationResponsePayload {
+  session_id: string;
+  escalation_id: string;
+  decision: string; // option id or "intervene"
+}
+
 export interface BarkRejectedPayload {
   reason: string;
   max: number;

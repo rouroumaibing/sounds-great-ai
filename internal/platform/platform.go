@@ -25,6 +25,7 @@ import (
 	"sounds-great-ai/internal/hooks"
 	"sounds-great-ai/internal/mcp"
 	"sounds-great-ai/internal/memory"
+	"sounds-great-ai/internal/plugins"
 	"sounds-great-ai/internal/prompt"
 	"sounds-great-ai/internal/ragstore"
 	"sounds-great-ai/internal/settings"
@@ -330,6 +331,12 @@ func New(cfg Config) (*Platform, error) {
 	homeCfg := filepath.Join(homeDir, ".sounds-great-ai", "skills-config.json")
 	projCfg := filepath.Join(cfg.WorkspaceDir, ".sounds-great-ai", "skills-config.json")
 	skillMgr := skills.NewManagerWithConfig(homeCfg, projCfg, map[string]string{cfg.SkillsDir: "packs"})
+	// Plugins P3: re-mount enabled plugins' skills sources after restart so
+	// their (already approved) skills keep injecting without a re-enable.
+	pluginSvc := plugins.NewService(settings.ConfigRoot(cfg.WorkspaceDir))
+	for _, pid := range pluginSvc.EnabledPlugins() {
+		skillMgr.AddSource(pluginSvc.SkillsDir(pid), "plugin")
+	}
 	_ = skillMgr.Config().Load() // best effort
 	_ = skillMgr.Scan()          // best effort
 	// G1：接线上 skills-config.json 热加载——外部进程编辑后自动刷新内存态

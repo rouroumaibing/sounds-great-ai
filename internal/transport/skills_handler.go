@@ -72,17 +72,26 @@ func (h *SkillsHandler) toItem(s *skills.Skill) skillListItem {
 	it := h.mgr.IntentOf(s.ID)
 	enabled := it != nil && it.Enabled
 	scope := ""
-	var mps []string
+	// 序列化契约：triggers / mountPoints 永远是数组。nil slice 会被编成
+	// null，前端 SkillsPanel 直接对这两个字段调 .map/.includes，一个刚清空
+	// 配置（全部 intent 缺失）的工作区会把整个设置面板打进 ErrorBoundary。
+	mps := []string{}
 	if it != nil {
 		scope = it.Scope
-		mps = it.MountPoints
+		if it.MountPoints != nil {
+			mps = it.MountPoints
+		}
+	}
+	triggers := s.AllTriggers()
+	if triggers == nil {
+		triggers = []string{}
 	}
 	return skillListItem{
 		ID:          s.ID,
 		Name:        s.Name,
 		Description: s.Description,
 		Category:    s.Category,
-		Triggers:    s.AllTriggers(),
+		Triggers:    triggers,
 		Source:      s.Source,
 		Enabled:     enabled,
 		Scope:       scope,

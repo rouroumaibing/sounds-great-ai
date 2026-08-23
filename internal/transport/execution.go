@@ -10,15 +10,15 @@ import (
 	"time"
 
 	"sounds-great-ai/internal/a2a"
+	agentsPorts "sounds-great-ai/internal/domains/agents/ports"
+	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
+	routingPorts "sounds-great-ai/internal/domains/routing/ports"
+	sopPorts "sounds-great-ai/internal/domains/sop/ports"
+	threadPorts "sounds-great-ai/internal/domains/threads/ports"
+	"sounds-great-ai/internal/memory"
+	"sounds-great-ai/internal/platform"
 	"sounds-great-ai/internal/prompt"
 	"sounds-great-ai/internal/telemetry"
-	threadPorts "sounds-great-ai/internal/domains/threads/ports"
-	custodyPorts "sounds-great-ai/internal/domains/custody/ports"
-	agentsPorts "sounds-great-ai/internal/domains/agents/ports"
-	sopPorts "sounds-great-ai/internal/domains/sop/ports"
-	routingPorts "sounds-great-ai/internal/domains/routing/ports"
-	"sounds-great-ai/internal/platform"
-	"sounds-great-ai/internal/memory"
 	"sounds-great-ai/pkg/protocol"
 
 	"github.com/cloudwego/eino/schema"
@@ -320,16 +320,16 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 	}
 
 	req := agentsPorts.ExecuteRequest{
-		ClientID:             variant.ClientID,
-		Messages:             messages,
-		SystemPrompt:         systemPrompt,
-		SystemPromptL0:       systemPromptL0,
-		Model:                variant.DefaultModel,
-		WorkDir:              h.platform.WorkspaceDir,
-		MCPConfig:            h.platform.BuildMCPConfig(),
-		ThreadID:             sessionID,
-		SessionID:            sessionID,
-		Context:              ctx,
+		ClientID:              variant.ClientID,
+		Messages:              messages,
+		SystemPrompt:          systemPrompt,
+		SystemPromptL0:        systemPromptL0,
+		Model:                 variant.DefaultModel,
+		WorkDir:               h.platform.WorkspaceDir,
+		MCPConfig:             h.platform.BuildMCPConfig(),
+		ThreadID:              sessionID,
+		SessionID:             sessionID,
+		Context:               ctx,
 		AutoCompactTokenLimit: compactBudget,
 	}
 
@@ -434,7 +434,7 @@ func (h *WSHandler) executeWithPlatform(ctx context.Context, breedID, sessionID,
 			s := telemetry.Span{
 				Name: "breed.execute", StartTime: execStart, EndTime: time.Now(),
 				Attributes: map[string]any{"breed": breedID, "duration": duration.Milliseconds()},
-				Status: "ok",
+				Status:     "ok",
 			}
 			if r := telemetry.RedactorInstance(); r != nil {
 				r.RedactSpan(&s)
@@ -765,16 +765,16 @@ func (h *WSHandler) executeParallel(ctx context.Context, breedIDs []string, sess
 			}
 			systemPrompt, systemPromptL0 := h.injectHooks(systemPrompt, bid, breed.DisplayName, breed.RoleDescription, breed.Personality, query, sessionID)
 			req := agentsPorts.ExecuteRequest{
-				ClientID:             variant.ClientID,
-				Messages:             sharedSchemaMsgs,
-				SystemPrompt:         systemPrompt,
-				SystemPromptL0:       systemPromptL0,
-				Model:                variant.DefaultModel,
-				WorkDir:              h.platform.WorkspaceDir,
-				MCPConfig:            h.platform.BuildMCPConfig(),
-				ThreadID:             sessionID,
-				SessionID:            sessionID,
-				Context:              ctx,
+				ClientID:              variant.ClientID,
+				Messages:              sharedSchemaMsgs,
+				SystemPrompt:          systemPrompt,
+				SystemPromptL0:        systemPromptL0,
+				Model:                 variant.DefaultModel,
+				WorkDir:               h.platform.WorkspaceDir,
+				MCPConfig:             h.platform.BuildMCPConfig(),
+				ThreadID:              sessionID,
+				SessionID:             sessionID,
+				Context:               ctx,
 				AutoCompactTokenLimit: compactBudget,
 			}
 			eventCh, err := h.platform.AgentExecutor.Execute(ctx, req)
@@ -888,6 +888,8 @@ func (h *WSHandler) handleA2AHandoff(ctx context.Context, thread *a2a.Thread, fr
 			})
 		})
 		h.SendSystemNotice("warn", "已上报 CVO", "A2A 深度超限，已将球权上交运营/主管处理。")
+		h.emitCvoEscalation(sessionID, fromBreed, toBreed,
+			fmt.Sprintf("A2A 交接链深度超限（%s → %s），链条已熔断。", fromBreed, toBreed))
 		return
 	}
 	// Enforce the cross-model review invariant: a dog may not hand its own

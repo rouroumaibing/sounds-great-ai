@@ -336,3 +336,12 @@ func (s *RecallStore) Count() int {
 	_ = s.db.QueryRow("SELECT COUNT(*) FROM recall_entry").Scan(&n)
 	return n
 }
+
+// Close releases the backing SQLite connection (fail-open: a nil store is a
+// no-op, matching NewRecallStore's degraded mode).
+func (s *RecallStore) Close() {
+	if s.db != nil {
+		s.db.Close()
+		s.db = nil
+	}
+}

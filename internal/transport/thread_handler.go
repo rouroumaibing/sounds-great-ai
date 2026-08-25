@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"sounds-great-ai/internal/domains/threads"
 	threadPorts "sounds-great-ai/internal/domains/threads/ports"
 )
 
@@ -16,6 +17,7 @@ import (
 type ThreadHandler struct {
 	store        threadPorts.IThreadStore
 	messageStore threadPorts.IMessageStore // optional, nil = message endpoints disabled
+	inbox        *threads.Inbox            // optional, nil = delivery-status endpoints disabled
 }
 
 // NewThreadHandler creates a new ThreadHandler.
@@ -26,6 +28,13 @@ func NewThreadHandler(store threadPorts.IThreadStore) *ThreadHandler {
 // NewThreadHandlerWithMessages creates a ThreadHandler with message store support.
 func NewThreadHandlerWithMessages(store threadPorts.IThreadStore, ms threadPorts.IMessageStore) *ThreadHandler {
 	return &ThreadHandler{store: store, messageStore: ms}
+}
+
+// NewThreadHandlerWithInbox creates a ThreadHandler with delivery-status (inbox)
+// support layered on top of the thread store. The inbox powers the message /
+// delivery / branch read-model (README 十大缺口 #1).
+func NewThreadHandlerWithInbox(store threadPorts.IThreadStore, inbox *threads.Inbox) *ThreadHandler {
+	return &ThreadHandler{store: store, inbox: inbox}
 }
 
 // Routes returns the HTTP routes for threads + sessions + messages.
@@ -41,6 +50,10 @@ func (h *ThreadHandler) Routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/threads/{id}/events", h.AddThreadEvent)
 	mux.HandleFunc("GET /api/threads/{id}/sessions", h.ListSessions)
 	mux.HandleFunc("POST /api/sessions/{id}/unseal", h.UnsealSession)
+	// Delivery-status (inbox) endpoints — P0-1 message/delivery substrate.
+	mux.HandleFunc("GET /api/threads/{id}/inbox", h.GetInbox)
+	mux.HandleFunc("POST /api/threads/{id}/inbox", h.ReceiveInboxMessage)
+	mux.HandleFunc("PUT /api/threads/{id}/messages/{mid}/delivery", h.SetDeliveryStatus)
 	return mux
 }
 
@@ -252,6 +265,89 @@ func (h *ThreadHandler) AddThreadEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusCreated, map[string]bool{"ok": true})
+}
+
+// GetInbox handles GET /api/threads/{id}/inbox — list a thread's messages with
+// their delivery status (the inbox read-model). Disabled when no inbox is wired.
+func (h *ThreadHandler) GetInbox(w http.ResponseWriter, r *http.Request) {
+	if h.inbox == nil {
+		respondJSON(w, http.StatusNotImplemented, map[string]string{"error": "inbox not configured"})
+		return
+	}
+	threadID := r.PathValue("id")
+	msgs := h.inbox.MessagesForThread(threadID, false)
+	respondJSON(w, http.StatusOK, map[string]any{"messages": msgs})
+}
+
+// ReceiveInboxMessage handles POST /api/threads/{id}/inbox — receive a message
+// into the inbox. Idempotent on message_id: re-receiving the same id is a no-op
+// (returns the existing record with 200 and "idempotent": true).
+func (h *ThreadHandler) ReceiveInboxMessage(w http.ResponseWriter, r *http.Request) {
+	if h.inbox == nil {
+		respondJSON(w, http.StatusNotImplemented, map[string]string{"error": "inbox not configured"})
+		return
+	}
+	threadID := r.PathValue("id")
+	var body struct {
+		ID      string `json:"id"`
+		Sender  string `json:"sender"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	if body.ID == "" {
+		body.ID = uuid.NewString()
+	}
+	if strings.TrimSpace(body.Content) == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "content is required"})
+		return
+	}
+	msg := threads.InboxMessage{
+		ID:       body.ID,
+		ThreadID: threadID,
+		Sender:   body.Sender,
+		Content:  body.Content,
+	}
+	already, err := h.inbox.Receive(msg)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	got, _ := h.inbox.Get(body.ID)
+	respondJSON(w, http.StatusOK, map[string]any{"idempotent": already, "message": got})
+}
+
+// SetDeliveryStatus handles PUT /api/threads/{id}/messages/{mid}/delivery —
+// transition a message's delivery status. Enforces the delivery state machine,
+// so e.g. re-delivering a canceled message is rejected (409).
+func (h *ThreadHandler) SetDeliveryStatus(w http.ResponseWriter, r *http.Request) {
+	if h.inbox == nil {
+		respondJSON(w, http.StatusNotImplemented, map[string]string{"error": "inbox not configured"})
+		return
+	}
+	mid := r.PathValue("mid")
+	var body struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	status := threads.DeliveryStatus(body.Status)
+	if _, ok := h.inbox.Get(mid); !ok {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "unknown message_id"})
+		return
+	}
+	if err := h.inbox.SetDeliveryStatus(mid, status); err != nil {
+		// SetDeliveryStatus enforces the state machine, so any error here is an
+		// illegal transition (e.g. re-delivering a canceled message).
+		respondJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+		return
+	}
+	got, _ := h.inbox.Get(mid)
+	respondJSON(w, http.StatusOK, map[string]any{"message": got})
 }
 
 func respondJSON(w http.ResponseWriter, code int, data any) {

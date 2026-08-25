@@ -132,3 +132,21 @@ func parseGeminiEvent(obj map[string]any) unified.StreamEvent {
 		return unified.StreamEvent{Type: "text", Meta: obj}
 	}
 }
+
+// ACPToolResult is the ACP provider's tool_result message shape (F197).
+type ACPToolResult struct {
+	ToolID  string `json:"tool_id"`
+	Content string `json:"content"`
+}
+
+// TransformACPToolResult converts an ACP provider tool_result into SG's unified
+// StreamEvent (F197: Gemini-on-ACP transformer). The L0/compression-immune
+// channel forwards tool results verbatim so the orchestration can join them
+// back into the conversation.
+func TransformACPToolResult(r ACPToolResult) unified.StreamEvent {
+	return unified.StreamEvent{
+		Type:    "tool_result",
+		Content: r.Content,
+		Meta:    map[string]any{"tool_id": r.ToolID, "source": "acp"},
+	}
+}

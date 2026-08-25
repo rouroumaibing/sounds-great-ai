@@ -14,6 +14,9 @@ import (
 // the registered CLI adapter and delegates invocation through it.
 type AgentExecutorService struct {
 	adapters map[string]unified.AgentExecutor
+	// avail, when set, gates execution on member availability. A disabled member
+	// fails closed with CatRoutingError (F182 disable-impact). Nil = unchecked.
+	avail AvailabilityChecker
 }
 
 // NewAgentExecutor wraps a map of CLI adapters (keyed by CLI name) behind the
@@ -22,9 +25,20 @@ func NewAgentExecutor(adapters map[string]unified.AgentExecutor) *AgentExecutorS
 	return &AgentExecutorService{adapters: adapters}
 }
 
+// SetAvailabilityChecker installs a member-availability gate (F182). Until set,
+// execution is not availability-checked (backward compatible).
+func (s *AgentExecutorService) SetAvailabilityChecker(a AvailabilityChecker) {
+	s.avail = a
+}
+
 // Execute resolves req.ClientID to the underlying adapter and delegates. The
-// caller's context (req.Context, falling back to ctx) drives tracing.
+// caller's context (req.Context, falling back to ctx) drives tracing. If a
+// member-availability checker is installed and the target member is disabled,
+// execution fails closed with CatRoutingError (F182).
 func (s *AgentExecutorService) Execute(ctx context.Context, req agentsPorts.ExecuteRequest) (<-chan agentsPorts.StreamEvent, error) {
+	if s.avail != nil && !s.avail.Enabled(req.ClientID) {
+		return nil, &CatRoutingError{DogID: req.ClientID, Reason: "member disabled"}
+	}
 	a, err := s.Get(req.ClientID)
 	if err != nil {
 		return nil, err

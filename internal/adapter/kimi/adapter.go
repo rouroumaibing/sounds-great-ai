@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -46,8 +47,24 @@ func (a *Adapter) Capabilities() unified.AgentCapabilities {
 		SupportsTools:    true,
 		SupportsFileOps:  true,
 		OutputFormat:     "stream-json",
-		SupportsNativeL0: false, // no native L0 flag wired in this adapter (R9: explicit)
+		// F274: Kimi exposes a native L0 channel via --agent-file (compression-immune).
+		SupportsNativeL0: true,
 	}
+}
+
+// l0FileWriter writes L0 content to a file and returns the path. Injected for
+// testability; production uses os.CreateTemp so no secret is passed on the CLI.
+var l0FileWriter = func(content string) (string, error) {
+	f, err := os.CreateTemp("", "kimi-l0-*.md")
+	if err != nil {
+		return "", err
+	}
+	if _, err := f.WriteString(content); err != nil {
+		f.Close()
+		return "", err
+	}
+	f.Close()
+	return f.Name(), nil
 }
 
 func (a *Adapter) Health(ctx context.Context) error {
@@ -59,7 +76,7 @@ func (a *Adapter) Execute(ctx context.Context, req unified.ExecuteRequest) (<-ch
 	if a.pm == nil {
 		return nil, fmt.Errorf("process manager not configured")
 	}
-	args := a.buildArgs(req.Model, req.WorkDir, a.buildPrompt(req))
+	args := a.buildArgs(req.Model, req.WorkDir, a.buildPrompt(req), req.SystemPromptL0)
 	if a.registry != nil {
 		// R1: same-invocation mid-stream fallback across the carrier's
 		// transport chain. On a fatal mid-stream error the current tier's
@@ -81,7 +98,7 @@ func (a *Adapter) Execute(ctx context.Context, req unified.ExecuteRequest) (<-ch
 	return a.streamEvents(handle), nil
 }
 
-func (a *Adapter) buildArgs(model, workDir, prompt string) []string {
+func (a *Adapter) buildArgs(model, workDir, prompt, l0 string) []string {
 	args := []string{"-p", prompt}
 	if model != "" {
 		args = append(args, "--model", model)
@@ -90,6 +107,12 @@ func (a *Adapter) buildArgs(model, workDir, prompt string) []string {
 		args = append(args, "--cwd", workDir)
 	}
 	args = append(args, "--output-format", "stream-json")
+	// F274: native L0 channel via --agent-file when an L0 prompt is present.
+	if l0 != "" {
+		if p, err := l0FileWriter(l0); err == nil {
+			args = append(args, "--agent-file", p)
+		}
+	}
 	return args
 }
 

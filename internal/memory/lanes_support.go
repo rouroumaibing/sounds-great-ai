@@ -184,6 +184,9 @@ func (r *LaneRegistry) flush() {
 
 // Close releases the persistent store (if any).
 func (r *LaneRegistry) Close() {
+	if r.events != nil {
+		r.events.close()
+	}
 	if r.vector != nil {
 		r.vector.close()
 	}

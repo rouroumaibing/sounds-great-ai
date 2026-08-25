@@ -24,6 +24,14 @@ type ApprovalItem struct {
 	Payload   map[string]any         `json:"payload,omitempty"`
 	CreatedAt time.Time              `json:"created_at"`
 	ResolvedAt *time.Time            `json:"resolved_at,omitempty"`
+
+	// RequestAnchor is the audit hash captured at submit time (F246 dual-anchor).
+	RequestAnchor string `json:"request_anchor,omitempty"`
+	// DecisionAnchor is the audit hash captured at resolve time (F246 dual-anchor).
+	DecisionAnchor string `json:"decision_anchor,omitempty"`
+	// RejectionReason carries the operator's rationale back to the requester on
+	// a reject decision (F281 backflow).
+	RejectionReason string `json:"rejection_reason,omitempty"`
 }
 
 // IApprovalAdapter is the port for approval adapters (per-feature).

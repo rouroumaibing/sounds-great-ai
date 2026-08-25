@@ -441,13 +441,17 @@ func New(cfg Config) (*Platform, error) {
 	resolvers["SkillTriggerResolver"] = &hooks.SkillTriggerResolver{Skills: skillMgr}
 	hookPipeline := hooks.NewPipeline(hookReg, resolvers)
 
-	// Initialize hook trace store (graceful degradation on failure)
+	// Initialize hook trace store under the workspace data/ directory
+	// (graceful degradation on failure; data/ is the project's runtime data root).
 	var hookTraceStore *hooks.TraceStore
-	traceDBPath := filepath.Join(cfg.WorkspaceDir, "hooks_trace.db")
-	hookTraceStore, err = hooks.NewTraceStore(traceDBPath)
-	if err != nil {
-		log.Printf("Warning: hook trace store init failed: %v", err)
+	traceDBPath := filepath.Join(cfg.WorkspaceDir, "data", "hooks_trace.db")
+	if mkErr := os.MkdirAll(filepath.Dir(traceDBPath), 0o755); mkErr != nil {
+		log.Printf("Warning: hook trace data dir unavailable: %v", mkErr)
+	} else if ts, openErr := hooks.NewTraceStore(traceDBPath); openErr != nil {
+		log.Printf("Warning: hook trace store init failed: %v", openErr)
 		hookTraceStore = nil // continue without tracing
+	} else {
+		hookTraceStore = ts
 	}
 	messageStore, err := threadstore.NewMessageStore(threadstore.StoreConfig{
 		SQLitePath: cfg.SQLitePath,

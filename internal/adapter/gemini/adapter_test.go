@@ -203,3 +203,18 @@ func TestParseGeminiEvent(t *testing.T) {
 		})
 	}
 }
+
+// --- F197: Gemini-on-ACP transformer (tool_result) ---
+
+func TestTransformACPToolResult(t *testing.T) {
+	evt := TransformACPToolResult(ACPToolResult{ToolID: "t1", Content: "the file contents"})
+	if evt.Type != "tool_result" {
+		t.Fatalf("expected tool_result event, got %s", evt.Type)
+	}
+	if evt.Content != "the file contents" {
+		t.Fatalf("content not forwarded: %q", evt.Content)
+	}
+	if evt.Meta["tool_id"] != "t1" || evt.Meta["source"] != "acp" {
+		t.Fatalf("meta wrong: %+v", evt.Meta)
+	}
+}

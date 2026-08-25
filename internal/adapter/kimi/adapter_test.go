@@ -87,3 +87,41 @@ func parseSample(s string) <-chan unified.StreamEvent {
 	a := &Adapter{}
 	return a.streamEvents(&unified.SpawnHandle{Stdout: strings.NewReader(s)})
 }
+
+// --- F274: Kimi native L0 channel (--agent-file) ---
+
+func TestKimi_NativeL0Channel(t *testing.T) {
+	// Override the file writer so the test is hermetic (no real temp files).
+	old := l0FileWriter
+	defer func() { l0FileWriter = old }()
+	l0FileWriter = func(content string) (string, error) { return "/tmp/fake-kimi-l0.md", nil }
+
+	a := &Adapter{}
+	withL0 := a.buildArgs("m1", "", "prompt", "native L0 system prompt")
+	if !containsArg(withL0, "--agent-file") {
+		t.Fatalf("native L0 must append --agent-file, got %v", withL0)
+	}
+	// Without L0, no --agent-file flag is emitted.
+	withoutL0 := a.buildArgs("m1", "", "prompt", "")
+	for _, arg := range withoutL0 {
+		if arg == "--agent-file" {
+			t.Fatalf("L0-absent build must not emit --agent-file, got %v", withoutL0)
+		}
+	}
+}
+
+func TestKimi_SupportsNativeL0(t *testing.T) {
+	a := &Adapter{}
+	if !a.Capabilities().SupportsNativeL0 {
+		t.Fatal("Kimi adapter must advertise SupportsNativeL0 (F274)")
+	}
+}
+
+func containsArg(args []string, want string) bool {
+	for _, a := range args {
+		if a == want {
+			return true
+		}
+	}
+	return false
+}
